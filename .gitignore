@@ -1,0 +1,53 @@
+# Dependencies
+node_modules
+
+# Next.js
+.next
+out
+
+# Build outputs
+dist
+build
+
+# Environment files
+.env
+.env.*
+.env.local
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# TypeScript cache
+*.tsbuildinfo
+
+# Vercel
+.vercel
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# VSCode
+.vscode/*
+!.vscode/extensions.json
+!.vscode/settings.json
+
+# Temporary/debug
+tmp
+temp
+debug
+public/arc-identity/
+coverage
+playwright-report
+test-results
+
+# Local database/cache
+*.sqlite
+*.db
+
+# Misc
+.cache

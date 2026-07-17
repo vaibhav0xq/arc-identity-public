@@ -18,7 +18,7 @@ function publicEnsureError(message: string) {
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const profile = await ensureWalletProfile(body.walletAddress, body.signature);
+    const profile = await ensureWalletProfile(body.walletAddress, body.signature, body.signatureMessage);
     const username = profile?.username ?? null;
     console.log("[arc-identity] ensure_lookup_result", {
       wallet: body.walletAddress,

@@ -155,7 +155,7 @@ async function fetchJson<T>(url: string, timeoutMs: number): Promise<T> {
 }
 
 export function scoreOnchainActivity(txCount: number, recentActivityCount = 0, activeDays = 0) {
-  const base = txCount === 0 ? 5 : txCount <= 2 ? 20 : txCount <= 8 ? 45 : txCount <= 25 ? 70 : 90;
+  const base = txCount === 0 ? 0 : txCount <= 2 ? 20 : txCount <= 8 ? 45 : txCount <= 25 ? 70 : 90;
   return Math.max(0, Math.min(100, Math.round(base + Math.min(recentActivityCount, 10) * 2 + Math.min(activeDays, 14))));
 }
 
@@ -664,3 +664,4 @@ export async function verifyArcTransaction(input: {
     throw normalized;
   }
 }
+

@@ -72,7 +72,8 @@ function readInitialRevealContext(): RevealContext {
 }
 
 function scoreFor(score: ScoreLookupResponse | null) {
-  return Math.max(35, Math.round(Number(score?.arcIdentityScore ?? 35)));
+  const value = Number(score?.arcIdentityScore ?? 0);
+  return Number.isFinite(value) ? Math.max(0, Math.min(100, Math.round(value))) : 0;
 }
 
 function indexedChainsFor(score: ScoreLookupResponse | null) {
@@ -114,6 +115,7 @@ export default function IdentityCreatedPage() {
     const reveal = getPostClaimRevealContext();
     const wallet = reveal?.wallet ?? "";
     const signature = localStorage.getItem("arcIdentitySignature") || "";
+    const signatureMessage = localStorage.getItem("arcIdentitySignatureMessage") || "";
     const initialUsername = reveal?.username ?? null;
     const initialProfileUrl = reveal?.profileUrl ?? (initialUsername ? profileRouteFor(initialUsername) : null);
 
@@ -134,11 +136,11 @@ export default function IdentityCreatedPage() {
       let nextUsername = initialUsername;
       let nextScore: ScoreLookupResponse | null = null;
 
-      const ensurePromise = wallet && signature
+      const ensurePromise = wallet && signature && signatureMessage
         ? fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-            body: JSON.stringify({ walletAddress: wallet, signature })
+            body: JSON.stringify({ walletAddress: wallet, signature, signatureMessage })
           }, 3000).catch(() => null)
         : Promise.resolve(null);
 
@@ -177,7 +179,7 @@ export default function IdentityCreatedPage() {
   const displayUsername = resolvedUsername ?? "your ARC Identity";
   const displayWallet = resolvedWallet ? shortenAddress(resolvedWallet) : "Verified wallet";
   const arcScore = scoreFor(score);
-  const riskLevel = score?.riskLevel ?? "New / Unproven";
+  const riskLevel = score?.riskLevel ?? "High Risk";
   const walletAge = ageFor(score);
   const txCount = txCountFor(score);
   const chainsIndexed = indexedChainsFor(score);
@@ -319,3 +321,4 @@ export default function IdentityCreatedPage() {
     </ArcShell>
   );
 }
+

@@ -7,6 +7,7 @@ import { unstable_noStore as noStore } from "next/cache";
 import { ArcShell } from "@/components/ArcShell";
 import { ChainCoverageExplorer } from "@/components/ChainCoverageExplorer";
 import { DecisionPanel } from "@/components/DecisionPanel";
+import { ExplainableReputationCard } from "@/components/ExplainableReputationCard";
 import { OnchainActivityCard } from "@/components/OnchainActivityCard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { TrustGraphCard } from "@/components/TrustGraphCard";
@@ -14,6 +15,7 @@ import { TrustNetwork } from "@/components/TrustNetwork";
 import { getIdentityByUsername, listAttestations, listReputationEvents, listTrustConnections } from "@/lib/db";
 import { getArcLiveWalletData } from "@/lib/onchain";
 import { getBadge, getRecommendedAction } from "@/lib/score";
+import { buildExplainableReputation, reputationInputFromIdentity } from "@/lib/explainable-reputation";
 import { buildScoreExplanations } from "@/lib/score-explanations";
 import { getTrustGraph } from "@/lib/trust-graph";
 import { maybeArcUsername } from "@/lib/username";
@@ -69,6 +71,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
   ]);
   const explorer = process.env.NEXT_PUBLIC_ARC_EXPLORER_URL;
   const explanations = buildScoreExplanations(identity);
+  const explainableReputation = buildExplainableReputation(reputationInputFromIdentity(identity, attestations));
   const arcChain = identity.multiChain?.chains.find((chain) => chain.chain.toLowerCase().includes("arc")) ?? null;
 
   return (
@@ -104,6 +107,11 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
           {explorer ? <Link href={`${explorer.replace(/\/$/, "")}/address/${identity.profile.walletAddress}`} className="mt-4 inline-flex w-full justify-center rounded border border-white/10 px-4 py-3 font-bold text-white transition hover:bg-white/10 sm:w-auto">View on ArcScan</Link> : null}
         </div>
         <div className="grid min-w-0 gap-7">
+          <ExplainableReputationCard
+            wallet={identity.profile.walletAddress}
+            arcId={identity.profile.username}
+            initialReputation={explainableReputation}
+          />
           <section className="arc-surface rounded-2xl p-5 sm:p-7">
             <p className="text-sm uppercase tracking-[0.22em] text-emerald-200">Wallet intelligence context</p>
             <p className="mt-2 text-sm leading-6 text-slate-400">Global wallet intelligence provides maturity and coverage context. Arc-native activity, verified attestations, and trust graph strength drive ARC Score.</p>

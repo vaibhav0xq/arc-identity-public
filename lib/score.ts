@@ -141,8 +141,8 @@ export function buildArcScore(profile: Profile, input: {
     return {
       score: {
         walletAddress: profile.walletAddress,
-        arcScore: 35,
-        riskLevel: "New / Unproven",
+        arcScore: 0,
+        riskLevel: "High Risk",
         activityScore: 0,
         longevityScore: 0,
         counterpartyDiversityScore: 0,
@@ -188,3 +188,4 @@ export function buildArcScore(profile: Profile, input: {
     activityLevel: getActivityLevel(snapshot)
   };
 }
+

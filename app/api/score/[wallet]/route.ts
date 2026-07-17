@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { getCanonicalWalletSnapshot } from "@/lib/canonical-snapshot";
-import { getIdentityByWallet, normalizeWallet } from "@/lib/db";
+import { getIdentityByWallet, listAttestations, normalizeWallet } from "@/lib/db";
+import { baselineExplainableReputation, buildExplainableReputation, reputationInputFromIdentity } from "@/lib/explainable-reputation";
 import { isRefreshInProgress, runWalletRefresh, triggerWalletRefresh } from "@/lib/score-refresh";
 import { getBadge, getDecisionRecommendations, getRecommendedAction, getRiskLevel } from "@/lib/score";
 import { buildScoreExplanations } from "@/lib/score-explanations";
@@ -55,6 +56,7 @@ function refreshMeta(job: WalletRefreshJob | null | undefined, refreshInProgress
 function baselineResponse(walletAddress: string, refreshInProgress: boolean) {
   const wallet = normalizeWallet(walletAddress);
   const components = scoreComponentsFromIdentity(null);
+  const reputation = baselineExplainableReputation(wallet);
   return {
     walletAddress: wallet,
     username: null,
@@ -68,7 +70,7 @@ function baselineResponse(walletAddress: string, refreshInProgress: boolean) {
     activeChains: [],
     totalTxCount: 0,
     arcTxCount: 0,
-    riskLevel: "New / Unproven",
+    riskLevel: "High Risk",
     riskFlags: ["indexing_required"],
     indexedChains: [],
     badge: getBadge(0),
@@ -90,6 +92,8 @@ function baselineResponse(walletAddress: string, refreshInProgress: boolean) {
     decisions: getDecisionRecommendations(0),
     breakdown: { globalWalletAge: 0, crossChainActivity: 0, arcActivity: 0, counterpartyDiversity: 0, verifiedAttestations: 0, propagatedTrust: 0, riskPenalty: 0 },
     components,
+    reputation,
+    reputation_v1: reputation,
     explanations: buildScoreExplanations(null),
     cacheStatus: "indexing_required" as CacheStatus,
     lastIndexedAt: null,
@@ -146,7 +150,14 @@ async function scoreResponse(identity: IdentityRecord, cacheStatus: CacheStatus,
   const explanations = buildScoreExplanations(identity);
   const components = scoreComponentsFromIdentity(identity);
   validateScorePayload(identity, explanations);
-  const trustGraph = await withTimeout(getTrustGraph(identity.profile.walletAddress), 650, "trust graph score summary").catch(() => null);
+  const [trustGraph, attestationRows] = await Promise.all([
+    withTimeout(getTrustGraph(identity.profile.walletAddress), 650, "trust graph score summary").catch(() => null),
+    withTimeout(listAttestations(identity.profile.walletAddress), 650, "attestation score impacts").catch(() => [])
+  ]);
+  const reputation = buildExplainableReputation({
+    ...reputationInputFromIdentity({ ...identity, trustGraph }, attestationRows),
+    canonicalScore: canonical.scoreValue
+  });
   const liveAvailable = false;
   const cachedBalance = identity.snapshot?.nativeBalance ?? arcChain?.nativeBalance ?? null;
   const cachedBlock = identity.snapshot?.latestBlock ?? null;
@@ -251,6 +262,8 @@ async function scoreResponse(identity: IdentityRecord, cacheStatus: CacheStatus,
       riskPenalty: identity.score.riskPenalty
     },
     components,
+    reputation,
+    reputation_v1: reputation,
     explanations,
     coverageIssues,
     providerErrors: coverageIssues,

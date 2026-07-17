@@ -2,35 +2,52 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { createPortal } from "react-dom";
-import type { ChainSnapshot, ChainStatus } from "@/lib/types";
+import type { ChainSnapshot } from "@/lib/types";
 
 type ChainCoverageExplorerProps = {
   chains?: ChainSnapshot[];
   title?: string;
 };
 
-function statusLabel(status: ChainStatus, errorMessage?: string | null) {
-  if (errorMessage === "Provider unavailable") return "TEMPORARILY LIMITED";
+type DisplayChainStatus = "indexed" | "no_activity" | "limited" | "pending" | "error";
+
+const providerIssuePattern = /provider|timeout|timed out|api|rate limit|429|missing key|api key|not configured|unavailable|failed to fetch|network|fetch failed|econn|etherscan|blockscout|arcscan|rpc|coverage|free tier|paid plan|requires paid/i;
+const internalFailurePattern = /internal application|application failure|invariant|database|supabase|schema|constraint|serialization|unexpected app/i;
+
+function displayStatus(chain: ChainSnapshot): DisplayChainStatus {
+  if (chain.status === "indexed") return "indexed";
+  if (chain.status === "no_activity") return "no_activity";
+  if (chain.status === "limited" || chain.status === "not_configured") return "limited";
+  if (!chain.indexedAt && !chain.errorMessage) return "pending";
+  if (chain.status === "error") {
+    const message = `${chain.errorMessage ?? ""} ${chain.providerSource ?? ""}`;
+    return internalFailurePattern.test(message) && !providerIssuePattern.test(message) ? "error" : "limited";
+  }
+  return "pending";
+}
+
+function statusLabel(chain: ChainSnapshot) {
+  const status = displayStatus(chain);
   if (status === "indexed") return "INDEXED";
   if (status === "no_activity") return "NO ACTIVITY";
-  if (status === "not_configured") return "LIMITED";
   if (status === "limited") return "LIMITED";
+  if (status === "pending") return "PENDING";
   return "ERROR";
 }
 
-function statusClass(status: ChainStatus, errorMessage?: string | null) {
+function statusClass(chain: ChainSnapshot) {
+  const status = displayStatus(chain);
   if (status === "indexed") return "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
-  if (status === "no_activity") return "border-white/10 bg-white/[0.06] text-slate-300";
-  if (status === "limited" || status === "not_configured" || errorMessage === "Provider unavailable") return "border-amber-300/25 bg-amber-300/10 text-amber-100";
+  if (status === "no_activity" || status === "pending") return "border-white/10 bg-white/[0.06] text-slate-300";
+  if (status === "limited") return "border-amber-300/25 bg-amber-300/10 text-amber-100";
   return "border-rose-300/25 bg-rose-400/10 text-rose-100";
 }
 
 function providerText(chain: ChainSnapshot) {
-  if (chain.errorMessage === "Provider unavailable") return "Some chain data is temporarily unavailable.";
-  if (chain.status === "limited" && chain.chain === "BNB Chain") return "BNB indexing is temporarily limited.";
-  if (chain.status === "limited") return "Chain coverage is temporarily limited.";
-  if (chain.status === "not_configured") return "Chain coverage is temporarily limited.";
-  if (chain.errorMessage) return "Some chain data is temporarily unavailable.";
+  const status = displayStatus(chain);
+  if (status === "limited") return "External provider temporarily unavailable.";
+  if (status === "pending") return "Indexing pending.";
+  if (status === "error") return "Internal application issue detected.";
   return chain.providerSource || "Provider unknown";
 }
 
@@ -42,7 +59,7 @@ function formatDate(value: string | null) {
 }
 
 function countLimitedProviderChains(chains: ChainSnapshot[]) {
-  return chains.filter((chain) => chain.status === "limited" || chain.status === "not_configured" || chain.errorMessage === "Provider unavailable").length;
+  return chains.filter((chain) => displayStatus(chain) === "limited").length;
 }
 
 export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }: ChainCoverageExplorerProps) {
@@ -73,8 +90,8 @@ export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }:
   }, [open]);
 
   const summary = useMemo(() => ({
-    indexed: chains.filter((chain) => chain.status === "indexed").length,
-    noActivity: chains.filter((chain) => chain.status === "no_activity").length,
+    indexed: chains.filter((chain) => displayStatus(chain) === "indexed").length,
+    noActivity: chains.filter((chain) => displayStatus(chain) === "no_activity").length,
     limitedProvider: countLimitedProviderChains(chains)
   }), [chains]);
 
@@ -83,7 +100,8 @@ export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }:
     if (!normalized) return chains;
     return chains.filter((chain) => [
       chain.chain,
-      chain.status,
+      displayStatus(chain),
+      statusLabel(chain),
       chain.providerSource,
       chain.errorMessage ?? ""
     ].some((value) => value.toLowerCase().includes(normalized)));
@@ -116,7 +134,7 @@ export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }:
         </div>
       </div>
 
-      {chains.length === 0 ? <p className="mt-4 text-sm text-slate-400">Some chain data is temporarily unavailable. Refresh intelligence to check again.</p> : null}
+      {chains.length === 0 ? <p className="mt-4 text-sm text-slate-400">Indexing limited by provider availability. Refresh intelligence to check again.</p> : null}
 
       {mounted && open ? createPortal(
         <div
@@ -155,7 +173,7 @@ export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }:
                         <p className="truncate font-extrabold text-white">{chain.chain}</p>
                         <p className="mt-1 text-xs text-slate-500">Chain ID {chain.chainId}</p>
                       </div>
-                      <span className={`w-fit rounded-md border px-2.5 py-1 text-[0.6875rem] font-extrabold uppercase tracking-[0.12em] ${statusClass(chain.status, chain.errorMessage)}`}>{statusLabel(chain.status, chain.errorMessage)}</span>
+                      <span className={`w-fit rounded-md border px-2.5 py-1 text-[0.6875rem] font-extrabold uppercase tracking-[0.12em] ${statusClass(chain)}`}>{statusLabel(chain)}</span>
                       <div><p className="text-xs text-slate-500">Tx count</p><p className="font-bold text-white">{chain.txCount}</p></div>
                       <div><p className="text-xs text-slate-500">Age</p><p className="font-bold text-white">{chain.walletAgeDays}d</p></div>
                       <div><p className="text-xs text-slate-500">Counterparties</p><p className="font-bold text-white">{chain.uniqueCounterparties}</p></div>

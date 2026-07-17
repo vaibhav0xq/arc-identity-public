@@ -22,7 +22,7 @@ export function ProfileNavButton() {
       return;
     }
 
-    if (identity.status === "unclaimed" || identity.status === "disconnected") {
+    if (identity.status === "unclaimed") {
       console.log("[arc-identity] profile_nav_final_url", { wallet: identity.normalizedWallet, url: "/create", reason: identity.status });
       window.location.href = "/create";
       return;
@@ -38,9 +38,11 @@ export function ProfileNavButton() {
     }
   }
 
+  if (identity.status === "disconnected") return null;
+
   const label = identity.status === "claimed"
     ? "View Profile"
-    : identity.status === "unclaimed" || identity.status === "disconnected"
+    : identity.status === "unclaimed"
       ? "Claim username"
       : "Checking profile...";
 

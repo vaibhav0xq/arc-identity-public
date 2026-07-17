@@ -7,10 +7,11 @@ import { buildArcScore, getRiskLevel } from "@/lib/score";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getTrustGraph, upsertTrustEdgeFromAttestation } from "@/lib/trust-graph";
 import { maybeArcUsername, profileRouteFor, toArcUsername } from "@/lib/username";
+import { verifyWalletSignature } from "@/lib/signature";
 
 const rateLimitMs = 24 * 60 * 60 * 1000;
 const allowedInteractionTypes = new Set<InteractionType>(["payment", "service_payment", "escrow_release", "trade_settlement"]);
-const baselineArcScore = 35;
+const initialArcScore = 0;
 
 export type UserSort = "score" | "activity" | "newest" | "risk";
 export const DIRECTORY_DEFAULT_SORT: UserSort = "score";
@@ -558,9 +559,9 @@ async function ensureBaselineSnapshot(walletAddress: string) {
   }
 }
 
-export async function ensureWalletProfile(walletAddress: string, signature: string) {
-  if (!signature) throw new Error("Signature required to verify wallet ownership");
+export async function ensureWalletProfile(walletAddress: string, signature: string, signatureMessage: string) {
   const wallet = normalizeWallet(walletAddress);
+  await verifyWalletSignature({ walletAddress: wallet, signature, message: signatureMessage });
   const supabase = getSupabaseAdmin();
   const now = new Date().toISOString();
   const existing = await getProfileByWallet(wallet);
@@ -582,9 +583,9 @@ export async function ensureWalletProfile(walletAddress: string, signature: stri
   return profileFromRow(data);
 }
 
-export async function claimUsername(walletAddress: string, username: string, signature: string) {
-  if (!signature) throw new Error("Signature required to claim username");
+export async function claimUsername(walletAddress: string, username: string, signature: string, signatureMessage: string) {
   const wallet = normalizeWallet(walletAddress);
+  await verifyWalletSignature({ walletAddress: wallet, signature, message: signatureMessage });
   const normalizedUsername = toArcUsername(username);
   const supabase = getSupabaseAdmin();
   const existing = await getProfileByWallet(wallet);
@@ -600,8 +601,8 @@ export async function claimUsername(walletAddress: string, username: string, sig
     username: normalizedUsername,
     signature,
     verified_wallet: true,
-    arc_score: baselineArcScore,
-    risk_level: "New / Unproven",
+    arc_score: initialArcScore,
+    risk_level: "High Risk",
     risk_flags: [],
     score_trend: 0,
     activity_level: "Dormant",
@@ -614,7 +615,7 @@ export async function claimUsername(walletAddress: string, username: string, sig
   let result = existing
     ? await supabase
         .from("profiles")
-        .update({ username: normalizedUsername, signature, verified_wallet: true, arc_score: baselineArcScore, risk_level: "New / Unproven", updated_at: now, last_seen: now })
+        .update({ username: normalizedUsername, signature, verified_wallet: true, arc_score: initialArcScore, risk_level: "High Risk", updated_at: now, last_seen: now })
         .ilike("wallet_address", wallet)
         .select("*")
         .single()
@@ -631,8 +632,8 @@ export async function claimUsername(walletAddress: string, username: string, sig
         username: normalizedUsername,
         signature,
         verified_wallet: true,
-        arc_score: baselineArcScore,
-        risk_level: "New / Unproven",
+        arc_score: initialArcScore,
+        risk_level: "High Risk",
         first_seen: now,
         last_seen: now,
         created_at: now,
@@ -865,6 +866,35 @@ async function getLatestGlobalProfileRows(wallets: string[]) {
   return new Map((data ?? []).map((row) => [normalizeWallet(row.wallet_address), row]));
 }
 
+async function getLatestChainSnapshotRows(wallets: string[]) {
+  if (wallets.length === 0) return new Map<string, ChainSnapshot[]>();
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from("wallet_chain_snapshots")
+    .select("*")
+    .in("wallet_address", wallets)
+    .order("indexed_at", { ascending: false })
+    .limit(Math.max(60, wallets.length * 8));
+  if (error) {
+    if (isMissingSchemaError(error)) return new Map<string, ChainSnapshot[]>();
+    console.warn("[arc-identity] directory_score_source_mismatch", { stage: "latest_chain_snapshot_query", error: error.message });
+    return new Map<string, ChainSnapshot[]>();
+  }
+  const latestByWallet = new Map<string, ChainSnapshot[]>();
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const wallet = normalizeWallet(row.wallet_address);
+    const chainName = String(row.chain_name ?? "");
+    const key = `${wallet}:${chainName}`;
+    if (!chainName || seen.has(key)) continue;
+    seen.add(key);
+    const current = latestByWallet.get(wallet) ?? [];
+    current.push(chainSnapshotFromRow(row));
+    latestByWallet.set(wallet, current);
+  }
+  return latestByWallet;
+}
+
 function getCanonicalDirectoryScore(profile: Profile, scoreRow: any | null): CanonicalDirectoryScore {
   const event = latestEventScore(scoreRow);
   const profileScore = validScore(profile.arcScore);
@@ -931,6 +961,17 @@ function scoreBreakdown(score: ArcScore): ScoreBreakdown {
   };
 }
 
+function isZeroSignalBreakdown(breakdown: ScoreBreakdown) {
+  return breakdown.globalWalletAge <= 0 &&
+    breakdown.crossChainActivity <= 0 &&
+    breakdown.arcActivity <= 0 &&
+    breakdown.counterpartyDiversity <= 0 &&
+    breakdown.verifiedAttestations <= 0 &&
+    breakdown.trustPropagation <= 0 &&
+    breakdown.indexedChainDepth <= 0 &&
+    breakdown.riskPenalty <= 0;
+}
+
 export function isGeneratedDirectoryUsername(username: string | null | undefined) {
   const base = String(username ?? "").trim().toLowerCase().replace(/\.arcid$/i, "");
   return DIRECTORY_HIDDEN_USERNAME_PREFIXES.some((prefix) => base.startsWith(prefix));
@@ -957,6 +998,7 @@ function reasonForComponent(component: string, previous: ScoreBreakdown | null, 
 }
 
 function buildScoreRefreshReason(previous: ScoreBreakdown | null, next: ScoreBreakdown, components: string[], counts: ReturnType<typeof chainStatusCounts>, scoreDelta: number, category: string) {
+  if (isZeroSignalBreakdown(next)) return "No indexed wallet activity, Arc activity, verified attestations, or trust graph evidence was detected. Profile creation does not add reputation, so ARC Score now reflects the verified signal total.";
   if (components.length === 0) return category === "SCORE_RECALCULATION" ? "Score recalibration completed from current Arc-native reputation signals and supporting wallet context." : "Score recalculated from current Arc-native reputation signals and supporting wallet context.";
   const reasons = components.slice(0, 3).map((component) => reasonForComponent(component, previous, next));
   if (scoreDelta <= -10) {
@@ -982,6 +1024,9 @@ function isPassiveScoreEvent(category: string) {
 
 function stabilizeScore(previousScore: number, rawScore: ArcScore, category: string, previousStableScore: number | null): { score: ArcScore; rawScore: number; suppressedTinyChange: boolean; wasDampened: boolean; memoryFloor: number | null } {
   const raw = rawScore.arcScore;
+  if (raw === 0 && isZeroSignalBreakdown(scoreBreakdown(rawScore))) {
+    return { score: { ...rawScore, arcScore: 0, riskLevel: getRiskLevel(0) }, rawScore: raw, suppressedTinyChange: false, wasDampened: previousScore !== 0, memoryFloor: null };
+  }
   const delta = raw - previousScore;
   if (Math.abs(delta) < 3) {
     return { score: { ...rawScore, arcScore: previousScore, riskLevel: getRiskLevel(previousScore) }, rawScore: raw, suppressedTinyChange: true, wasDampened: false, memoryFloor: previousStableScore };
@@ -1478,19 +1523,43 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
 
   const enrichmentStarted = Date.now();
   const directoryWallets = claimedProfiles.map((row) => normalizeWallet(row.wallet_address));
-  const [latestScoreRows, latestGlobalRows] = await Promise.all([
+  const [latestScoreRows, latestGlobalRows, latestChainRows] = await Promise.all([
     getLatestScoreRefreshRows(directoryWallets),
-    getLatestGlobalProfileRows(directoryWallets)
+    getLatestGlobalProfileRows(directoryWallets),
+    getLatestChainSnapshotRows(directoryWallets)
   ]);
   const rows = claimedProfiles.map((row) => {
     const profile = profileFromRow(row);
-    const globalRow = latestGlobalRows.get(normalizeWallet(profile.walletAddress)) ?? null;
-    const canonicalTotalTx = Number(globalRow?.total_tx_count ?? profile.txCount ?? 0);
-    const canonicalActiveChains = Array.isArray(globalRow?.active_chains) ? globalRow.active_chains : profile.indexedChains;
-    const canonicalGlobalAge = Number(globalRow?.global_wallet_age_days ?? profile.globalWalletAgeDays ?? 0);
+    const walletKey = normalizeWallet(profile.walletAddress);
+    const globalRow = latestGlobalRows.get(walletKey) ?? null;
+    const chainSnapshots = latestChainRows.get(walletKey) ?? [];
+    const arcChain = chainSnapshots.find((chain) => chain.chain === "Arc Testnet") ?? null;
+    const canonicalTotalTx = Math.max(Number(globalRow?.total_tx_count ?? 0), profile.txCount, chainSnapshots.reduce((sum, chain) => sum + Number(chain.txCount ?? 0), 0));
+    const indexedChainNames = chainSnapshots.filter((chain) => chain.status === "indexed" && chain.txCount > 0).map((chain) => chain.chain);
+    const canonicalActiveChains = Array.from(new Set([...(Array.isArray(globalRow?.active_chains) ? globalRow.active_chains : []), ...profile.indexedChains, ...indexedChainNames])).filter(Boolean);
+    const canonicalGlobalAge = Math.max(Number(globalRow?.global_wallet_age_days ?? 0), profile.globalWalletAgeDays, chainSnapshots.reduce((max, chain) => Math.max(max, chain.walletAgeDays), 0));
+    const canonicalArcAge = Math.max(profile.arcWalletAgeDays, arcChain?.walletAgeDays ?? 0);
     const canonicalScore = getCanonicalDirectoryScore(profile, latestScoreRows.get(normalizeWallet(profile.walletAddress)) ?? null);
     const { score, riskFlags, activityLevel } = buildArcScore(profile, {
-      snapshot: null,
+      snapshot: arcChain ? {
+        id: `directory-arc-${profile.walletAddress}`,
+        walletAddress: profile.walletAddress,
+        txCount: arcChain.txCount,
+        volume: 0,
+        counterparties: arcChain.uniqueCounterparties,
+        activeDays: arcChain.activeDays,
+        recentActivityCount: arcChain.recentActivityCount,
+        walletAgeDays: arcChain.walletAgeDays,
+        activityFrequency: arcChain.walletAgeDays > 0 ? arcChain.txCount / arcChain.walletAgeDays : 0,
+        transferCount: arcChain.txCount,
+        contractInteractionCount: arcChain.contractInteractions,
+        indexerSource: arcChain.providerSource,
+        calculatedScore: 0,
+        latestBlock: 0,
+        nativeBalance: arcChain.nativeBalance,
+        lastActivityAt: arcChain.lastSeenAt,
+        createdAt: arcChain.indexedAt
+      } : null,
       multiChain: null,
       attestationWeight: 0,
       attestationCount: 0,
@@ -1522,7 +1591,12 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
         arcScore: cachedArcScore,
         riskLevel: cachedRiskLevel,
         riskFlags: profile.riskFlags.length ? profile.riskFlags : riskFlags,
-        activityLevel: profile.activityLevel || activityLevel
+        activityLevel: profile.activityLevel || activityLevel,
+        txCount: canonicalTotalTx,
+        globalWalletAgeDays: canonicalGlobalAge,
+        arcWalletAgeDays: canonicalArcAge,
+        activeChainCount: canonicalActiveChains.length,
+        indexedChains: canonicalActiveChains
       },
       profileUrl: profile.username ? profileRouteFor(profile.username) : undefined,
       score: { ...score, arcScore: cachedArcScore, riskLevel: cachedRiskLevel },
@@ -1535,7 +1609,25 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
       scoreValue: cachedArcScore,
       scoreUpdatedAt: directoryScoreUpdatedAt,
       scoreSource: directoryScoreSource,
-      snapshot: null,
+      snapshot: arcChain ? {
+        id: `directory-arc-${profile.walletAddress}`,
+        walletAddress: profile.walletAddress,
+        txCount: arcChain.txCount,
+        volume: 0,
+        counterparties: arcChain.uniqueCounterparties,
+        activeDays: arcChain.activeDays,
+        recentActivityCount: arcChain.recentActivityCount,
+        walletAgeDays: arcChain.walletAgeDays,
+        activityFrequency: arcChain.walletAgeDays > 0 ? arcChain.txCount / arcChain.walletAgeDays : 0,
+        transferCount: arcChain.txCount,
+        contractInteractionCount: arcChain.contractInteractions,
+        indexerSource: arcChain.providerSource,
+        calculatedScore: 0,
+        latestBlock: 0,
+        nativeBalance: arcChain.nativeBalance,
+        lastActivityAt: arcChain.lastSeenAt,
+        createdAt: arcChain.indexedAt
+      } : null,
       acceptedAttestations: 0,
       uniqueCounterparties: 0,
       trustGraph: null,
@@ -1547,7 +1639,7 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
         activeChains: canonicalActiveChains,
         uniqueCounterparties: Number(globalRow?.total_unique_counterparties ?? 0),
         totalContractInteractions: Number(globalRow?.total_contract_interactions ?? 0),
-        chains: []
+        chains: chainSnapshots
       },
       refreshJob: null
     } as IdentityRecord & Record<string, unknown>;
@@ -1821,28 +1913,4 @@ async function upsertTrustConnection(walletA: string, walletB: string) {
   }
   await supabase.from("trust_connections").insert({ wallet_a: a, wallet_b: b, interaction_count: 1, last_interaction_at: now });
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 

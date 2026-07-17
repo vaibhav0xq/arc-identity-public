@@ -117,6 +117,7 @@ export default function CreateProfilePage() {
   const router = useRouter();
   const [walletAddress, setWalletAddress] = useState("");
   const [signature, setSignature] = useState("");
+  const [signatureMessage, setSignatureMessage] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(false);
@@ -132,12 +133,12 @@ export default function CreateProfilePage() {
 
   const usernameValue = normalizeUsernameInput(username);
   const usernameValidation = validateUsername(usernameValue);
-  const canClaim = Boolean(walletAddress && signature && usernameValidation.valid && !loading && availability !== "taken");
+  const canClaim = Boolean(walletAddress && signature && signatureMessage && usernameValidation.valid && !loading && availability !== "taken");
 
-  const checkExistingIdentity = useCallback(async (wallet: string, storedSignature: string, showFailureNote = false) => {
+  const checkExistingIdentity = useCallback(async (wallet: string, storedSignature: string, storedSignatureMessage: string, showFailureNote = false) => {
     if (onboardingCompleteRef.current) return;
-    const lookupKey = wallet && storedSignature ? `${wallet.toLowerCase()}:${storedSignature}` : "";
-    if (!wallet || !storedSignature) {
+    const lookupKey = wallet && storedSignature && storedSignatureMessage ? `${wallet.toLowerCase()}:${storedSignature}:${storedSignatureMessage}` : "";
+    if (!wallet || !storedSignature || !storedSignatureMessage) {
       lastCheckedWalletRef.current = "";
       setExistingUsername(null);
       setSuccess("");
@@ -161,7 +162,7 @@ export default function CreateProfilePage() {
       const ensure = await fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: wallet, signature: storedSignature })
+        body: JSON.stringify({ walletAddress: wallet, signature: storedSignature, signatureMessage: storedSignatureMessage })
       }, identityLookupTimeoutMs);
       console.log("[arc-identity] ensure_profile_lookup_success", { wallet, username: ensure.profile?.username ?? null });
       const ensuredUsername = cleanUsername(ensure.profile?.username);
@@ -221,12 +222,13 @@ export default function CreateProfilePage() {
   function retryLookup() {
     const wallet = localStorage.getItem("arcIdentityWallet") ?? walletAddress;
     const storedSignature = localStorage.getItem("arcIdentitySignature") ?? signature;
+    const storedSignatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? signatureMessage;
     lastCheckedWalletRef.current = "";
-    void checkExistingIdentity(wallet, storedSignature, true);
+    void checkExistingIdentity(wallet, storedSignature, storedSignatureMessage, true);
   }
 
   function claimFormReady() {
-    return Boolean(walletAddress && signature && !existingUsername && identityState === "unclaimed" && !checkingProfile);
+    return Boolean(walletAddress && signature && signatureMessage && !existingUsername && identityState === "unclaimed" && !checkingProfile);
   }
 
   function likelyClaimed() {
@@ -240,6 +242,7 @@ export default function CreateProfilePage() {
   const syncWalletState = useCallback(() => {
     const wallet = localStorage.getItem("arcIdentityWallet") ?? "";
     const storedSignature = localStorage.getItem("arcIdentitySignature") ?? "";
+    const storedSignatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? "";
     const normalizedWallet = wallet.toLowerCase();
     const previousWallet = currentWalletRef.current;
     const walletChanged = Boolean(normalizedWallet && previousWallet && normalizedWallet !== previousWallet);
@@ -254,15 +257,17 @@ export default function CreateProfilePage() {
     currentWalletRef.current = normalizedWallet;
     setWalletAddress(wallet);
     setSignature(storedSignature);
+
+      setSignatureMessage(storedSignatureMessage);
     setLookupWarning("");
-    if (!wallet || !storedSignature) {
+    if (!wallet || !storedSignature || !storedSignatureMessage) {
       lastCheckedWalletRef.current = "";
       setExistingUsername(null);
       setIdentityState("idle");
       setCheckingProfile(false);
       return;
     }
-    void checkExistingIdentity(wallet, storedSignature, false);
+    void checkExistingIdentity(wallet, storedSignature, storedSignatureMessage, false);
   }, [checkExistingIdentity]);
 
   useEffect(() => {
@@ -290,8 +295,9 @@ export default function CreateProfilePage() {
     event?.preventDefault();
     if (loading) return;
     const storedSignature = localStorage.getItem("arcIdentitySignature") ?? signature;
+    const storedSignatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? signatureMessage;
     const wallet = localStorage.getItem("arcIdentityWallet") ?? walletAddress;
-    if (!storedSignature || !wallet) {
+    if (!storedSignature || !storedSignatureMessage || !wallet) {
       setError("Connect and sign with your wallet before profile creation.");
       return;
     }
@@ -313,7 +319,7 @@ export default function CreateProfilePage() {
       const response = await fetch("/api/profile/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: wallet, username: usernameValue, signature: storedSignature })
+        body: JSON.stringify({ walletAddress: wallet, username: usernameValue, signature: storedSignature, signatureMessage: storedSignatureMessage })
       });
       const data = await response.json() as ProfileCreateResponse;
       if (!response.ok) throw new Error(data.error ?? "Unable to claim username");
@@ -326,12 +332,15 @@ export default function CreateProfilePage() {
 
       localStorage.setItem("arcIdentityWallet", claimedWallet);
       localStorage.setItem("arcIdentitySignature", storedSignature);
+      localStorage.setItem("arcIdentitySignatureMessage", storedSignatureMessage);
       storeUsernameForWallet(claimedWallet, claimedUsername);
       localStorage.removeItem(lookupWarningKey);
       localStorage.removeItem(dashboardCacheKey(claimedWallet));
       localStorage.setItem(postClaimKey(claimedWallet), claimedUsername);
       setWalletAddress(claimedWallet);
       setSignature(storedSignature);
+
+      setSignatureMessage(storedSignatureMessage);
       const byWalletResponse = await fetch(`/api/profile/by-wallet/${encodeURIComponent(claimedWallet)}?t=${Date.now()}`, {
         headers: { "Cache-Control": "no-store" },
         cache: "no-store"

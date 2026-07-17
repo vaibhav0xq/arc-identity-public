@@ -56,9 +56,9 @@ const sample = {
 export function DevelopersPageClient() {
   return (
     <WalletGate
-      sectionLabel="Developer API locked"
-      title="Connect your wallet to access ARC Identity developer tools."
-      description="Wallet connection unlocks API examples and live credential demos for this launch build."
+      sectionLabel="Developer API"
+      title="Connect your wallet to view ARC Identity developer tools."
+      description="Connect your wallet to explore API examples and live credential demos."
     >
       <section className="fade-in grid min-w-0 gap-6 py-8 lg:grid-cols-[0.9fr_1.1fr]">
         <div className="arc-surface min-w-0 rounded p-5 sm:p-6">

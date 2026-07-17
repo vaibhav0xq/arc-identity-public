@@ -37,7 +37,7 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
     console.log("[arc-identity] username_claim_started", { wallet: body.walletAddress, username: body.username });
-    const profile = await claimUsername(body.walletAddress, body.username, body.signature);
+    const profile = await claimUsername(body.walletAddress, body.username, body.signature, body.signatureMessage);
     console.log("[arc-identity] username_claim_success", { wallet: profile.walletAddress, username: profile.username });
     const response = profileResponse(profile);
     console.log("[arc-identity] profile_create_response", {

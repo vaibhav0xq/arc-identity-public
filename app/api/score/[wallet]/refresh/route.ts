@@ -126,8 +126,8 @@ export async function POST(_request: Request, { params }: { params: Promise<{ wa
       ...meta,
       intelligenceStatus: coverageIssues.length > 0 && meta.hasIndexedActivity ? "partial" : meta.hasIndexedActivity ? "indexed" : "limited",
       ...canonical,
-      score: canonical.scoreValue || identity?.score.arcScore || 35,
-      arcIdentityScore: canonical.arcIdentityScore || identity?.score.arcScore || 35,
+      score: canonical.scoreValue ?? identity?.score.arcScore ?? 0,
+      arcIdentityScore: canonical.arcIdentityScore ?? identity?.score.arcScore ?? 0,
       riskLevel: canonical.riskLevel || identity?.score.riskLevel || "New / Unproven",
       breakdown: identity ? {
         globalWalletAge: identity.score.longevityScore,
@@ -156,3 +156,4 @@ export async function POST(_request: Request, { params }: { params: Promise<{ wa
     }, { headers: publicNoStoreHeaders });
   }
 }
+

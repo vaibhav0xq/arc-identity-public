@@ -79,9 +79,9 @@ export default function MyProfileResolverPage() {
   return (
     <ArcShell>
       <WalletGate
-        sectionLabel="Profile resolver locked"
+        sectionLabel="Public profile"
         title="Connect your wallet to open your ARC Identity."
-        description="Wallet connection resolves your claimed username to the canonical public profile."
+        description="Connect your wallet to open your public ARC Identity profile."
       >
       <section className="mx-auto flex min-h-[64vh] max-w-2xl items-center py-10">
         <div className="arc-surface w-full rounded-3xl p-7 text-center sm:p-10">

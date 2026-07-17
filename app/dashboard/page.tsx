@@ -10,6 +10,7 @@ import { DecisionPanel } from "@/components/DecisionPanel";
 import { OnchainActivityCard } from "@/components/OnchainActivityCard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { TrustGraphCard } from "@/components/TrustGraphCard";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 import type { Attestation, ChainSnapshot, IdentityRecord, ReputationEvent, ScoreExplanations, TrustGraph, WalletActivitySnapshot } from "@/lib/types";
 import { fetchJsonWithTimeout } from "@/lib/timeouts";
 import { publicAppUrl } from "@/lib/links";
@@ -98,6 +99,7 @@ type DashboardSessionState = {
 type DashboardLoadTrigger = "initial" | "session" | "focus" | "visibility";
 
 const PASSIVE_REFRESH_MIN_INTERVAL_MS = 60_000;
+const MAX_PROMINENT_LOCAL_CACHE_AGE_MS = 6 * 60 * 60 * 1000;
 
 type DisplayedDashboardSnapshot = {
   wallet: string;
@@ -131,8 +133,8 @@ function baselineIdentity(wallet: string, username: string): IdentityRecord {
       username,
       signature: localStorage.getItem("arcIdentitySignature"),
       verifiedWallet: true,
-      arcScore: 35,
-      riskLevel: "New / Unproven",
+      arcScore: 0,
+      riskLevel: "High Risk",
       riskFlags: [],
       scoreTrend: 0,
       activityLevel: "Dormant",
@@ -144,14 +146,14 @@ function baselineIdentity(wallet: string, username: string): IdentityRecord {
       globalWalletAgeDays: 0,
       arcWalletAgeDays: 0,
       activeChainCount: 0,
-      credentialScore: 35,
-      credentialLevel: "New / Unproven",
+      credentialScore: 0,
+      credentialLevel: "High Risk",
       indexedChains: []
     },
     score: {
       walletAddress: wallet.toLowerCase(),
-      arcScore: 35,
-      riskLevel: "New / Unproven",
+      arcScore: 0,
+      riskLevel: "High Risk",
       activityScore: 0,
       longevityScore: 0,
       counterpartyDiversityScore: 0,
@@ -779,7 +781,7 @@ export default function DashboardPage() {
     const wallet = localStorage.getItem("arcIdentityWallet")?.trim() || arcIdentity.normalizedWallet || null;
     return {
       wallet,
-      signatureVerified: Boolean(localStorage.getItem("arcIdentitySignature"))
+      signatureVerified: Boolean(localStorage.getItem("arcIdentitySignature") && localStorage.getItem("arcIdentitySignatureMessage"))
     };
   }
 
@@ -958,6 +960,15 @@ export default function DashboardPage() {
       const selected = realCached && isBaselineScore(cached.scoreMeta ?? cached.identity) ? realCached : cached;
       if (selected !== cached) console.log("[arc-identity] score_merge_rejected_baseline_over_real", { wallet, reason: "hydrate_preferred_last_real" });
       if (selected.wallet.toLowerCase() !== wallet.toLowerCase() || !selected.identity?.profile) return false;
+      const cacheFreshness = dashboardSnapshotFreshness(selected.identity, selected.scoreMeta ?? null, selected.cachedAt);
+      if (cacheFreshness > 0 && Date.now() - cacheFreshness > MAX_PROMINENT_LOCAL_CACHE_AGE_MS) {
+        console.log("[arc-identity] dashboard_local_cache_too_old_for_prominent_score", {
+          wallet,
+          cachedAt: selected.cachedAt,
+          freshness: new Date(cacheFreshness).toISOString()
+        });
+        return false;
+      }
       const resolvedUsername = cleanUsername(selected.identity.profile.username) ?? cleanUsername(selected.scoreMeta?.username);
       const normalizedIdentity = withResolvedUsername(selected.identity, resolvedUsername);
       if (!shouldApplyDashboardSnapshot(wallet, normalizedIdentity, selected.scoreMeta ?? null, "local_cache_hydration", selected.cachedAt)) {
@@ -1030,14 +1041,15 @@ export default function DashboardPage() {
 
     try {
       const signature = localStorage.getItem("arcIdentitySignature") ?? "";
+      const signatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? "";
       let ensuredUsername: string | null = null;
-      if (signature) {
+      if (signature && signatureMessage) {
         console.log("[arc-identity] dashboard_ensure_started", { wallet });
         console.log("[arc-identity] dashboard_identity_refetch_started", { wallet, source: "profile_ensure" });
         const ensure = await fetchJsonWithTimeout<ProfileEnsureResponse>(`/api/profile/ensure?t=${Date.now()}`, {
           method: "POST",
           headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-          body: JSON.stringify({ walletAddress: wallet, signature })
+          body: JSON.stringify({ walletAddress: wallet, signature, signatureMessage })
         }, 3000).catch((error) => {
           console.log("[arc-identity] dashboard_identity_refetch_failed", { wallet, error: error instanceof Error ? error.message : "Unknown error" });
           return null;
@@ -1409,8 +1421,13 @@ export default function DashboardPage() {
   const sessionSignatureVerified = sessionState.signatureVerified || arcIdentity.status === "claimed";
   const confirmedUnclaimed = sessionHasWallet && loadState === "new_wallet_no_data" && message.startsWith("Complete your ARC Identity");
   const shouldHoldConnectedPendingState = sessionHasWallet && !identity && !confirmedUnclaimed;
-  const setupHeading = shouldHoldConnectedPendingState ? dashboardPendingMessage(sessionSignatureVerified) : message || "Complete your ARC Identity to unlock wallet intelligence.";
-  const showSetupClaimCta = !shouldHoldConnectedPendingState;
+  const needsWalletConnection = !sessionHasWallet;
+  const setupHeading = needsWalletConnection
+    ? "Connect your wallet to open your ARC Identity dashboard."
+    : shouldHoldConnectedPendingState
+      ? dashboardPendingMessage(sessionSignatureVerified)
+      : message || "Complete your ARC Identity to unlock wallet intelligence.";
+  const showSetupClaimCta = sessionHasWallet && !shouldHoldConnectedPendingState;
   const dashboardStatusMessage = refreshing
     ? "Refreshing wallet intelligence. Current data remains visible."
     : loadState === "refresh_failed_showing_cached_data"
@@ -1422,7 +1439,7 @@ export default function DashboardPage() {
           : loadState === "showing_cached_data"
             ? "Using cached wallet intelligence."
             : loadState === "loading_cached_profile" && knownUsername
-              ? `Loading wallet intelligence for ${knownUsername}. Fresh-wallet scores stay hidden until the latest state is confirmed.`
+              ? `Loading wallet intelligence for ${knownUsername}.`
               : "";
 
   return (
@@ -1432,7 +1449,7 @@ export default function DashboardPage() {
           <p className="arc-section-label">Wallet intelligence console</p>
           <h1 className="mt-3 text-4xl font-extrabold text-white">Dashboard</h1>
           <div className="mt-5 flex flex-wrap items-center gap-3">
-            <button onClick={refreshIntelligence} disabled={refreshing} className="arc-button-primary px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh intelligence"}</button>
+            {sessionHasWallet ? <button onClick={refreshIntelligence} disabled={refreshing} className="arc-button-primary px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh intelligence"}</button> : null}
             {scoreMeta?.lastIndexedAt ? <span className="rounded-lg border border-white/[0.07] bg-white/[0.03] px-3.5 py-2 text-xs text-slate-400">Last indexed {new Date(scoreMeta.lastIndexedAt).toLocaleString()}</span> : null}
             {scoreMeta?.cacheStatus ? <span title="Score data is served from the latest saved wallet intelligence snapshot. Refresh can still update the timestamp and chain coverage." className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3.5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-200">{scoreMeta.cacheStatus === "cached" ? "Cached snapshot" : scoreMeta.cacheStatus.replace("_", " ")}</span> : null}
           </div>
@@ -1497,15 +1514,19 @@ export default function DashboardPage() {
             <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
               {loadState === "loading_cached_profile" || shouldHoldConnectedPendingState
                 ? knownUsername
-                ? "We found your ARC Identity and are loading the latest wallet intelligence. Fresh-wallet scores stay hidden until this wallet state is confirmed."
-                  : "Wallet connection is active. ARC Identity is checking your signature and profile before showing setup actions."
+                ? "Loading your ARC Identity dashboard."
+                  : "Preparing your ARC Identity workspace."
                 : message.startsWith("ARC Identity created")
-                ? "Your public identity exists. Score and chain intelligence may need a first refresh before the full dashboard appears."
-                : "Wallet connection verifies ownership, but dashboard intelligence starts only after a username claim creates your ARC Identity."}
+                ? "Your public identity is ready. Refresh intelligence to load the latest wallet context."
+                : needsWalletConnection
+                ? "Connect your wallet to view your reputation, attestations, and wallet intelligence."
+                : "Claim a username to activate your public ARC Identity dashboard."}
             </p>
             {loadState === "loading_cached_profile" || shouldHoldConnectedPendingState ? <p className="mt-4 text-sm text-slate-500">{knownUsername ? "Loading wallet intelligence..." : "Checking identity..."}</p> : null}
             <div className="mt-6 flex flex-wrap gap-3">
-              {!showSetupClaimCta ? null : message.startsWith("ARC Identity created") && (knownUsername || scoreMeta?.username) ? (
+              {needsWalletConnection ? (
+                <WalletConnectButton />
+              ) : !showSetupClaimCta ? null : message.startsWith("ARC Identity created") && (knownUsername || scoreMeta?.username) ? (
                 <Link href="/profile/me" className="inline-flex rounded bg-emerald-300 px-4 py-3 font-black text-slate-950">View public profile</Link>
               ) : (
                 <Link href="/create" className="inline-flex rounded bg-emerald-300 px-4 py-3 font-black text-slate-950">Claim username</Link>
@@ -1518,7 +1539,4 @@ export default function DashboardPage() {
     </ArcShell>
   );
 }
-
-
-
 

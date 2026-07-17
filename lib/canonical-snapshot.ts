@@ -24,7 +24,7 @@ export function getCanonicalWalletSnapshot(identity: IdentityRecord | null) {
       scoreValue: 0,
       arcIdentityScore: 0,
       credentialScore: 0,
-      riskLevel: "New / Unproven",
+      riskLevel: "High Risk",
       totalTx: 0,
       totalTxCount: 0,
       indexedTx: 0,

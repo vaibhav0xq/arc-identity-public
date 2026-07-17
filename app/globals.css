@@ -136,6 +136,16 @@ a {
     backdrop-filter: blur(32px) saturate(140%);
   }
 
+  /* Mobile nav */
+  .arc-mobile-nav {
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .arc-mobile-nav::-webkit-scrollbar {
+    display: none;
+  }
+
   /* ─── Card hover lift ─── */
   .arc-card-hover {
     transition:

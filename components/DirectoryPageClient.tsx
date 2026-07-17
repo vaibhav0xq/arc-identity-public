@@ -8,9 +8,9 @@ export function DirectoryPageClient({ sort, limit }: { sort: UserSort; limit: nu
   return (
     <WalletGate
       requireClaimed
-      sectionLabel="Directory locked"
-      title="Connect your wallet to access the ARC Identity Directory."
-      description="Wallet connection verifies ownership before showing the launch Directory."
+      sectionLabel="Directory"
+      title="Connect your wallet to view the ARC Identity Directory."
+      description="Connect your wallet to browse registered ARC identities."
     >
       <section className="fade-in grid gap-6 py-8">
         <div className="max-w-4xl">

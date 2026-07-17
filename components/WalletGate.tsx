@@ -15,9 +15,9 @@ type WalletGateProps = {
 export function WalletGate({
   children,
   requireClaimed = false,
-  sectionLabel = "Wallet required",
+  sectionLabel = "ARC Identity",
   title = "Connect your wallet to access ARC Identity.",
-  description = "Wallet connection verifies ownership and unlocks this section."
+  description = "Connect your wallet to continue."
 }: WalletGateProps) {
   const { identity, refreshIdentity } = useArcIdentity();
 
@@ -29,29 +29,34 @@ export function WalletGate({
   const error = identity.status === "error";
   const unclaimed = identity.status === "unclaimed";
 
+  const cardTitle = checking
+    ? "Checking wallet connection..."
+    : unclaimed
+      ? "Claim your ARC Identity to continue."
+      : error
+        ? "Could not verify wallet connection."
+        : title;
+
+  const cardDescription = checking
+    ? "Preparing your ARC Identity session."
+    : unclaimed
+      ? "Claim a username to activate your public ARC Identity."
+      : error
+        ? identity.error ?? "We could not complete this step. Retry or reconnect your wallet."
+        : description;
+
   return (
-    <section className="mx-auto grid min-h-[60vh] w-full max-w-3xl place-items-center py-10">
-      <div className="arc-surface w-full rounded-3xl p-7 text-center shadow-panel sm:p-10">
-        <p className="arc-section-label">{checking ? "Checking wallet" : unclaimed ? "Identity required" : error ? "Retry available" : sectionLabel}</p>
-        <h1 className="mt-4 text-3xl font-black text-white sm:text-4xl">
-          {checking
-            ? "Checking wallet connection..."
-            : unclaimed
-              ? "Claim your ARC Identity to continue."
-              : error
-                ? "Could not verify wallet connection."
-                : title}
-        </h1>
-        <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400">
-          {checking
-            ? "Looking for a verified wallet in this browser session."
-            : unclaimed
-              ? "Wallet ownership is verified. Claim a username to unlock this section."
-              : error
-                ? identity.error ?? "The wallet lookup did not complete. Retry the check or reconnect your wallet."
-                : description}
-        </p>
-        <div className="mx-auto mt-7 flex max-w-sm flex-col items-stretch justify-center gap-3 sm:max-w-none sm:flex-row sm:items-center">
+    <section className="fade-in py-10">
+      <div className="mb-10">
+        <p className="arc-section-label">ARC Identity</p>
+        <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-white lg:text-5xl">{sectionLabel}</h1>
+      </div>
+
+      <div className="arc-surface rounded-2xl p-8 text-left text-slate-300 shadow-panel">
+        <p className="arc-section-label">ARC Identity setup</p>
+        <h2 className="mt-3 max-w-3xl text-2xl font-extrabold text-white sm:text-3xl">{cardTitle}</h2>
+        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">{cardDescription}</p>
+        <div className="mt-6 flex flex-wrap items-center gap-3">
           {disconnected ? <WalletConnectButton /> : null}
           {unclaimed ? (
             <Link href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">

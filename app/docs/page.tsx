@@ -4,69 +4,104 @@ import { ArcShell } from "@/components/ArcShell";
 import { DocsOnThisPage } from "@/components/DocsOnThisPage";
 
 export const metadata: Metadata = {
-  title: "Introducing ARC Identity",
-  description: "Learn how ARC Identity combines Arc-native reputation, verified attestations, trust graph context, and global wallet intelligence."
+  title: "ARC Identity Docs",
+  description: "Documentation for ARC Identity wallet intelligence, verified attestations, trust graph context, and developer APIs."
 };
 
 const tocItems: { label: string; href: `#${string}` }[] = [
   { label: "Overview", href: "#overview" },
-  { label: "Two-layer model", href: "#two-layer-model" },
-  { label: "ARC Reputation Score", href: "#arc-reputation-score" },
-  { label: "Global Wallet Intelligence", href: "#global-wallet-intelligence" },
-  { label: "Verified Attestations", href: "#verified-attestations" },
+  { label: "Core primitives", href: "#core-primitives" },
+  { label: "Score model", href: "#score-model" },
+  { label: "Verified attestations", href: "#verified-attestations" },
+  { label: "Trust graph", href: "#trust-graph" },
+  { label: "Reliability model", href: "#reliability-model" },
   { label: "Developer API", href: "#developer-api" },
   { label: "Get started", href: "#get-started" }
 ];
 
-const reputationSignals = [
-  "Arc ecosystem activity",
-  "Verified transaction-backed attestations",
-  "Trusted counterparties",
-  "Trust graph strength",
-  "Consistency of Arc activity",
-  "Meaningful participation",
-  "Wallet maturity as supporting confidence",
-  "Risk and anomaly checks"
+const primitives = [
+  {
+    title: "Wallet identity",
+    body: "Users connect an injected EVM wallet, sign an ownership message, and claim a public .arcid username."
+  },
+  {
+    title: "ARC Identity Score",
+    body: "A single reputation score that combines indexed wallet behavior, Arc activity, verified attestations, and risk signals."
+  },
+  {
+    title: "Global wallet profile",
+    body: "Multi-chain context including wallet age, transaction count, chain coverage, counterparties, and contract interactions."
+  },
+  {
+    title: "Arc network footprint",
+    body: "Arc-specific activity from Arc RPC/indexing plus verified Arc transaction attestations when explorer coverage is limited."
+  },
+  {
+    title: "Verified attestations",
+    body: "Transaction-backed trust evidence created only when a submitted Arc transaction is verified against both wallets."
+  },
+  {
+    title: "Trust graph",
+    body: "Verified wallet-to-wallet edges, reciprocal relationships, network maturity, anomaly hints, and capped trust propagation."
+  }
 ];
 
-const walletIntelligenceSignals = [
-  "Wallet age",
-  "Chain coverage",
-  "Multi-chain activity",
-  "Transaction history",
-  "Wallet maturity",
-  "Indexed chain data",
-  "General wallet behavior"
+const scoreComponents = [
+  ["Global Wallet Age", "Based on the earliest real indexed transaction across supported chains."],
+  ["Cross-chain Activity", "Based on indexed transaction volume, active chains, recent activity, and contract interaction history."],
+  ["Arc Activity", "Based on Arc Testnet footprint, Arc attestations, Arc counterparties, active days, and Arc balance signals."],
+  ["Counterparty Diversity", "Based on unique counterparties across indexed chains, with Arc relationships treated as higher-signal context."],
+  ["Verified Attestations", "Based only on transaction-backed attestations with unique tx hashes and registered counterparties."],
+  ["Trust Propagation", "A capped network signal from verified trust edges. It can help, but it cannot dominate the base score."],
+  ["Risk Penalty", "Applied when anomaly signals, low confidence, repetitive behavior, or suspicious trust patterns appear."]
 ];
 
 const attestationChecks = [
-  "Valid transaction hash required",
-  "Registered counterparty required",
-  "Self-attestation rejected",
-  "Duplicate submissions guarded",
-  "Invalid or unverified transactions rejected"
+  "Requires a real Arc Testnet transaction hash",
+  "Transaction must exist and succeed on Arc",
+  "Connected wallet and selected counterparty must both participate",
+  "Duplicate transaction hashes cannot be reused",
+  "Self-attestations and unsupported interaction types are rejected",
+  "Only verified transaction-backed attestations can create trust edges"
+];
+
+const providerStates = [
+  ["INDEXED", "Provider returned usable activity and the chain contributes real indexed data."],
+  ["NO ACTIVITY", "Provider responded successfully, but no transactions were found for the wallet."],
+  ["LIMITED", "External provider access is unavailable, rate limited, paywalled, or temporarily restricted."],
+  ["NOT CONFIGURED", "Required API key or provider configuration is missing."],
+  ["PENDING", "The wallet has not been checked yet or refresh is still running."]
+];
+
+const endpoints = [
+  ["GET", "/api/score/:wallet", "Cached-first score, breakdown, explanations, chain coverage, and trust summary."],
+  ["POST", "/api/score/:wallet/refresh", "Runs a full wallet intelligence refresh in the background-safe refresh pipeline."],
+  ["GET", "/api/profile/:username", "Public profile, wallet, score, attestations, reputation events, and trust graph context."],
+  ["GET", "/api/users", "Claimed public identities for the directory."],
+  ["POST", "/api/attestations/request", "Creates a verified transaction-backed attestation after Arc transaction verification."],
+  ["GET", "/api/trust/:wallet", "Trust edges, snapshots, anomalies, reciprocal peers, and network metrics."]
 ];
 
 const faqItems = [
   {
-    question: "Is ARC Score based only on transaction count?",
-    answer: "No. ARC Score is primarily based on Arc ecosystem behavior, verified attestations, trust graph strength, and meaningful participation."
+    question: "Is ARC Identity a manual reputation form?",
+    answer: "No. Profiles are wallet-owned, and reputation comes from indexed wallet activity, verified transaction-backed attestations, and trust graph context."
   },
   {
-    question: "Does global wallet activity affect the score?",
-    answer: "It can support confidence and maturity context, but generic multi-chain activity is not the main driver of ARC Reputation Score."
+    question: "Why can some chains show LIMITED?",
+    answer: "Some external indexers have rate limits, API plan restrictions, or temporary outages. LIMITED means provider coverage is constrained, not that the wallet is risky."
   },
   {
-    question: "What are Verified Attestations?",
-    answer: "Transaction-backed trust signals between registered ARC Identity users."
+    question: "Can someone farm score with fake attestations?",
+    answer: "ARC Identity only scores transaction-backed attestations. The backend verifies the Arc transaction, participants, duplicate use, and relationship rules before trust is created."
   },
   {
-    question: "Can developers use ARC Identity data?",
-    answer: "Yes. Developers can query wallet and username reputation data, explanations, intelligence status, and coverage context through the Developer API."
+    question: "Does the score update instantly?",
+    answer: "The score API is cached-first for fast UX. Full indexing runs through a refresh pipeline, and the dashboard keeps the last good cached score visible while refreshes complete."
   },
   {
-    question: "Is ARC Identity still evolving?",
-    answer: "Yes. ARC Identity is live in an active building phase. Scoring, verification safeguards, chain coverage, and developer-facing responses will continue improving as usage grows."
+    question: "Is the system final?",
+    answer: "No. ARC Identity is in an active launch phase. Score explanations, provider coverage, trust safeguards, and developer responses will keep improving as usage grows."
   }
 ];
 
@@ -99,6 +134,14 @@ function SectionShell({
   );
 }
 
+function CodeBlock({ children }: { children: string }) {
+  return (
+    <pre className="mt-5 overflow-x-auto rounded-2xl border border-white/[0.08] bg-slate-950/70 p-4 text-xs leading-6 text-emerald-100 sm:text-sm">
+      <code>{children}</code>
+    </pre>
+  );
+}
+
 export default function DocsPage() {
   return (
     <ArcShell>
@@ -107,16 +150,16 @@ export default function DocsPage() {
           <div className="min-w-0">
             <p className="arc-section-label">ARC Identity docs</p>
             <h1 className="mt-4 max-w-4xl text-4xl font-black tracking-tight text-white sm:text-5xl lg:text-6xl">
-              Introducing ARC Identity
+              Real wallet intelligence for Arc users.
             </h1>
             <p className="mt-5 max-w-3xl text-lg leading-8 text-slate-300">
-              Understand wallet reputation through Arc-native activity, verified attestations, trust graph context, and supporting on-chain intelligence.
+              ARC Identity indexes wallet activity, verifies Arc transactions, and turns trust relationships into one portable reputation credential for stablecoin apps.
             </p>
           </div>
           <div className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] p-5">
-            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-100">Live launch</p>
+            <p className="text-xs font-black uppercase tracking-[0.18em] text-amber-100">Launch guide</p>
             <p className="mt-3 text-sm leading-7 text-amber-50/85">
-              ARC Identity is now live as an early reputation layer for Arc users and builders. This page explains how ARC Reputation Score, verified attestations, trust graph context, and wallet intelligence work together.
+              This page documents the current production architecture: wallet signatures, Supabase persistence, cached score refreshes, transaction-backed attestations, provider fallbacks, and trust graph intelligence.
             </p>
           </div>
         </header>
@@ -129,14 +172,17 @@ export default function DocsPage() {
           <article className="docs-article grid min-w-0 gap-6 md:gap-7">
             <section id="overview" className="scroll-mt-40 rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.055] p-5 md:scroll-mt-44 sm:p-7 lg:p-8">
               <p className="arc-section-label">Overview</p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">What is ARC Identity?</h2>
+              <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">What ARC Identity does</h2>
               <div className="mt-5 grid gap-4 text-[0.95rem] leading-8 text-slate-300 sm:text-base">
                 <p>
-                  ARC Identity helps turn wallet activity into a readable reputation profile. Users can claim a <span className="font-bold text-emerald-100">.arcid</span> identity, view wallet intelligence, create verified attestations, explore public profiles, and query reputation data through the Developer API.
+                  ARC Identity is a wallet credential layer for Arc and stablecoin applications. A user connects an EVM wallet, signs a verification message, claims a public <span className="font-bold text-emerald-100">.arcid</span> profile, and receives an ARC Identity Score based on real indexed activity and verified transaction evidence.
+                </p>
+                <p>
+                  The product is built for checks that happen before payments, lending, escrow, protected deals, merchant flows, and higher-value stablecoin interactions.
                 </p>
               </div>
               <div className="mt-6 grid gap-3 sm:grid-cols-3">
-                {["Claim an identity", "Understand reputation", "Share trusted context"].map((item) => (
+                {["Wallet-owned identity", "Transaction-verified trust", "Cached API intelligence"].map((item) => (
                   <div key={item} className="rounded-xl border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm font-bold text-emerald-50">
                     {item}
                   </div>
@@ -146,97 +192,53 @@ export default function DocsPage() {
 
             <section className="rounded-2xl border border-amber-300/15 bg-amber-300/[0.055] p-5 shadow-panel sm:p-7">
               <p className="arc-section-label">Launch phase</p>
-              <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Active development, transparent improvement</h2>
+              <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Production-minded, still improving</h2>
               <div className="mt-5 grid gap-4 text-[0.95rem] leading-7 text-amber-50/85 sm:text-base">
                 <p>
-                  ARC Identity is launching in an active building phase. The current release focuses on identity claiming, ARC Reputation Score, Global Wallet Intelligence, verified attestations, public profiles, directory discovery, and API access.
+                  ARC Identity no longer depends on demo users, local JSON storage, or manual score farming. Current data flows through wallet signatures, Supabase, Arc transaction verification, external chain indexers, cached score snapshots, and verified trust graph records.
                 </p>
                 <p>
-                  Scoring logic, verification safeguards, chain coverage, and developer responses may continue to improve as more users test the platform. If something looks incorrect, use the Report issue button to share bugs, wallet issues, UI glitches, or feedback.
+                  Some external chain providers can be rate limited or plan restricted. The UI treats those cases as LIMITED provider availability so the product stays understandable while Arc-native data and cached intelligence remain visible.
                 </p>
               </div>
             </section>
 
-            <section id="two-layer-model" className="scroll-mt-40 md:scroll-mt-44">
-              <div className="mb-5 max-w-3xl">
-                <p className="arc-section-label">Two-layer model</p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Reputation first, context second</h2>
-                <p className="mt-4 text-[0.95rem] leading-8 text-slate-300 sm:text-base">
-                  ARC Identity separates Arc-native reputation from broader wallet analytics so the score stays meaningful, explainable, and harder to inflate through random activity.
-                </p>
-              </div>
-              <div className="grid gap-5 lg:grid-cols-2">
-                <div className="arc-card-hover rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.075] p-5 sm:p-7">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-emerald-100">Primary layer</p>
-                  <h3 className="mt-3 text-2xl font-black text-white">ARC Reputation Score</h3>
-                  <p className="mt-4 text-sm leading-7 text-emerald-50/85">
-                    ARC Reputation Score measures reputation inside Arc.
-                  </p>
-                </div>
-                <div className="arc-card-hover rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.075] p-5 sm:p-7">
-                  <p className="text-xs font-black uppercase tracking-[0.18em] text-cyan-100">Secondary layer</p>
-                  <h3 className="mt-3 text-2xl font-black text-white">Global Wallet Intelligence</h3>
-                  <p className="mt-4 text-sm leading-7 text-cyan-50/85">
-                    Global Wallet Intelligence explains broader wallet context.
-                  </p>
-                </div>
-              </div>
-            </section>
-
-            <SectionShell id="arc-reputation-score" label="ARC Reputation Score - Primary" title="The main trust signal">
-              <div className="grid gap-4">
-                <p>
-                  ARC Reputation Score is the primary trust signal. It focuses on Arc ecosystem behavior, verified counterparties, transaction-backed attestations, trust graph strength, activity consistency, wallet maturity, and risk checks.
-                </p>
-                <p>
-                  It answers: <span className="font-bold text-emerald-100">&quot;How reputable is this wallet inside the Arc ecosystem?&quot;</span>
-                </p>
-              </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {reputationSignals.map((signal) => (
-                  <div key={signal} className="rounded-xl border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm font-semibold text-slate-200">
-                    {signal}
+            <SectionShell id="core-primitives" label="Core primitives" title="The building blocks">
+              <div className="grid gap-4 sm:grid-cols-2">
+                {primitives.map((item) => (
+                  <div key={item.title} className="rounded-2xl border border-white/[0.06] bg-white/[0.035] p-4">
+                    <h3 className="text-base font-black text-white">{item.title}</h3>
+                    <p className="mt-2 text-sm leading-6 text-slate-300">{item.body}</p>
                   </div>
                 ))}
               </div>
             </SectionShell>
 
-            <SectionShell id="global-wallet-intelligence" label="Global Wallet Intelligence - Secondary" title="Broader wallet context">
+            <SectionShell id="score-model" label="Score model" title="One score, explainable components">
               <div className="grid gap-4">
                 <p>
-                  Global Wallet Intelligence is the supporting context layer. It helps users understand a wallet&apos;s broader on-chain footprint through wallet age, chain coverage, indexed activity, transaction history, and general wallet behavior.
+                  ARC Identity exposes one primary score. Supporting components explain why the score moved, but they are not separate competing scores.
                 </p>
                 <p>
-                  It answers: <span className="font-bold text-cyan-100">&quot;What does this wallet&apos;s broader on-chain history look like?&quot;</span>
+                  The score combines global wallet credibility, Arc-specific activity, verified attestations, trust graph context, and risk analysis. It is clamped from 0 to 100 and mapped into familiar risk levels: High Risk, New / Unproven, Reliable, and Trusted.
+                </p>
+                <p>
+                  Claiming a username or creating a profile does not grant reputation points. A fresh wallet with no indexed activity, no Arc footprint, no verified transaction attestations, and no trust graph evidence starts from the real component total: 0. The score rises only when ARC Identity can verify meaningful wallet behavior.
                 </p>
               </div>
-              <div className="mt-6 grid gap-3 sm:grid-cols-2">
-                {walletIntelligenceSignals.map((signal) => (
-                  <div key={signal} className="rounded-xl border border-white/[0.06] bg-white/[0.035] px-4 py-3 text-sm font-semibold text-slate-200">
-                    {signal}
+              <div className="mt-6 grid gap-3">
+                {scoreComponents.map(([name, description]) => (
+                  <div key={name} className="rounded-xl border border-white/[0.06] bg-white/[0.035] p-4">
+                    <p className="text-sm font-black text-white">{name}</p>
+                    <p className="mt-1 text-sm leading-6 text-slate-300">{description}</p>
                   </div>
                 ))}
               </div>
-            </SectionShell>
-
-            <SectionShell id="why-separation-matters" label="Why this separation matters" title="Reputation is not raw activity volume">
-              <div className="grid gap-4">
-                <p>
-                  Many scoring systems reward raw transaction volume. ARC Identity avoids making random multi-chain activity the main reputation driver.
+              <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5">
+                <p className="text-sm font-black text-cyan-50">Score stability</p>
+                <p className="mt-2 text-sm leading-7 text-cyan-50/80">
+                  Refreshes are dampened to avoid scary unexplained drops. Passive recalculations are labeled as score recalibrations, while strong negative styling is reserved for real risk events, anomaly signals, or suspicious behavior.
                 </p>
-                <p>
-                  Broader wallet data can support confidence, but the primary score remains focused on Arc-native reputation and verified relationships.
-                </p>
-              </div>
-              <div className="mt-6 grid gap-4 md:grid-cols-2">
-                <div className="rounded-2xl border border-emerald-300/20 bg-emerald-300/[0.07] p-5">
-                  <p className="text-sm font-black text-white">ARC Reputation Score</p>
-                  <p className="mt-2 text-sm leading-6 text-emerald-50/80">Reputation inside the Arc ecosystem.</p>
-                </div>
-                <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.07] p-5">
-                  <p className="text-sm font-black text-white">Global Wallet Intelligence</p>
-                  <p className="mt-2 text-sm leading-6 text-cyan-50/80">Broader wallet history and context.</p>
-                </div>
               </div>
             </SectionShell>
 
@@ -245,7 +247,7 @@ export default function DocsPage() {
                 <p className="arc-section-label">Verified Attestations</p>
                 <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Transaction-backed trust</h2>
                 <p className="mt-5 text-[0.95rem] leading-8 text-slate-300">
-                  Verified Attestations let registered ARC Identity users create transaction-backed trust signals with each other. They are designed to prove real interactions, strengthen reputation history, and improve trust graph context.
+                  Verified Attestations are not social claims. A user submits an Arc transaction hash, a registered counterparty, and an interaction type. The backend verifies the transaction before any reputation or trust graph effect is applied.
                 </p>
                 <div className="mt-6 grid gap-2.5 text-sm text-slate-300">
                   {attestationChecks.map((item) => (
@@ -255,35 +257,97 @@ export default function DocsPage() {
               </div>
 
               <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5 shadow-panel sm:p-7">
-                <p className="arc-section-label">Trust Graph</p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Relationships make reputation contextual</h2>
+                <p className="arc-section-label">Anti-spam model</p>
+                <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Trust has friction</h2>
                 <p className="mt-5 text-[0.95rem] leading-8 text-slate-300">
-                  The Trust Graph adds relationship context to reputation. Instead of treating a wallet as an isolated score, it looks at verified counterparties, relationship quality, and network strength.
+                  Attestations use duplicate prevention, self-attestation blocking, relationship cooldowns, counterparty checks, and diminishing relationship influence. Circular trust farming or low-diversity behavior can reduce trust confidence and trigger anomaly records.
                 </p>
-                <div className="mt-6 rounded-2xl border border-white/[0.06] bg-white/[0.035] p-5">
-                  <p className="text-sm font-bold leading-7 text-slate-200">
-                    A wallet&apos;s reputation becomes stronger when it connects to verified, meaningful, and non-abusive interactions across the Arc ecosystem.
+                <div className="mt-6 rounded-2xl border border-amber-300/20 bg-amber-300/[0.06] p-5">
+                  <p className="text-sm font-bold leading-7 text-amber-50/85">
+                    Only submit attestations for legitimate economic interactions. ARC Identity is designed to reward real transaction evidence, not coordinated self-reporting.
                   </p>
                 </div>
               </div>
             </section>
 
-            <section id="developer-api" className="scroll-mt-40 grid gap-5 md:scroll-mt-44 lg:grid-cols-2">
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5 shadow-panel sm:p-7">
-                <p className="arc-section-label">Public Profiles and Directory</p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Shareable identity pages</h2>
-                <p className="mt-5 text-[0.95rem] leading-8 text-slate-300">
-                  Public profiles make ARC Identity shareable. The directory helps users discover registered identities and inspect reputation context before interacting.
+            <SectionShell id="trust-graph" label="Trust graph" title="Verified relationships, not social follows">
+              <div className="grid gap-4">
+                <p>
+                  Trust edges are created only from accepted, verified transaction-backed attestations. Usernames, manual profile data, and unverified activity do not create graph relationships.
+                </p>
+                <p>
+                  The trust graph tracks trusted peers, strongest relationships, reciprocal edges, total trust weight, network maturity, anomaly hints, and capped propagated trust contribution.
                 </p>
               </div>
+              <div className="mt-6 grid gap-4 md:grid-cols-3">
+                {["Verified edges only", "Reciprocal confidence", "Capped propagation"].map((item) => (
+                  <div key={item} className="rounded-2xl border border-emerald-300/15 bg-emerald-300/[0.055] p-4 text-sm font-black text-emerald-50">
+                    {item}
+                  </div>
+                ))}
+              </div>
+            </SectionShell>
 
-              <div className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5 shadow-panel sm:p-7">
-                <p className="arc-section-label">Developer API</p>
-                <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Reputation data for builders</h2>
-                <p className="mt-5 text-[0.95rem] leading-8 text-slate-300">
-                  The Developer API gives builders access to ARC Score and wallet reputation context through clean public responses. It supports wallet lookup, username lookup, score explanations, intelligence status, and coverage context.
+            <SectionShell id="reliability-model" label="Reliability model" title="Fast reads, careful refreshes">
+              <div className="grid gap-4">
+                <p>
+                  Score reads are cached-first. <span className="font-bold text-white">GET /api/score/:wallet</span> returns the best available cached profile quickly, including cache status, refresh status, last indexed time, explanations, chain coverage, and trust summary.
+                </p>
+                <p>
+                  Full indexing happens through <span className="font-bold text-white">POST /api/score/:wallet/refresh</span>. The refresh pipeline uses lifecycle states so incomplete or failed provider checks do not overwrite the last good cached score.
                 </p>
               </div>
+              <div className="mt-6 grid gap-3">
+                {providerStates.map(([state, description]) => (
+                  <div key={state} className="grid gap-2 rounded-xl border border-white/[0.06] bg-white/[0.035] p-4 sm:grid-cols-[150px_minmax(0,1fr)]">
+                    <p className="text-sm font-black text-white">{state}</p>
+                    <p className="text-sm leading-6 text-slate-300">{description}</p>
+                  </div>
+                ))}
+              </div>
+            </SectionShell>
+
+            <section id="developer-api" className="scroll-mt-40 rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5 shadow-panel md:scroll-mt-44 sm:p-7 lg:p-8">
+              <p className="arc-section-label">Developer API</p>
+              <h2 className="mt-3 text-2xl font-black tracking-tight text-white sm:text-3xl">Reputation data for builders</h2>
+              <p className="mt-5 max-w-4xl text-[0.95rem] leading-8 text-slate-300 sm:text-base">
+                Any Arc app can use ARC Identity before payments, lending, escrow, protected deals, merchant flows, or high-value stablecoin interactions.
+              </p>
+              <div className="mt-6 grid gap-3">
+                {endpoints.map(([method, path, description]) => (
+                  <div key={path} className="grid gap-3 rounded-xl border border-white/[0.06] bg-white/[0.035] p-4 lg:grid-cols-[72px_260px_minmax(0,1fr)]">
+                    <p className="text-xs font-black uppercase tracking-[0.16em] text-emerald-100">{method}</p>
+                    <p className="break-all font-mono text-sm font-bold text-white">{path}</p>
+                    <p className="text-sm leading-6 text-slate-300">{description}</p>
+                  </div>
+                ))}
+              </div>
+              <CodeBlock>{`{
+  "walletAddress": "0x...",
+  "username": "example.arcid",
+  "arcIdentityScore": 72,
+  "riskLevel": "Reliable",
+  "cacheStatus": "cached",
+  "refreshStatus": "committed",
+  "dataSource": "arc_rpc_plus_transaction_verified_attestations",
+  "breakdown": {
+    "globalWalletAge": 16,
+    "crossChainActivity": 12,
+    "arcActivity": 18,
+    "verifiedAttestations": 15,
+    "propagatedTrust": 6,
+    "riskPenalty": 0
+  },
+  "explanations": {
+    "globalWalletAge": "Based on earliest indexed transaction.",
+    "verifiedAttestations": "Based on verified transaction attestations."
+  },
+  "trustGraph": {
+    "trustedPeerCount": 2,
+    "networkHealth": "emerging",
+    "trustConfidence": 64
+  }
+}`}</CodeBlock>
             </section>
 
             <section className="rounded-2xl border border-white/[0.08] bg-white/[0.035] p-5 shadow-panel sm:p-7 lg:p-8">
@@ -301,9 +365,9 @@ export default function DocsPage() {
 
             <section id="get-started" className="scroll-mt-40 rounded-3xl border border-emerald-300/20 bg-emerald-300/[0.075] p-5 shadow-panel md:scroll-mt-44 sm:p-8">
               <p className="arc-section-label">Get started</p>
-              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">Start using ARC Identity</h2>
+              <h2 className="mt-3 text-3xl font-black tracking-tight text-white">Run the launch flow</h2>
               <p className="mt-4 max-w-3xl text-[0.95rem] leading-8 text-emerald-50/85 sm:text-base">
-                Start with your wallet, then build reputation through verified Arc activity.
+                Connect a wallet, sign the ownership message, claim a username, refresh wallet intelligence, inspect the public profile, and try a transaction-backed attestation when you have a real Arc transaction with another registered identity.
               </p>
               <div className="mt-7 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 {ctaLinks.map(([label, href], index) => (
@@ -325,3 +389,4 @@ export default function DocsPage() {
     </ArcShell>
   );
 }
+

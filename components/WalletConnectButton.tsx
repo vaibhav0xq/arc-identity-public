@@ -87,6 +87,7 @@ function clearWalletScopedState(wallet?: string | null) {
   localStorage.removeItem("arcIdentityWallet");
   localStorage.removeItem("arcIdentityWalletProvider");
   localStorage.removeItem("arcIdentitySignature");
+  localStorage.removeItem("arcIdentitySignatureMessage");
   localStorage.removeItem("arcIdentityUsername");
   localStorage.removeItem(lookupWarningKey);
   for (let index = localStorage.length - 1; index >= 0; index -= 1) {
@@ -239,8 +240,9 @@ export function WalletConnectButton({
     function syncWalletState() {
       const stored = localStorage.getItem("arcIdentityWallet") ?? "";
       const signature = localStorage.getItem("arcIdentitySignature") ?? "";
+      const signatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? "";
       setWallet(stored);
-      setVerified(Boolean(signature));
+      setVerified(Boolean(signature && signatureMessage));
       onConnect?.(stored);
     }
     syncWalletState();
@@ -332,6 +334,7 @@ export function WalletConnectButton({
 
       localStorage.setItem("arcIdentityWallet", connected);
       localStorage.setItem("arcIdentitySignature", signature);
+      localStorage.setItem("arcIdentitySignatureMessage", message);
       localStorage.setItem("arcIdentityWalletProvider", providerName(provider));
       setWallet(connected);
       setVerified(true);
@@ -344,7 +347,7 @@ export function WalletConnectButton({
         const data = await fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ walletAddress: connected, signature })
+          body: JSON.stringify({ walletAddress: connected, signature, signatureMessage: message })
         }, identityLookupTimeoutMs);
         logIdentityLookup("wallet_identity_lookup_success", { wallet: connected, username: data.profile?.username ?? null });
         const ensuredUsername = maybeArcUsername(data.profile?.username);
@@ -418,10 +421,10 @@ export function WalletConnectButton({
 
   if (wallet) {
     return (
-      <div className="grid max-w-full gap-2 sm:flex sm:flex-wrap sm:items-center sm:gap-3">
+      <div className="flex max-w-full flex-wrap items-center justify-end gap-2">
         <span
           className={`inline-flex max-w-full items-center justify-center gap-2.5 rounded-lg border border-emerald-300/30 bg-emerald-300/10 font-extrabold text-emerald-100 ${
-            compact ? "px-3.5 py-2.5 text-sm sm:py-2" : "px-5 py-3 text-base"
+            compact ? "min-w-0 flex-1 px-3 py-2 text-xs sm:flex-none sm:px-3.5 sm:text-sm" : "px-5 py-3 text-base"
           }`}
         >
           <span className="h-2.5 w-2.5 rounded-full bg-emerald-300 shadow-[0_0_8px_rgba(212,175,55,0.8)]" />
@@ -433,7 +436,7 @@ export function WalletConnectButton({
         <button
           type="button"
           onClick={disconnect}
-          className="arc-button-secondary w-full px-4 py-2.5 text-sm font-bold sm:w-auto sm:py-2"
+          className="arc-button-secondary flex-none px-3 py-2 text-xs font-bold sm:px-4 sm:text-sm"
         >
           Disconnect
         </button>

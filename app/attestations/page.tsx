@@ -633,7 +633,7 @@ export default function AttestationsPage() {
                   ? "Looking up the connected wallet directly against the ARC Identity registry."
                   : identityStatus === "failed"
                     ? "The registry lookup did not complete. Retry the check without leaving this page."
-                    : "Wallet connection verifies ownership. Verified attestations unlock after a completed username claim."}
+                    : "Claim your ARC Identity to create verified attestations."}
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
                 {identityStatus === "unregistered" || identityStatus === "disconnected" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim ARC Identity</a> : null}

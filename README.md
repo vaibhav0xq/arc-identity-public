@@ -1,121 +1,80 @@
-# ARC Identity
+# Arc Identity
 
-ARC Identity is a wallet identity and reputation tool for Arc users.
+Wallet identity and reputation layer for the Arc ecosystem.
 
-It helps users claim a `.arcid` identity, view wallet reputation context, create verified attestations, share public profiles, and access reputation data through a Developer API.
+Live: https://arcidentity.in  
+Docs: https://arcidentity.in/docs  
+Developer API: https://arcidentity.in/developers
 
-**Live app:** https://arcidentity.in  
-**Docs:** https://arcidentity.in/docs  
-**Developer API:** https://arcidentity.in/developers  
+## Overview
 
----
+Arc Identity helps users claim a readable identity, inspect wallet reputation, create verified attestations and share public profiles.
+
+The project focuses on making wallet activity easier to understand before users or builders interact with an address.
 
 ## Screenshots
 
 ### Homepage
 
-![ARC Identity Homepage](./public/screenshots/homepage.png)
+![Arc Identity Homepage](./public/screenshots/homepage.png)
 
 ### Dashboard
 
-![ARC Identity Dashboard](./public/screenshots/dashboard.png)
+![Arc Identity Dashboard](./public/screenshots/dashboard.png)
 
 ### Directory
 
-![ARC Identity Directory](./public/screenshots/directory.png)
+![Arc Identity Directory](./public/screenshots/directory.png)
 
 ### Verified Attestations
 
-![ARC Identity Verified Attestations](./public/screenshots/verified_attestations.png)
+![Arc Identity Verified Attestations](./public/screenshots/verified_attestations.png)
 
----
+## What it does
 
-## Overview
+Arc Identity lets users:
 
-Wallets show activity, but they do not always make trust context easy to understand.
+- Connect an EVM wallet
+- Verify wallet ownership
+- Claim a readable `.arcid` identity
+- View reputation context
+- Create verified transaction-backed attestations
+- Share public identity profiles
+- Discover registered identities
+- Query reputation data through a Developer API
 
-ARC Identity turns wallet activity, verified interactions, and ecosystem participation into a readable identity profile. The goal is to help users and builders understand wallet reputation before interacting with an address or building trust-aware user experiences.
+## Core features
 
-ARC Identity is currently live in Phase 1 as a web application and API layer.
+### Identity claiming
 
----
+Users can connect an EVM wallet, verify ownership and claim a readable `.arcid` identity.
 
-## What ARC Identity Does
+### Reputation context
 
-ARC Identity lets users:
+Arc Identity turns wallet activity, verified interactions and ecosystem participation into a readable reputation profile.
 
-- connect an EVM wallet
-- verify wallet ownership
-- claim a readable `.arcid` identity
-- view an ARC Reputation Score
-- explore wallet intelligence
-- create verified transaction-backed attestations
-- share public identity profiles
-- discover registered identities through the directory
-- query reputation context through the Developer API
-
----
-
-## Core Features
-
-### `.arcid` Identity Claiming
-
-Users can connect an EVM wallet, verify ownership, and claim a readable `.arcid` identity.
-
-The claim flow is designed to make wallet identity easier to share and inspect.
-
----
-
-### ARC Reputation Score
-
-ARC Reputation Score is the primary reputation signal inside ARC Identity.
-
-It focuses on:
+The reputation layer focuses on:
 
 - Arc activity
-- verified attestations
-- trusted counterparties
-- trust graph context
-- wallet maturity
-- activity consistency
-- risk and anomaly checks
+- Verified attestations
+- Trusted counterparties
+- Wallet maturity
+- Activity consistency
+- Risk and anomaly checks
 
-The score is designed to be explainable instead of being treated as a black-box number.
+### Verified attestations
 
----
-
-### Global Wallet Intelligence
-
-Global Wallet Intelligence provides supporting wallet context.
-
-It includes:
-
-- wallet age
-- chain coverage
-- indexed activity
-- transaction history
-- counterparties
-- broader onchain footprint
-
-This layer supports reputation context, but it does not replace the main ARC Reputation Score.
-
----
-
-### Verified Attestations
-
-Registered ARC Identity users can create transaction-backed attestations with other registered users.
+Registered users can create transaction-backed attestations with other registered users.
 
 Current safeguards include:
 
-- valid transaction hash required
-- registered counterparty required
-- self-attestations rejected
-- duplicate submissions guarded
-- invalid or unverified transactions rejected
+- Valid transaction hash required
+- Registered counterparty required
+- Self-attestations rejected
+- Duplicate submissions guarded
+- Invalid or unverified transactions rejected
 
----
-
-### Public Profiles
+### Public profiles
 
 Each claimed identity has a public profile page that makes wallet reputation easier to inspect and share.
 
@@ -125,17 +84,9 @@ Example route:
 /profile/example.arcid
 ```
 
----
-
-### Directory
-
-The directory lets users discover registered ARC identities and inspect public reputation context.
-
----
-
 ### Developer API
 
-ARC Identity exposes public API routes for builders who want to query wallet or username reputation context.
+Arc Identity exposes public API routes for builders who want to query wallet or username reputation context.
 
 Example routes:
 
@@ -146,31 +97,9 @@ GET /api/profile/by-wallet/:wallet
 GET /api/users
 ```
 
----
+## Supported chains
 
-## How It Works
-
-ARC Identity is built around two layers.
-
-### 1. ARC Reputation Score
-
-The main reputation signal.
-
-It focuses on Arc-related activity, verified interactions, relationship context, and meaningful wallet behavior.
-
-### 2. Global Wallet Intelligence
-
-The supporting context layer.
-
-It gives users a broader view of wallet history across supported EVM networks.
-
-This separation helps avoid treating raw transaction volume as the main reputation driver.
-
----
-
-## Current Chain Context
-
-ARC Identity currently supports EVM-compatible wallet intelligence across:
+Arc Identity currently supports EVM-compatible wallet intelligence across:
 
 - Arc Testnet
 - Ethereum
@@ -179,39 +108,31 @@ ARC Identity currently supports EVM-compatible wallet intelligence across:
 - Arbitrum
 - BNB Chain
 
-Some chains may have limited coverage depending on available indexing or provider support.
+Some chains may have limited coverage depending on indexing or provider support.
 
-No custom smart contracts are deployed in Phase 1.
-
----
-
-## Tech Stack
+## Tech stack
 
 - Next.js
 - React
 - TypeScript
 - Tailwind CSS
-- Supabase
 - EVM wallet connection
+- API routes
 - Vercel
 
----
-
-## Project Structure
+## Project structure
 
 ```txt
 app/          Application routes and API routes
 components/   Reusable UI components
-lib/          Reputation, wallet, onboarding, scoring, and trust logic
+lib/          Reputation, wallet, onboarding, scoring and trust logic
 data/         Local supporting data
 supabase/     Database schema and migrations
 public/       Public assets and screenshots
 scripts/      Test and verification scripts
 ```
 
----
-
-## Local Development
+## Local development
 
 Clone the repository:
 
@@ -232,16 +153,7 @@ Create a local environment file:
 cp .env.example .env.local
 ```
 
-Fill in the required environment variables:
-
-```env
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
-NEXT_PUBLIC_APP_URL=http://localhost:3000
-```
-
-Run the development server:
+Add the required local environment values, then run the development server:
 
 ```bash
 npm run dev
@@ -253,9 +165,7 @@ Open:
 http://localhost:3000
 ```
 
----
-
-## Build Verification
+## Build verification
 
 ```bash
 npm run typecheck
@@ -264,66 +174,47 @@ npm run build
 
 Some test scripts require a local server to be running.
 
----
+## Current status
 
-## Current Status
-
-ARC Identity is live in Phase 1.
+Arc Identity is live in Phase 1.
 
 Current focus areas:
 
-- onboarding reliability
-- score explainability
-- verified attestation UX
-- trust graph quality
+- Onboarding reliability
+- Reputation explainability
+- Verified attestation UX
+- Trust graph quality
 - Developer API stability
 - Arc ecosystem feedback
 
----
-
 ## Roadmap
 
-### Phase 1 — Public MVP
+### Phase 1: Public release
 
-- identity claiming
-- public profiles
-- dashboard
-- reputation score
-- verified attestations
-- directory
-- docs
+- Identity claiming
+- Public profiles
+- Dashboard
+- Reputation score
+- Verified attestations
+- Directory
+- Docs
 - Developer API
 
-### Phase 2 — Reputation Explainability
+### Phase 2: Reputation clarity
 
-- better score explanations
-- clearer history views
-- improved trust context
-- more readable public profiles
+- Better score explanations
+- Clearer history views
+- Improved trust context
+- More readable public profiles
 
-### Phase 3 — Trust Relationship Improvements
+### Phase 3: Developer tooling
 
-- stronger counterparty context
-- better attestation review flows
-- improved duplicate and invalid submission handling
-- richer relationship signals
+- Cleaner API examples
+- Improved response formats
+- Stronger documentation
+- Builder-focused integrations
 
-### Phase 4 — Developer Tooling
-
-- cleaner API examples
-- improved response formats
-- stronger documentation
-- builder-focused integrations
-
-### Phase 5 — Arc Ecosystem Expansion
-
-- deeper Arc-aligned reputation signals
-- broader identity use cases
-- future stablecoin-related trust-context exploration where appropriate
-
----
-
-## Security Notes
+## Security notes
 
 Do not commit real secrets.
 
@@ -331,18 +222,16 @@ Never commit:
 
 - `.env.local`
 - API secrets
-- service role keys
+- Service role keys
 - RPC credentials
-- private keys
-- deployment tokens
+- Private keys
+- Deployment tokens
 
 This public repository does not include production environment values.
-
----
 
 ## Author
 
 Built by **Vaibhav Gangani**  
 X: [@vaibhav_0xq](https://x.com/vaibhav_0xq)
 
-ARC Identity is an independent builder project for the Arc ecosystem.
+Arc Identity is an independent builder project for the Arc ecosystem.

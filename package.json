@@ -1,33 +1,40 @@
 {
-  "name": "arc-identity",
-  "version": "0.1.0",
-  "private": true,
-  "scripts": {
-    "dev": "next dev",
-    "build": "next build",
-    "start": "next start",
-    "typecheck": "tsc --noEmit",
-    "test:score-contract": "node --experimental-strip-types scripts/test-score-contract-v2.mjs",
-    "test:score-api": "node scripts/test-score-integrity-v2.mjs",
-    "backfill:score-v2": "node scripts/backfill-score-model-v2.mjs"
-  },
-  "dependencies": {
-    "@supabase/supabase-js": "^2.105.3",
-    "next": "^15.5.18",
-    "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "viem": "^2.55.2"
-  },
-  "devDependencies": {
-    "@types/node": "22.7.5",
-    "@types/react": "18.3.11",
-    "@types/react-dom": "18.3.1",
-    "autoprefixer": "10.4.20",
-    "postcss": "8.5.10",
-    "tailwindcss": "3.4.14",
-    "typescript": "5.6.3"
-  },
-  "overrides": {
-    "postcss": "8.5.10"
-  }
+    "name":  "arc-identity",
+    "version":  "0.1.0",
+    "private":  true,
+    "license":  "MIT",
+    "homepage":  "https://arcidentity.in",
+    "repository":  {
+                       "type":  "git",
+                       "url":  "https://github.com/vaibhav0xq/arc-identity-public.git"
+                   },
+    "scripts":  {
+                    "dev":  "next dev",
+                    "build":  "next build",
+                    "start":  "next start",
+                    "typecheck":  "tsc --noEmit",
+                    "test:score-contract":  "node --experimental-strip-types scripts/test-score-contract-v2.mjs",
+                    "test:score-api":  "node scripts/test-score-integrity-v2.mjs",
+                    "backfill:score-v2":  "node scripts/backfill-score-model-v2.mjs"
+                },
+    "dependencies":  {
+                         "@supabase/supabase-js":  "^2.105.3",
+                         "next":  "^15.5.18",
+                         "react":  "18.3.1",
+                         "react-dom":  "18.3.1",
+                         "viem":  "^2.55.2"
+                     },
+    "devDependencies":  {
+                            "@types/node":  "22.7.5",
+                            "@types/react":  "18.3.11",
+                            "@types/react-dom":  "18.3.1",
+                            "autoprefixer":  "10.4.20",
+                            "postcss":  "8.5.10",
+                            "tailwindcss":  "3.4.14",
+                            "typescript":  "5.6.3"
+                        },
+    "overrides":  {
+                      "postcss":  "8.5.10"
+                  }
 }
+

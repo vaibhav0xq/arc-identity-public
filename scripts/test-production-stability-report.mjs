@@ -92,7 +92,7 @@ for (let index = 0; index < 3; index += 1) {
   const repeated = await request(`/api/score/${wallet}?t=${Date.now()}-${index}`);
   timings.push({ path: `/api/score repeat ${index + 1}`, status: repeated.response.status, durationMs: repeated.durationMs });
   failIf(!repeated.response.ok, failures, `score repeat ${index + 1} must return`, repeated.json ?? repeated.text);
-  failIf(chainTxSum > 0 && scoreValue(repeated.json) === 35 && totalTx(repeated.json) === 0 && activeChainCount(repeated.json) === 0, failures, `score repeat ${index + 1} must not regress to baseline`, repeated.json);
+  failIf(chainTxSum > 0 && scoreValue(repeated.json) === 0 && totalTx(repeated.json) === 0 && activeChainCount(repeated.json) === 0, failures, `score repeat ${index + 1} must not regress to a zero-evidence baseline`, repeated.json);
 }
 
 const fs = await import("node:fs/promises");

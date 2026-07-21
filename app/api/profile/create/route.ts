@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { claimUsername } from "@/lib/db";
 import { profileRouteFor, usernameBase } from "@/lib/username";
-import { publicNoStoreHeaders } from "@/lib/api-contract";
+import { publicNoStoreHeaders, sanitizeUserProfile } from "@/lib/api-contract";
 
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -19,6 +19,7 @@ function publicClaimError(message: string) {
 
 function profileResponse(profile: Awaited<ReturnType<typeof claimUsername>>) {
   const username = profile.username;
+  const publicProfile = sanitizeUserProfile(profile);
   return {
     success: Boolean(username && profile.verifiedWallet),
     username,
@@ -27,8 +28,8 @@ function profileResponse(profile: Awaited<ReturnType<typeof claimUsername>>) {
     verified_wallet: profile.verifiedWallet,
     usernameClaimed: Boolean(username),
     profileUrl: username ? profileRouteFor(username) : null,
-    profile,
-    user: profile
+    profile: publicProfile,
+    user: publicProfile
   };
 }
 

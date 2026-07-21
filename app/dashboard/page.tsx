@@ -15,6 +15,7 @@ import type { Attestation, ChainSnapshot, IdentityRecord, ReputationEvent, Score
 import { fetchJsonWithTimeout } from "@/lib/timeouts";
 import { publicAppUrl } from "@/lib/links";
 import { maybeArcUsername, profileRouteFor } from "@/lib/username";
+import { ARC_SCORE_MODEL_VERSION } from "@/lib/score-contract";
 import { shortenAddress } from "@/lib/wallet";
 import { getBadge } from "@/lib/score";
 import { deriveIntelligenceState, intelligenceStateCopy } from "@/lib/intelligence-state";
@@ -148,7 +149,11 @@ function baselineIdentity(wallet: string, username: string): IdentityRecord {
       activeChainCount: 0,
       credentialScore: 0,
       credentialLevel: "High Risk",
-      indexedChains: []
+      indexedChains: [],
+      scoreModelVersion: ARC_SCORE_MODEL_VERSION,
+      scoreInputs: null,
+      scoreBreakdown: null,
+      scoreCalculatedAt: now
     },
     score: {
       walletAddress: wallet.toLowerCase(),
@@ -162,7 +167,8 @@ function baselineIdentity(wallet: string, username: string): IdentityRecord {
       trustPropagationScore: 0,
       consistencyScore: 0,
       riskPenalty: 0,
-      lastSyncedAt: now
+      lastSyncedAt: now,
+      modelVersion: ARC_SCORE_MODEL_VERSION
     },
     snapshot: null,
     acceptedAttestations: 0,
@@ -179,6 +185,7 @@ function baselineIdentity(wallet: string, username: string): IdentityRecord {
       arcActivity: "No Arc activity detected yet.",
       indexedChainDepth: "No chains detected yet.",
       verifiedAttestations: "No verified transaction attestations exist yet.",
+      propagatedTrust: "No propagated trust contribution is currently applied.",
       riskPenalty: "No risk penalty is applied while ARC Intelligence initializes."
     },
     refreshJob: null
@@ -213,6 +220,7 @@ function applyScoreMeta(identity: IdentityRecord, score: ScoreLookupResponse | n
       volume: Number(identity.snapshot?.volume ?? 0),
       counterparties: Number(onchain?.counterparties ?? onchain?.uniqueCounterparties ?? identity.snapshot?.counterparties ?? 0),
       activeDays: Number(onchain?.activeDays ?? identity.snapshot?.activeDays ?? 0),
+      counterpartyAddresses: identity.snapshot?.counterpartyAddresses ?? [],
       recentActivityCount: Number(onchain?.recentActivityCount ?? identity.snapshot?.recentActivityCount ?? 0),
       walletAgeDays: Number(onchain?.walletAgeDays ?? identity.snapshot?.walletAgeDays ?? 0),
       activityFrequency: Number(onchain?.activityFrequency ?? identity.snapshot?.activityFrequency ?? 0),

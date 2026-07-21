@@ -1,12 +1,15 @@
 import type { IdentityRecord, MultiChainWalletProfile, WalletActivitySnapshot } from "@/lib/types";
 
+export const ARC_SCORE_MODEL_VERSION = "arc_score_v2_2026_07";
+
 export type ScoreComponentKey =
   | "walletAge"
   | "crossChain"
   | "transactionActivity"
   | "diversity"
   | "arcActivity"
-  | "attestations";
+  | "attestations"
+  | "propagatedTrust";
 
 export type ScoreComponent = {
   points: number;
@@ -18,12 +21,13 @@ export type ScoreComponent = {
 export type ScoreComponents = Record<ScoreComponentKey, ScoreComponent>;
 
 export const ARC_SCORE_COMPONENT_MAX = {
-  walletAge: 10,
+  walletAge: 20,
   crossChain: 5,
-  transactionActivity: 5,
+  transactionActivity: 15,
   diversity: 15,
-  arcActivity: 35,
-  attestations: 30
+  arcActivity: 25,
+  attestations: 15,
+  propagatedTrust: 5
 } as const satisfies Record<ScoreComponentKey, number>;
 
 export type ScoreContractInput = {
@@ -32,10 +36,13 @@ export type ScoreContractInput = {
   indexedTx: number;
   uniqueCounterparties: number;
   arcTx: number;
+  arcWalletAgeDays: number;
+  arcBalance: number;
   arcCounterparties: number;
   arcActiveDays: number;
   verifiedAttestations: number;
   verifiedAttestationCounterparties: number;
+  attestationWeight: number;
   propagatedTrustScore: number;
   anomalyScore: number;
   repeatedPairRatio: number;
@@ -79,37 +86,39 @@ export function buildScoreContract(input: ScoreContractInput): ScoreContractResu
   const indexedTx = Math.max(0, finite(input.indexedTx));
   const uniqueCounterparties = Math.max(0, finite(input.uniqueCounterparties));
   const arcTx = Math.max(0, finite(input.arcTx));
+  const arcWalletAgeDays = Math.max(0, finite(input.arcWalletAgeDays));
+  const arcBalance = Math.max(0, finite(input.arcBalance));
   const arcCounterparties = Math.max(0, finite(input.arcCounterparties));
   const arcActiveDays = Math.max(0, finite(input.arcActiveDays));
   const verifiedAttestations = Math.max(0, finite(input.verifiedAttestations));
   const verifiedAttestationCounterparties = Math.max(0, finite(input.verifiedAttestationCounterparties));
+  const attestationWeight = Math.max(0, finite(input.attestationWeight));
   const propagatedTrustScore = Math.max(0, finite(input.propagatedTrustScore));
   const anomalyScore = Math.max(0, finite(input.anomalyScore));
   const repeatedPairRatio = Math.max(0, finite(input.repeatedPairRatio));
 
-  const walletAgePoints = tiered(walletAgeDays, [[7, 2], [30, 4], [180, 7], [365, 9]], ARC_SCORE_COMPONENT_MAX.walletAge);
-  const crossChainPoints = activeChains <= 0 ? 0 : activeChains === 1 ? 2 : activeChains === 2 ? 3 : activeChains === 3 ? 4 : ARC_SCORE_COMPONENT_MAX.crossChain;
-  const transactionPoints = tiered(indexedTx, [[4, 1], [19, 2], [99, 3], [249, 4]], ARC_SCORE_COMPONENT_MAX.transactionActivity);
-  const diversityValue = Math.min(6, uniqueCounterparties) + arcCounterparties * 2 + verifiedAttestationCounterparties * 3;
-  const diversityPoints = tiered(diversityValue, [[2, 3], [7, 7], [14, 11], [24, 13]], ARC_SCORE_COMPONENT_MAX.diversity);
-  const arcActivityPoints = arcTx <= 0
-    ? 0
-    : Math.min(
-      ARC_SCORE_COMPONENT_MAX.arcActivity,
-      tiered(arcTx, [[2, 8], [8, 17], [24, 25], [49, 31]], 33) +
-      Math.min(4, Math.floor(arcActiveDays / 7)) +
-      Math.min(3, arcCounterparties)
-    );
-  const trustBonus = Math.min(8, Math.floor(propagatedTrustScore / 4));
+  const walletAgePoints = tiered(walletAgeDays, [[7, 3], [30, 7], [180, 12], [365, 16]], ARC_SCORE_COMPONENT_MAX.walletAge);
+  const crossChainPoints = Math.min(ARC_SCORE_COMPONENT_MAX.crossChain, Math.ceil(activeChains));
+  const transactionPoints = tiered(indexedTx, [[4, 2], [19, 5], [49, 8], [99, 11], [249, 13]], ARC_SCORE_COMPONENT_MAX.transactionActivity);
+  const diversityValue = uniqueCounterparties + arcCounterparties + verifiedAttestationCounterparties * 2;
+  const diversityPoints = tiered(diversityValue, [[2, 3], [7, 6], [14, 9], [29, 12]], ARC_SCORE_COMPONENT_MAX.diversity);
+  const arcTxPoints = tiered(arcTx, [[2, 3], [8, 5], [24, 7], [49, 9]], 10);
+  const arcCounterpartyPoints = tiered(arcCounterparties, [[1, 2], [2, 3], [5, 4], [9, 5]], 6);
+  const arcActiveDayPoints = tiered(arcActiveDays, [[1, 1], [3, 2], [7, 3], [14, 4]], 5);
+  const arcAgePoints = tiered(arcWalletAgeDays, [[7, 1], [30, 2]], 3);
+  const arcBalancePoints = arcBalance > 0 ? 1 : 0;
+  const arcActivityPoints = arcTx <= 0 ? 0 : Math.min(ARC_SCORE_COMPONENT_MAX.arcActivity, arcTxPoints + arcCounterpartyPoints + arcActiveDayPoints + arcAgePoints + arcBalancePoints);
+  const attestationQualityPoints = attestationWeight >= 3 ? 2 : attestationWeight >= 1 ? 1 : 0;
   const attestationPoints = verifiedAttestations <= 0
     ? 0
     : Math.min(
       ARC_SCORE_COMPONENT_MAX.attestations,
-      10 +
-      Math.max(0, verifiedAttestationCounterparties - 1) * 5 +
-      Math.max(0, verifiedAttestations - 1) * 3 +
-      trustBonus
+      8 +
+      Math.min(3, Math.max(0, verifiedAttestationCounterparties - 1) * 3) +
+      Math.min(2, Math.max(0, verifiedAttestations - 1)) +
+      attestationQualityPoints
     );
+  const propagatedTrustPoints = Math.min(ARC_SCORE_COMPONENT_MAX.propagatedTrust, Math.round(propagatedTrustScore / 3));
 
   const components: ScoreComponents = {
     walletAge: {
@@ -148,7 +157,7 @@ export function buildScoreContract(input: ScoreContractInput): ScoreContractResu
       points: arcActivityPoints,
       max: ARC_SCORE_COMPONENT_MAX.arcActivity,
       reason: arcTx > 0
-        ? `Arc ecosystem activity contributes ${arcActivityPoints}/${ARC_SCORE_COMPONENT_MAX.arcActivity} from ${arcTx} Arc transaction${arcTx === 1 ? "" : "s"}, ${arcCounterparties} Arc counterparties, and ${arcActiveDays} active day${arcActiveDays === 1 ? "" : "s"}.`
+        ? `Arc ecosystem activity contributes ${arcActivityPoints}/${ARC_SCORE_COMPONENT_MAX.arcActivity} from ${arcTx} Arc transaction${arcTx === 1 ? "" : "s"}, ${arcCounterparties} Arc counterparties, ${arcActiveDays} active day${arcActiveDays === 1 ? "" : "s"}, ${arcWalletAgeDays} indexed Arc days, and the current Arc balance signal.`
         : "No Arc Testnet activity detected yet. ARC Score is primarily based on Arc ecosystem behavior.",
       sourceValue: arcTx
     },
@@ -156,9 +165,17 @@ export function buildScoreContract(input: ScoreContractInput): ScoreContractResu
       points: attestationPoints,
       max: ARC_SCORE_COMPONENT_MAX.attestations,
       reason: verifiedAttestations > 0
-        ? `Verified transaction-backed trust contributes ${attestationPoints}/${ARC_SCORE_COMPONENT_MAX.attestations} from ${verifiedAttestations} attestation${verifiedAttestations === 1 ? "" : "s"}, ${verifiedAttestationCounterparties} verified counterparties, and trust graph strength.`
-        : "No verified transaction-backed attestations yet. Verified Arc trust is a primary ARC Score driver.",
+        ? `Verified transaction-backed trust contributes ${attestationPoints}/${ARC_SCORE_COMPONENT_MAX.attestations} from ${verifiedAttestations} attestation${verifiedAttestations === 1 ? "" : "s"}, ${verifiedAttestationCounterparties} verified counterparties, and ${attestationWeight.toFixed(2)} weighted trust evidence.`
+        : "No verified transaction-backed attestations yet. Attestations are a capped secondary reputation signal.",
       sourceValue: verifiedAttestations
+    },
+    propagatedTrust: {
+      points: propagatedTrustPoints,
+      max: ARC_SCORE_COMPONENT_MAX.propagatedTrust,
+      reason: propagatedTrustPoints > 0
+        ? `Verified trust graph propagation contributes ${propagatedTrustPoints}/${ARC_SCORE_COMPONENT_MAX.propagatedTrust}; network influence remains capped and cannot dominate wallet behavior.`
+        : "No propagated trust contribution is currently applied.",
+      sourceValue: propagatedTrustScore
     }
   };
 
@@ -183,6 +200,7 @@ export function scoreInputFromParts(parts: {
   attestationCount: number;
   uniqueAttestationCounterparties: number;
   repeatedPairRatio?: number;
+  attestationWeight?: number;
   propagatedTrustScore?: number;
   trustAnomalyScore?: number;
 }): ScoreContractInput {
@@ -193,14 +211,41 @@ export function scoreInputFromParts(parts: {
     indexedTx: parts.multiChain?.totalTxCount ?? 0,
     uniqueCounterparties: parts.multiChain?.uniqueCounterparties ?? 0,
     arcTx: parts.snapshot?.txCount ?? 0,
+    arcWalletAgeDays: parts.snapshot?.walletAgeDays ?? 0,
+    arcBalance: parts.snapshot?.nativeBalance ?? 0,
     arcCounterparties: parts.snapshot?.counterparties ?? 0,
     arcActiveDays: parts.snapshot?.activeDays ?? 0,
     verifiedAttestations: parts.attestationCount,
     verifiedAttestationCounterparties: parts.uniqueAttestationCounterparties,
+    attestationWeight: parts.attestationWeight ?? 0,
     propagatedTrustScore: parts.propagatedTrustScore ?? 0,
     anomalyScore: parts.trustAnomalyScore ?? 0,
     repeatedPairRatio: parts.repeatedPairRatio ?? 0,
     providerLimited: limited
+  };
+}
+
+export function scoreInputFromUnknown(value: unknown): ScoreContractInput | null {
+  if (!value || typeof value !== "object") return null;
+  const input = value as Record<string, unknown>;
+  const numeric = (key: string) => Math.max(0, finite(Number(input[key] ?? 0)));
+  return {
+    walletAgeDays: numeric("walletAgeDays"),
+    activeChains: numeric("activeChains"),
+    indexedTx: numeric("indexedTx"),
+    uniqueCounterparties: numeric("uniqueCounterparties"),
+    arcTx: numeric("arcTx"),
+    arcWalletAgeDays: numeric("arcWalletAgeDays"),
+    arcBalance: numeric("arcBalance"),
+    arcCounterparties: numeric("arcCounterparties"),
+    arcActiveDays: numeric("arcActiveDays"),
+    verifiedAttestations: numeric("verifiedAttestations"),
+    verifiedAttestationCounterparties: numeric("verifiedAttestationCounterparties"),
+    attestationWeight: numeric("attestationWeight"),
+    propagatedTrustScore: numeric("propagatedTrustScore"),
+    anomalyScore: numeric("anomalyScore"),
+    repeatedPairRatio: numeric("repeatedPairRatio"),
+    providerLimited: Boolean(input.providerLimited)
   };
 }
 
@@ -213,13 +258,18 @@ export function scoreComponentsFromIdentity(identity: IdentityRecord | null): Sc
       uniqueAttestationCounterparties: 0
     })).components;
   }
+  const storedInput = identity.profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+    ? scoreInputFromUnknown(identity.profile.scoreInputs)
+    : null;
+  if (storedInput) return buildScoreContract(storedInput).components;
   return buildScoreContract(scoreInputFromParts({
     snapshot: identity.snapshot,
     multiChain: identity.multiChain ?? null,
     attestationCount: identity.acceptedAttestations,
     uniqueAttestationCounterparties: identity.uniqueCounterparties,
+    attestationWeight: identity.attestationWeight ?? 0,
     propagatedTrustScore: identity.trustGraph?.metrics.propagatedTrustScore ?? identity.score.trustPropagationScore,
     trustAnomalyScore: identity.trustGraph?.metrics.anomalyScore ?? 0,
-    repeatedPairRatio: 0
+    repeatedPairRatio: identity.repeatedPairRatio ?? 0
   })).components;
 }

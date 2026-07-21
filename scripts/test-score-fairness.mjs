@@ -63,7 +63,7 @@ function component(payload, key) {
 }
 
 function isBaselineDowngrade(payload) {
-  return scoreValue(payload) === 35 && indexedTx(payload) === 0 && activeChains(payload) === 0;
+  return scoreValue(payload) === 0 && indexedTx(payload) === 0 && activeChains(payload) === 0;
 }
 
 function assertScoreContract(payload, label) {
@@ -74,12 +74,13 @@ function assertScoreContract(payload, label) {
   assert(payload?.components, `${label} must include score components`, payload);
 
   const expected = {
-    walletAge: 10,
+    walletAge: 20,
     crossChain: 5,
-    transactionActivity: 5,
+    transactionActivity: 15,
     diversity: 15,
-    arcActivity: 35,
-    attestations: 30
+    arcActivity: 25,
+    attestations: 15,
+    propagatedTrust: 5
   };
   for (const [key, max] of Object.entries(expected)) {
     const value = component(payload, key);
@@ -134,7 +135,7 @@ if (/^0x[a-f0-9]{40}$/.test(activeWallet)) {
     if (indexedTx(latest) > 0) assert(component(latest, "transactionActivity")?.points > 0, "indexed tx must contribute transaction activity points", latest);
     if (ageDays(latest) > 0) assert(component(latest, "walletAge")?.points > 0, "wallet age must contribute wallet age points", latest);
     if (activeChains(latest) > 0) assert(component(latest, "crossChain")?.points > 0, "active chains must contribute cross-chain points", latest);
-    assert(!isBaselineDowngrade(latest), "active wallet must not regress to baseline 35/0/0", latest);
+    assert(!isBaselineDowngrade(latest), "active wallet must not regress to a zero-evidence baseline", latest);
   }
 
   const deterministicA = await request(`/api/score/${activeWallet}?t=determinism-a`);

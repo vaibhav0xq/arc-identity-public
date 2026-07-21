@@ -1,237 +1,465 @@
-# Arc Identity
+# ARC Identity
 
-Wallet identity and reputation layer for the Arc ecosystem.
+Wallet intelligence and reputation infrastructure for the ARC ecosystem.
 
-Live: https://arcidentity.in  
-Docs: https://arcidentity.in/docs  
-Developer API: https://arcidentity.in/developers
+ARC Identity transforms raw wallet activity into readable identity intelligence using:
+- live onchain analytics
+- transaction-backed attestations
+- trust graph relationships
+- multichain activity indexing
+- reputation scoring
+- wallet credibility insights
 
-## Overview
+---
 
-Arc Identity helps users claim a readable identity, inspect wallet reputation, create verified attestations and share public profiles.
+# Screenshots
 
-The project focuses on making wallet activity easier to understand before users or builders interact with an address.
+## Homepage
 
-## Screenshots
+![Homepage](./public/screenshots/homepage.png)
 
-### Homepage
+---
 
-![Arc Identity Homepage](./public/screenshots/homepage.png)
+## Dashboard
 
-### Dashboard
+![Dashboard](./public/screenshots/dashboard.png)
 
-![Arc Identity Dashboard](./public/screenshots/dashboard.png)
+---
 
-### Directory
+## Directory
 
-![Arc Identity Directory](./public/screenshots/directory.png)
+![Directory](./public/screenshots/directory.png)
 
-### Verified Attestations
+---
 
-![Arc Identity Verified Attestations](./public/screenshots/verified_attestations.png)
+## Verified Attestations
 
-## What it does
+![Verified Attestations](./public/screenshots/verified_attestations.png)
 
-Arc Identity lets users:
+---
 
-- Connect an EVM wallet
-- Verify wallet ownership
-- Claim a readable `.arcid` identity
-- View reputation context
-- Create verified transaction-backed attestations
-- Share public identity profiles
-- Discover registered identities
-- Query reputation data through a Developer API
+# Overview
 
-## Core features
+ARC Identity is designed to provide a reputation and intelligence layer for blockchain wallets.
 
-### Identity claiming
+Instead of treating wallets as anonymous addresses, ARC Identity analyzes:
+- transaction history
+- counterparties
+- wallet age
+- trust relationships
+- attestation activity
+- chain participation
+- behavioral consistency
 
-Users can connect an EVM wallet, verify ownership and claim a readable `.arcid` identity.
+to generate a transparent and explainable identity score.
 
-### Reputation context
+The system supports:
+- live ARC RPC intelligence
+- multichain indexing
+- trust propagation
+- attestation verification
+- profile discovery
+- developer APIs
 
-Arc Identity turns wallet activity, verified interactions and ecosystem participation into a readable reputation profile.
+---
 
-The reputation layer focuses on:
+# Core Features
 
-- Arc activity
-- Verified attestations
-- Trusted counterparties
-- Wallet maturity
-- Activity consistency
-- Risk and anomaly checks
+## Wallet Reputation Scoring
 
-### Verified attestations
+Dynamic reputation scoring system based on:
+- wallet age
+- transaction depth
+- cross-chain activity
+- trust relationships
+- verified attestations
+- activity consistency
+The current production model is versioned as `arc_score_v2_2026_07`. It is deterministic: the same committed evidence always produces the same score.
 
-Registered users can create transaction-backed attestations with other registered users.
+The 100 available points are capped by evidence category:
 
-Current safeguards include:
+- Global wallet age: 20
+- Active chain coverage: 5
+- Indexed transaction activity: 15
+- Counterparty diversity: 15
+- Arc activity: 25
+- Verified transaction attestations: 15
+- Propagated trust: 5
 
-- Valid transaction hash required
-- Registered counterparty required
-- Self-attestations rejected
-- Duplicate submissions guarded
-- Invalid or unverified transactions rejected
+Supported anomaly evidence and excessive repeated-pair concentration can apply a disclosed penalty of up to 10 points. Profile creation has no score value, so a wallet with no indexed or verified evidence starts at 0.
 
-### Public profiles
+Transaction count is one bounded input, not the complete reputation result. Two wallets with different raw activity can rank differently when Arc footprint, counterparties, verified attestations, trust evidence, or risk signals differ. The public profile and score API expose the component points used for that comparison.
 
-Each claimed identity has a public profile page that makes wallet reputation easier to inspect and share.
 
-Example route:
+---
 
-```txt
-/profile/example.arcid
-```
+## Live ARC RPC Intelligence
 
-### Developer API
+Real-time wallet intelligence directly from ARC RPC:
+- live balances
+- latest block tracking
+- transaction counts
+- recent activity
+- freshness verification
 
-Arc Identity exposes public API routes for builders who want to query wallet or username reputation context.
+Supports:
+- live RPC
+- cached snapshots
+- fallback verification layers
 
-Example routes:
+---
 
-```http
-GET /api/score/:wallet
-GET /api/profile/:username
-GET /api/profile/by-wallet/:wallet
-GET /api/users
-```
+## Transaction-Backed Attestations
 
-## Supported chains
+Users can verify interactions between wallets through:
+- transaction-linked attestations
+- trust confirmations
+- interaction history
+- counterpart validation
 
-Arc Identity currently supports EVM-compatible wallet intelligence across:
+---
 
-- Arc Testnet
+## Trust Graph System
+
+Wallet relationships are transformed into a trust network.
+
+Includes:
+- trust propagation
+- interaction weighting
+- counterpart diversity
+- credibility signals
+
+---
+
+## Multichain Coverage
+
+Chain intelligence across multiple networks:
+- ARC Testnet
 - Ethereum
-- Base
 - Polygon
+- Base
 - Arbitrum
 - BNB Chain
 
-Some chains may have limited coverage depending on indexing or provider support.
+Chain explorer includes:
+- indexed chains
+- limited providers
+- no-activity chains
+- provider source tracking
 
-## Tech stack
+---
 
-- Next.js
+## Public Wallet Profiles
+
+Custom wallet identity profiles:
+- public identity pages
+- reputation visualization
+- chain activity summaries
+- explainable score reasoning
+
+Example:
+```txt
+/profile/[username]
+```
+
+---
+
+## Developer API
+
+REST APIs for:
+- wallet intelligence
+- reputation scoring
+- trust analysis
+- onchain activity
+- profile retrieval
+
+---
+
+# Technology Stack
+
+## Frontend
+- Next.js 14
 - React
 - TypeScript
-- Tailwind CSS
-- EVM wallet connection
-- API routes
-- Vercel
+- TailwindCSS
 
-## Project structure
+## Backend
+- Next.js API Routes
+- Supabase
+- ARC RPC
+- Multichain provider integrations
+
+## Infrastructure
+- Vercel
+- GitHub
+- Supabase PostgreSQL
+
+---
+
+# Project Structure
 
 ```txt
-app/          Application routes and API routes
-components/   Reusable UI components
-lib/          Reputation, wallet, onboarding, scoring and trust logic
-data/         Local supporting data
-supabase/     Database schema and migrations
-public/       Public assets and screenshots
-scripts/      Test and verification scripts
+app/
+components/
+lib/
+data/
+supabase/
 ```
 
-## Local development
+## Important Directories
 
-Clone the repository:
+### app/
+Frontend pages and API routes.
+
+### components/
+Reusable UI components.
+
+### lib/
+Core intelligence engine:
+- scoring
+- trust graph
+- multichain indexing
+- live RPC readers
+- wallet intelligence
+
+### supabase/
+Database schema and migrations.
+
+---
+
+# Intelligence Architecture
+
+## Reputation Engine
+
+The scoring engine evaluates:
+- wallet maturity
+- interaction quality
+- network diversity
+- activity depth
+- attestation trust
+
+Scores are explainable through:
+- score explainability cards
+- factor breakdowns
+- risk penalties
+- trust metrics
+
+---
+
+## Live RPC Layer
+
+ARC Identity prioritizes:
+1. live RPC data
+2. cached indexed snapshots
+3. verified attestation fallback
+
+This ensures:
+- fast responses
+- accurate balances
+- resilient infrastructure
+
+---
+
+## Chain Intelligence
+
+Each supported chain is categorized as:
+- indexed
+- limited provider
+- no activity
+
+Chain explorer provides:
+- tx counts
+- wallet age
+- counterparties
+- activity history
+- provider source visibility
+
+---
+
+# Current Features
+
+- Wallet reputation scoring
+- Public identity profiles
+- Live ARC RPC balance tracking
+- Chain explorer modal
+- Score explainability
+- Trust graph system
+- Transaction-backed attestations
+- Developer API
+- Wallet intelligence refresh system
+- Multichain analysis
+- Responsive UI
+- Live freshness indicators
+
+---
+
+# API Examples
+
+## Wallet Score
+
+```http
+GET /api/score/:wallet
+```
+
+Returns:
+- reputation score
+- trust metrics
+- live ARC balance
+- chain intelligence
+- activity analytics
+
+---
+
+## Public Profile
+
+```http
+GET /api/profile/:username
+```
+
+Returns:
+- wallet identity profile
+- score breakdown
+- chain coverage
+- trust insights
+
+---
+
+## Onchain Activity
+
+```http
+GET /api/onchain/:wallet
+```
+
+Returns:
+- transaction analytics
+- activity history
+- counterpart metrics
+- wallet statistics
+
+---
+
+# Local Development
+
+## Clone Repository
 
 ```bash
-git clone https://github.com/vaibhav0xq/arc-identity-public.git
-cd arc-identity-public
+git clone https://github.com/your-username/arc-identity.git
+cd arc-identity
 ```
 
-Install dependencies:
+---
+
+## Install Dependencies
 
 ```bash
 npm install
 ```
 
-Create a local environment file:
+---
 
-```bash
-cp .env.example .env.local
+## Configure Environment Variables
+
+Create:
+```txt
+.env.local
 ```
 
-Add the required local environment values, then run the development server:
+Example:
+```env
+NEXT_PUBLIC_APP_URL=https://arcidentity.in
+NEXT_PUBLIC_ARC_RPC_URL=
+NEXT_PUBLIC_ARC_CHAIN_ID=
+NEXT_PUBLIC_ARC_EXPLORER_URL=
+NEXT_PUBLIC_SUPABASE_URL=
+NEXT_PUBLIC_SUPABASE_ANON_KEY=
+SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
+ETHERSCAN_API_KEY=
+BASESCAN_API_KEY=
+ARBISCAN_API_KEY=
+POLYGONSCAN_API_KEY=
+BSCSCAN_API_KEY=
+```
+
+---
+
+## Run Development Server
 
 ```bash
 npm run dev
 ```
 
-Open:
-
+Application/Local server:
 ```txt
 http://localhost:3000
 ```
 
-## Build verification
+---
+
+# Build Verification
 
 ```bash
 npm run typecheck
 npm run build
 ```
 
-Some test scripts require a local server to be running.
+---
 
-## Current status
+# Roadmap
 
-Arc Identity is live in Phase 1.
+## Phase 1
+- Reputation engine
+- Wallet profiles
+- Trust graph
+- Multichain support
 
-Current focus areas:
+## Phase 2
+- Advanced trust propagation
+- Wallet clustering
+- AI-assisted reputation analysis
+- Expanded chain coverage
 
-- Onboarding reliability
-- Reputation explainability
-- Verified attestation UX
-- Trust graph quality
-- Developer API stability
-- Arc ecosystem feedback
+## Phase 3
+- Credit intelligence
+- Sybil resistance systems
+- Protocol integrations
+- SDKs and developer tooling
 
-## Roadmap
+---
 
-### Phase 1: Public release
+# Security Notes
 
-- Identity claiming
-- Public profiles
-- Dashboard
-- Reputation score
-- Verified attestations
-- Directory
-- Docs
-- Developer API
-
-### Phase 2: Reputation clarity
-
-- Better score explanations
-- Clearer history views
-- Improved trust context
-- More readable public profiles
-
-### Phase 3: Developer tooling
-
-- Cleaner API examples
-- Improved response formats
-- Stronger documentation
-- Builder-focused integrations
-
-## Security notes
-
-Do not commit real secrets.
+Sensitive files are excluded using `.gitignore`.
 
 Never commit:
-
 - `.env.local`
 - API secrets
-- Service role keys
 - RPC credentials
-- Private keys
-- Deployment tokens
+- private keys
 
-This public repository does not include production environment values.
+---
 
-## Author
+# Status
 
-Built by **Vaibhav Gangani**  
-X: [@vaibhav_0xq](https://x.com/vaibhav_0xq)
+Current state:
+- Active development
+- Private infrastructure
+- Internal testing phase
+- Production deployment preparation
 
-Arc Identity is an independent builder project for the Arc ecosystem.
+---
+
+# License
+
+Private repository.
+All rights reserved.
+
+---
+
+# Author
+
+Built by:
+
+**Vaibhav (@vaibhav0xq)**
+
+Web3 builder, researcher, moderator, and infrastructure contributor focused on wallet intelligence, trust systems, and blockchain identity infrastructure.

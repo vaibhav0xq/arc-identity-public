@@ -13,10 +13,8 @@ export const fetchCache = "force-no-store";
 
 function latestIndexedAt(identity: Awaited<ReturnType<typeof getIdentityByWallet>>) {
   const candidates = [
-    identity?.snapshot?.createdAt,
-    ...(identity?.multiChain?.chains ?? []).map((chain) => chain.indexedAt),
-    identity?.score.lastSyncedAt,
-    identity?.profile.updatedAt
+    identity?.profile.scoreCalculatedAt,
+    identity?.refreshJob?.status === "committed" ? identity.refreshJob.completedAt : null
   ].filter(Boolean) as string[];
   const times = candidates.map((value) => new Date(value).getTime()).filter((value) => Number.isFinite(value));
   return times.length ? new Date(Math.max(...times)).toISOString() : null;
@@ -85,6 +83,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ wa
       intelligenceStatus: coverageIssues.length > 0 && meta.hasIndexedActivity ? "partial" : meta.hasIndexedActivity ? "indexed" : meta.dataSource === "provider_unavailable" ? "limited" : "baseline",
       ...canonical,
       score: canonical.scoreValue,
+      scoreModelVersion: identity.score.modelVersion,
       arcIdentityScore: canonical.arcIdentityScore,
       riskLevel: canonical.riskLevel,
       breakdown: {
@@ -126,6 +125,7 @@ export async function POST(_request: Request, { params }: { params: Promise<{ wa
       ...meta,
       intelligenceStatus: coverageIssues.length > 0 && meta.hasIndexedActivity ? "partial" : meta.hasIndexedActivity ? "indexed" : "limited",
       ...canonical,
+      scoreModelVersion: identity?.score.modelVersion ?? null,
       score: canonical.scoreValue ?? identity?.score.arcScore ?? 0,
       arcIdentityScore: canonical.arcIdentityScore ?? identity?.score.arcScore ?? 0,
       riskLevel: canonical.riskLevel || identity?.score.riskLevel || "New / Unproven",

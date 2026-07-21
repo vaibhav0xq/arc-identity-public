@@ -47,7 +47,7 @@ function scoreValue(payload) {
 }
 
 function isBaselineDowngrade(payload) {
-  return scoreValue(payload) === 35 && indexedTx(payload) === 0 && activeChainCount(payload) === 0;
+  return scoreValue(payload) === 0 && indexedTx(payload) === 0 && activeChainCount(payload) === 0;
 }
 
 function providerUnavailable(payload) {
@@ -73,7 +73,7 @@ assert(
   "active wallet refresh must produce indexed data or explicit provider unavailable",
   refresh.json
 );
-assert(!isBaselineDowngrade(refresh.json) || providerUnavailable(refresh.json), "refresh must not silently return baseline 35/0/0", refresh.json);
+assert(!isBaselineDowngrade(refresh.json) || providerUnavailable(refresh.json), "refresh must not silently replace indexed evidence with a zero-evidence baseline", refresh.json);
 
 let lastReal = refresh.json;
 if (refreshTx === 0 && refreshChains === 0 && providerUnavailable(refresh.json)) {
@@ -103,7 +103,7 @@ assert(indexedTx(byWallet.json) > 0 || activeChainCount(byWallet.json) > 0 || by
 const simulated = mergeScoreState(lastReal, {
   walletAddress: wallet,
   username: lastReal.username,
-  arcIdentityScore: 35,
+  arcIdentityScore: 0,
   totalTxCount: 0,
   activeChains: [],
   dataSource: "baseline",

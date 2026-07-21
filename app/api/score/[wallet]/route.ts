@@ -5,7 +5,7 @@ import { baselineExplainableReputation, buildExplainableReputation, reputationIn
 import { isRefreshInProgress, runWalletRefresh, triggerWalletRefresh } from "@/lib/score-refresh";
 import { getBadge, getDecisionRecommendations, getRecommendedAction, getRiskLevel } from "@/lib/score";
 import { buildScoreExplanations } from "@/lib/score-explanations";
-import { scoreComponentsFromIdentity } from "@/lib/score-contract";
+import { ARC_SCORE_MODEL_VERSION, scoreComponentsFromIdentity } from "@/lib/score-contract";
 import { getActiveChainCount, getIndexedTxCount, hasIndexedActivity, scoreDataSource } from "@/lib/score-precedence";
 import { getTrustGraph } from "@/lib/trust-graph";
 import { withTimeout } from "@/lib/timeouts";
@@ -25,10 +25,8 @@ function formatArcBalance(value: number | null | undefined) {
 
 function latestIndexedAt(identity: IdentityRecord | null) {
   const candidates = [
-    identity?.snapshot?.createdAt,
-    ...(identity?.multiChain?.chains ?? []).map((chain) => chain.indexedAt),
-    identity?.score.lastSyncedAt,
-    identity?.profile.updatedAt
+    identity?.profile.scoreCalculatedAt,
+    identity?.refreshJob?.status === "committed" ? identity.refreshJob.completedAt : null
   ].filter(Boolean) as string[];
   const times = candidates.map((value) => new Date(value).getTime()).filter((value) => Number.isFinite(value));
   return times.length ? new Date(Math.max(...times)).toISOString() : null;
@@ -64,6 +62,7 @@ function baselineResponse(walletAddress: string, refreshInProgress: boolean) {
     verifiedWallet: false,
     score: 0,
     arcIdentityScore: 0,
+    scoreModelVersion: ARC_SCORE_MODEL_VERSION,
     credentialScore: 0,
     globalWalletAgeDays: 0,
     arcWalletAgeDays: 0,
@@ -90,7 +89,7 @@ function baselineResponse(walletAddress: string, refreshInProgress: boolean) {
     latestArcBlock: null,
     attestations: { acceptedCount: 0, uniqueCounterparties: 0 },
     decisions: getDecisionRecommendations(0),
-    breakdown: { globalWalletAge: 0, crossChainActivity: 0, arcActivity: 0, counterpartyDiversity: 0, verifiedAttestations: 0, propagatedTrust: 0, riskPenalty: 0 },
+    breakdown: { globalWalletAge: 0, crossChainActivity: 0, transactionActivity: 0, arcActivity: 0, counterpartyDiversity: 0, verifiedAttestations: 0, propagatedTrust: 0, riskPenalty: 0 },
     components,
     reputation,
     reputation_v1: reputation,
@@ -105,10 +104,25 @@ function baselineResponse(walletAddress: string, refreshInProgress: boolean) {
 function validateScorePayload(identity: IdentityRecord, explanations: ReturnType<typeof buildScoreExplanations>) {
   const warnings: string[] = [];
   const score = identity.score.arcScore;
+  const components = scoreComponentsFromIdentity(identity);
+  const componentTotal = Object.values(components).reduce((sum, component) => sum + component.points, 0);
+  const expectedScore = Math.max(0, Math.min(100, Math.round(componentTotal - identity.score.riskPenalty)));
   console.log("[arc-identity] score_validation_started", { wallet: identity.profile.walletAddress, score });
 
   if (!Number.isFinite(score) || score < 0 || score > 100) {
     warnings.push("arc_score_out_of_range");
+  }
+
+  if (score !== expectedScore) {
+    warnings.push("score_breakdown_total_mismatch");
+    console.warn("[arc-identity] score_factor_mismatch", {
+      wallet: identity.profile.walletAddress,
+      factor: "componentTotal",
+      expected: expectedScore,
+      actual: score,
+      componentTotal,
+      riskPenalty: identity.score.riskPenalty
+    });
   }
 
   const expectedRisk = getRiskLevel(Math.max(0, Math.min(100, Number.isFinite(score) ? score : 0)));
@@ -163,7 +177,7 @@ async function scoreResponse(identity: IdentityRecord, cacheStatus: CacheStatus,
   const cachedBlock = identity.snapshot?.latestBlock ?? null;
   const arcBalance = cachedBalance;
   const latestArcBlock = cachedBlock;
-  const arcTxCount = Math.max(identity.snapshot?.txCount ?? 0, arcChain?.txCount ?? 0, identity.profile.txCount ?? 0);
+  const arcTxCount = Math.max(identity.snapshot?.txCount ?? 0, arcChain?.txCount ?? 0);
   const arcBalanceSource = liveAvailable ? "arc_rpc" : identity.snapshot || arcChain ? "cached_wallet_intelligence" : "unavailable";
   const arcDataFreshness = liveAvailable ? "live" : identity.snapshot ? "cached_fallback" : arcChain?.status === "indexed" ? "verified_attestation_fallback" : "unavailable";
   const indexedTx = Math.max(getIndexedTxCount(identity), arcTxCount);
@@ -192,6 +206,7 @@ async function scoreResponse(identity: IdentityRecord, cacheStatus: CacheStatus,
   });
   const coverageIssues = sanitizeCoverageIssues(identity.multiChain?.chains ?? []);
   return {
+    scoreModelVersion: identity.score.modelVersion,
     walletAddress: identity.profile.walletAddress,
     username: identity.profile.username,
     usernameClaimed: Boolean(identity.profile.username),
@@ -219,7 +234,7 @@ async function scoreResponse(identity: IdentityRecord, cacheStatus: CacheStatus,
       txCount: arcTxCount,
       balance: arcBalance ?? 0,
       latestBlock: latestArcBlock ?? 0,
-      firstSeenAt: identity.snapshot?.lastActivityAt ?? null,
+      firstSeenAt: arcChain?.firstSeenAt ?? null,
       lastActivityAt: identity.snapshot?.lastActivityAt ?? identity.profile.lastSeen,
       activeDays: identity.snapshot?.activeDays ?? 0,
       uniqueCounterparties: identity.snapshot?.counterparties ?? 0,
@@ -274,7 +289,8 @@ async function scoreResponse(identity: IdentityRecord, cacheStatus: CacheStatus,
   };
 }
 
-export async function GET(_request: Request, { params }: { params: Promise<{ wallet: string }> }) {
+export async function GET(request: Request, { params }: { params: Promise<{ wallet: string }> }) {
+  const allowBackgroundRefresh = new URL(request.url).searchParams.get("refresh") !== "false";
   try {
     const { wallet: walletParam } = await params;
     const wallet = normalizeWallet(walletParam);
@@ -285,17 +301,22 @@ export async function GET(_request: Request, { params }: { params: Promise<{ wal
     const headers = publicNoStoreHeaders;
     if (!identity?.profile.username) return NextResponse.json(baselineResponse(wallet, false), { headers });
     const lastIndexedAt = latestIndexedAt(identity);
-    const refreshRecommended = isStale(lastIndexedAt);
+    const refreshRecommended = isStale(lastIndexedAt) || identity.profile.scoreModelVersion !== ARC_SCORE_MODEL_VERSION;
     let refreshInProgress = isRefreshInProgress(wallet) || Boolean(identity?.refreshJob && activeRefreshStatuses.has(identity.refreshJob.status));
 
-    const hasCachedScore = Boolean(lastIndexedAt && (identity.multiChain || identity.snapshot || identity.profile.arcScore > 0));
+    const hasCachedScore = Boolean(lastIndexedAt && (identity.multiChain || identity.snapshot || identity.profile.scoreCalculatedAt || identity.profile.arcScore > 0));
 
-    if (!hasCachedScore && refreshRecommended && !refreshInProgress) {
+    if (allowBackgroundRefresh && !hasCachedScore && refreshRecommended && !refreshInProgress) {
       void triggerWalletRefresh(wallet).promise.catch(() => undefined);
       refreshInProgress = true;
     }
 
     if (!hasCachedScore) return NextResponse.json(await scoreResponse(identity, "indexing_required", lastIndexedAt, true, refreshInProgress), { headers });
+    if (allowBackgroundRefresh && hasCachedScore && refreshRecommended && !refreshInProgress) {
+      void triggerWalletRefresh(wallet).promise.catch(() => undefined);
+      refreshInProgress = true;
+    }
+
     return NextResponse.json(await scoreResponse(identity, "cached", lastIndexedAt, refreshRecommended, refreshInProgress), { headers });
   } catch (error) {
     console.warn("[arc-identity] score_api_failed", { error: error instanceof Error ? error.message : "Unable to load score" });

@@ -3,7 +3,8 @@ import { getCanonicalWalletSnapshot } from "@/lib/canonical-snapshot";
 import { normalizeChainStatus } from "@/lib/chain-status";
 import { getArcLiveWalletData, getWalletAnalytics, scoreTransactionSize, verifyArcTransaction } from "@/lib/onchain";
 import { getMultiChainWalletProfile } from "@/lib/multichain";
-import { buildArcScore, getRiskLevel } from "@/lib/score";
+import { arcScoreFromInput, buildArcScore, getRiskLevel } from "@/lib/score";
+import { ARC_SCORE_MODEL_VERSION, scoreInputFromUnknown } from "@/lib/score-contract";
 import { getSupabaseAdmin } from "@/lib/supabase";
 import { getTrustGraph, upsertTrustEdgeFromAttestation } from "@/lib/trust-graph";
 import { maybeArcUsername, profileRouteFor, toArcUsername } from "@/lib/username";
@@ -58,6 +59,15 @@ function parseRiskFlags(value: unknown): string[] {
   }
   return [];
 }
+function parseRecord(value: unknown): Record<string, unknown> | null {
+  if (!value) return null;
+  if (typeof value === "object" && !Array.isArray(value)) return value as Record<string, unknown>;
+  if (typeof value !== "string") return null;
+  try {
+    const parsed = JSON.parse(value);
+    return parsed && typeof parsed === "object" && !Array.isArray(parsed) ? parsed as Record<string, unknown> : null;
+  } catch { return null; }
+}
 
 function profileFromRow(row: any): Profile {
   return {
@@ -81,7 +91,11 @@ function profileFromRow(row: any): Profile {
     activeChainCount: Number(row.active_chain_count ?? 0),
     credentialScore: Number(row.credential_score ?? row.arc_score ?? 0),
     credentialLevel: row.credential_level ?? row.risk_level ?? "New / Unproven",
-    indexedChains: Array.isArray(row.indexed_chains) ? row.indexed_chains : []
+    indexedChains: Array.isArray(row.indexed_chains) ? row.indexed_chains : [],
+    scoreModelVersion: row.score_model_version ?? null,
+    scoreInputs: parseRecord(row.score_inputs),
+    scoreBreakdown: parseRecord(row.score_breakdown) as Record<string, number> | null,
+    scoreCalculatedAt: row.score_calculated_at ?? null
   };
 }
 
@@ -92,6 +106,7 @@ function snapshotFromRow(row: any): WalletActivitySnapshot {
     txCount: Number(row.tx_count ?? 0),
     volume: Number(row.volume ?? 0),
     counterparties: Number(row.counterparties ?? 0),
+    counterpartyAddresses: parseRiskFlags(row.counterparty_addresses).map(normalizeWallet),
     activeDays: Number(row.active_days ?? 0),
     recentActivityCount: Number(row.recent_activity_count ?? 0),
     walletAgeDays: Number(row.wallet_age_days ?? 0),
@@ -99,6 +114,7 @@ function snapshotFromRow(row: any): WalletActivitySnapshot {
     transferCount: Number(row.transfer_count ?? 0),
     contractInteractionCount: Number(row.contract_interaction_count ?? 0),
     indexerSource: row.indexer_source ?? "unknown",
+    evidenceVersion: row.evidence_version ?? null,
     calculatedScore: Number(row.calculated_score ?? 0),
     latestBlock: Number(row.latest_block ?? 0),
     nativeBalance: Number(row.native_balance ?? 0),
@@ -170,6 +186,7 @@ function chainSnapshotFromRow(row: any): ChainSnapshot {
     walletAgeDays: Number(row.wallet_age_days ?? 0),
     nativeBalance: Number(row.native_balance ?? 0),
     uniqueCounterparties: Number(row.unique_counterparties ?? 0),
+    counterpartyAddresses: parseRiskFlags(row.counterparty_addresses).map(normalizeWallet),
     contractInteractions: Number(row.contract_interaction_count ?? 0),
     activeDays: Number(row.active_days ?? 0),
     recentActivityCount: Number(row.recent_activity_count ?? 0),
@@ -188,6 +205,7 @@ type VerifiedArcActivity = {
   activeDays: number;
   counterparties: number;
   recentActivityCount: number;
+  counterpartyAddresses: string[];
   latestBlock: number;
 };
 
@@ -213,7 +231,13 @@ function aggregateMultiChainFromChains(walletAddress: string, chains: ChainSnaps
     globalWalletAgeDays,
     totalTxCount: totalTxCount || Number(fallback?.totalTxCount ?? 0),
     activeChains: activeChains.length ? activeChains : fallback?.activeChains ?? [],
-    uniqueCounterparties: active.reduce((sum, chain) => sum + chain.uniqueCounterparties, 0) || Number(fallback?.uniqueCounterparties ?? 0),
+    uniqueCounterparties: (() => {
+      const addresses = new Set(active.flatMap((chain) => chain.counterpartyAddresses ?? []).map(normalizeWallet).filter(Boolean));
+      const legacyCount = active
+        .filter((chain) => (chain.counterpartyAddresses?.length ?? 0) === 0)
+        .reduce((max, chain) => Math.max(max, chain.uniqueCounterparties), 0);
+      return Math.max(addresses.size, legacyCount, Number(fallback?.uniqueCounterparties ?? 0));
+    })(),
     totalContractInteractions: active.reduce((sum, chain) => sum + chain.contractInteractions, 0) || Number(fallback?.totalContractInteractions ?? 0),
     chains
   };
@@ -241,8 +265,246 @@ function aggregateMultiChainFromChains(walletAddress: string, chains: ChainSnaps
   return profile;
 }
 
+function finiteNumber(value: unknown, fallback = 0) {
+  const numeric = Number(value);
+  return Number.isFinite(numeric) ? numeric : fallback;
+}
+
+function maxMetric(...values: unknown[]) {
+  return Math.max(0, ...values.map((value) => finiteNumber(value)).filter((value) => Number.isFinite(value)));
+}
+
+function isVersionedArcSnapshot(snapshot?: WalletActivitySnapshot | null) {
+  return snapshot?.evidenceVersion === ARC_SCORE_MODEL_VERSION
+    || snapshot?.indexerSource.startsWith(`${ARC_SCORE_MODEL_VERSION}:`) === true;
+}
+
+function hasIndexedEvidence(chain?: ChainSnapshot | null) {
+  return Boolean(chain && chain.status === "indexed" && chain.txCount > 0);
+}
+
+function stableChainSnapshot(fresh: ChainSnapshot, cached?: ChainSnapshot): ChainSnapshot {
+  if (!cached || !hasIndexedEvidence(cached)) return fresh;
+  if (hasIndexedEvidence(fresh)) {
+    return {
+      ...fresh,
+      txCount: maxMetric(fresh.txCount, cached.txCount),
+      firstSeenAt: earliestDate(fresh.firstSeenAt, cached.firstSeenAt),
+      lastSeenAt: latestDate(fresh.lastSeenAt, cached.lastSeenAt),
+      walletAgeDays: maxMetric(fresh.walletAgeDays, cached.walletAgeDays),
+      nativeBalance: Number.isFinite(fresh.nativeBalance) ? fresh.nativeBalance : cached.nativeBalance,
+      uniqueCounterparties: maxMetric(fresh.uniqueCounterparties, cached.uniqueCounterparties),
+      counterpartyAddresses: Array.from(new Set([...(fresh.counterpartyAddresses ?? []), ...(cached.counterpartyAddresses ?? [])].map(normalizeWallet).filter(Boolean))),
+      contractInteractions: maxMetric(fresh.contractInteractions, cached.contractInteractions),
+      activeDays: maxMetric(fresh.activeDays, cached.activeDays),
+      recentActivityCount: fresh.recentActivityCount,
+      explorerUrl: fresh.explorerUrl ?? cached.explorerUrl,
+      providerSource: fresh.providerSource && fresh.providerSource !== "unknown" ? fresh.providerSource : cached.providerSource,
+      errorMessage: fresh.errorMessage ?? null
+    };
+  }
+
+  return {
+    ...cached,
+    indexedAt: fresh.indexedAt || cached.indexedAt,
+    nativeBalance: Number.isFinite(fresh.nativeBalance) && fresh.nativeBalance > 0 ? fresh.nativeBalance : cached.nativeBalance,
+    providerSource: cached.providerSource && cached.providerSource !== "unknown" ? cached.providerSource : fresh.providerSource,
+    errorMessage: fresh.status === "limited" ? fresh.errorMessage ?? "Provider access required" : cached.errorMessage
+  };
+}
+
+function profileIndexedFirstSeen(profile: Profile) {
+  return profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION && profile.globalWalletAgeDays > 0 ? profile.firstSeen : null;
+}
+
+function versionedProfileScoreInput(profile: Profile) {
+  return profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+    ? scoreInputFromUnknown(profile.scoreInputs)
+    : null;
+}
+
+function profileWalletAgeFloor(profile: Profile) {
+  return versionedProfileScoreInput(profile)?.walletAgeDays ?? 0;
+}
+
+function profileTransactionFloor(profile: Profile) {
+  return versionedProfileScoreInput(profile)?.indexedTx ?? 0;
+}
+
+function profileActiveChainFloor(profile: Profile) {
+  return versionedProfileScoreInput(profile) ? profile.indexedChains : [];
+}
+
+function buildStableMultiChainProfile(profile: Profile, fresh: MultiChainWalletProfile, cached: MultiChainWalletProfile | null): MultiChainWalletProfile {
+  const profileFirstSeen = profileIndexedFirstSeen(profile);
+  const profileAgeFloor = profileWalletAgeFloor(profile);
+  const profileTxFloor = profileTransactionFloor(profile);
+  const profileChainFloor = profileActiveChainFloor(profile);
+  if (!cached) {
+    return aggregateMultiChainFromChains(profile.walletAddress, fresh.chains, {
+      ...fresh,
+      globalFirstSeenAt: earliestDate(fresh.globalFirstSeenAt, profileFirstSeen),
+      globalWalletAgeDays: maxMetric(fresh.globalWalletAgeDays, profileAgeFloor),
+      totalTxCount: maxMetric(fresh.totalTxCount, profileTxFloor),
+      activeChains: Array.from(new Set([...(fresh.activeChains ?? []), ...profileChainFloor])),
+      uniqueCounterparties: fresh.uniqueCounterparties,
+      totalContractInteractions: fresh.totalContractInteractions
+    });
+  }
+
+  const cachedByChain = new Map(cached.chains.map((chain) => [chain.chain, chain]));
+  const freshByChain = new Map(fresh.chains.map((chain) => [chain.chain, chain]));
+  const chainNames = Array.from(new Set([...Array.from(freshByChain.keys()), ...Array.from(cachedByChain.keys())]));
+  const chains = chainNames.map((chainName) => {
+    const freshChain = freshByChain.get(chainName);
+    const cachedChain = cachedByChain.get(chainName);
+    return freshChain ? stableChainSnapshot(freshChain, cachedChain) : cachedChain!;
+  });
+  const activeChains = Array.from(new Set([
+    ...(fresh.activeChains ?? []),
+    ...(cached.activeChains ?? []),
+    ...profileChainFloor,
+    ...chains.filter((chain) => chain.status === "indexed" && chain.txCount > 0).map((chain) => chain.chain)
+  ]));
+
+  return aggregateMultiChainFromChains(profile.walletAddress, chains, {
+    globalFirstSeenAt: earliestDate(earliestDate(fresh.globalFirstSeenAt, cached.globalFirstSeenAt), profileFirstSeen),
+    globalWalletAgeDays: maxMetric(fresh.globalWalletAgeDays, cached.globalWalletAgeDays, profileAgeFloor),
+    totalTxCount: maxMetric(fresh.totalTxCount, cached.totalTxCount, profileTxFloor),
+    activeChains,
+    uniqueCounterparties: maxMetric(fresh.uniqueCounterparties, cached.uniqueCounterparties),
+    totalContractInteractions: maxMetric(fresh.totalContractInteractions, cached.totalContractInteractions)
+  });
+}
+
+function stableArcSnapshot(
+  walletAddress: string,
+  analytics: any,
+  cachedSnapshot: WalletActivitySnapshot | null,
+  multiChain: MultiChainWalletProfile,
+  now: string
+): WalletActivitySnapshot {
+  const arcChain = multiChain.chains.find((chain) => chain.chain === "Arc Testnet") ?? null;
+  const trustedCachedSnapshot = isVersionedArcSnapshot(cachedSnapshot) ? cachedSnapshot : null;
+  const txCount = maxMetric(analytics.txCount, trustedCachedSnapshot?.txCount, arcChain?.txCount);
+  const walletAgeDays = maxMetric(analytics.walletAgeDays, trustedCachedSnapshot?.walletAgeDays, arcChain?.walletAgeDays);
+  const counterpartyAddresses = Array.from(new Set([...(analytics.counterpartyAddresses ?? []), ...(trustedCachedSnapshot?.counterpartyAddresses ?? []), ...(arcChain?.counterpartyAddresses ?? [])].map(normalizeWallet).filter(Boolean)));
+  const counterparties = maxMetric(counterpartyAddresses.length, analytics.uniqueCounterparties, trustedCachedSnapshot?.counterparties, arcChain?.uniqueCounterparties);
+  const activeDays = maxMetric(analytics.activeDays, trustedCachedSnapshot?.activeDays, arcChain?.activeDays);
+  const recentActivityCount = maxMetric(analytics.recentActivityCount, arcChain?.recentActivityCount);
+  const transferCount = maxMetric(analytics.transferCount, trustedCachedSnapshot?.transferCount, arcChain?.txCount);
+  const contractInteractionCount = maxMetric(analytics.contractInteractionCount, trustedCachedSnapshot?.contractInteractionCount, arcChain?.contractInteractions);
+  const source = analytics.indexerSource && analytics.indexerSource !== "unknown"
+    ? analytics.indexerSource
+    : arcChain?.providerSource ?? trustedCachedSnapshot?.indexerSource ?? "arcscan";
+
+  return {
+    id: "pending",
+    walletAddress: normalizeWallet(walletAddress),
+    txCount,
+    volume: finiteNumber(analytics.balance, trustedCachedSnapshot?.volume ?? 0),
+    counterparties,
+    counterpartyAddresses,
+    activeDays,
+    recentActivityCount,
+    walletAgeDays,
+    activityFrequency: walletAgeDays > 0 ? txCount / walletAgeDays : finiteNumber(analytics.activityFrequency, trustedCachedSnapshot?.activityFrequency ?? 0),
+    transferCount,
+    contractInteractionCount,
+    indexerSource: `${ARC_SCORE_MODEL_VERSION}:${source}`,
+    evidenceVersion: ARC_SCORE_MODEL_VERSION,
+    calculatedScore: maxMetric(analytics.activityScore, trustedCachedSnapshot?.calculatedScore, txCount > 0 ? 20 : 0),
+    latestBlock: maxMetric(analytics.latestBlock, trustedCachedSnapshot?.latestBlock),
+    nativeBalance: analytics.rpcAvailable ? finiteNumber(analytics.balance) : finiteNumber(trustedCachedSnapshot?.nativeBalance, arcChain?.nativeBalance ?? 0),
+    lastActivityAt: latestDate(latestDate(analytics.lastActivityAt ?? null, trustedCachedSnapshot?.lastActivityAt ?? null), arcChain?.lastSeenAt ?? null),
+    createdAt: now
+  };
+}
+function mergeArcSnapshotIntoMultiChain(
+  multiChain: MultiChainWalletProfile,
+  snapshot: WalletActivitySnapshot
+): MultiChainWalletProfile {
+  const existing = multiChain.chains.find((chain) => chain.chain === "Arc Testnet") ?? null;
+  const counterpartyAddresses = Array.from(new Set([
+    ...(existing?.counterpartyAddresses ?? []),
+    ...snapshot.counterpartyAddresses
+  ].map(normalizeWallet).filter(Boolean)));
+  const arcChain: ChainSnapshot = {
+    chain: "Arc Testnet",
+    chainId: existing?.chainId ?? Number(process.env.NEXT_PUBLIC_ARC_CHAIN_ID || 0),
+    status: snapshot.txCount > 0 ? "indexed" : existing?.status ?? "no_activity",
+    txCount: Math.max(existing?.txCount ?? 0, snapshot.txCount),
+    firstSeenAt: existing?.firstSeenAt ?? null,
+    lastSeenAt: latestDate(existing?.lastSeenAt ?? null, snapshot.lastActivityAt),
+    walletAgeDays: Math.max(existing?.walletAgeDays ?? 0, snapshot.walletAgeDays),
+    nativeBalance: snapshot.nativeBalance,
+    uniqueCounterparties: Math.max(existing?.uniqueCounterparties ?? 0, snapshot.counterparties, counterpartyAddresses.length),
+    counterpartyAddresses,
+    contractInteractions: Math.max(existing?.contractInteractions ?? 0, snapshot.contractInteractionCount),
+    activeDays: Math.max(existing?.activeDays ?? 0, snapshot.activeDays),
+    recentActivityCount: snapshot.recentActivityCount,
+    explorerUrl: existing?.explorerUrl ?? (process.env.NEXT_PUBLIC_ARC_EXPLORER_URL ? `${process.env.NEXT_PUBLIC_ARC_EXPLORER_URL.replace(/\/$/, "")}/address/${snapshot.walletAddress}` : null),
+    indexedAt: snapshot.createdAt,
+    providerSource: snapshot.indexerSource || existing?.providerSource || "arcscan",
+    errorMessage: snapshot.txCount > 0 ? null : existing?.errorMessage ?? null
+  };
+  const chains = existing
+    ? multiChain.chains.map((chain) => chain.chain === "Arc Testnet" ? arcChain : chain)
+    : [...multiChain.chains, arcChain];
+  return aggregateMultiChainFromChains(multiChain.walletAddress, chains, multiChain);
+}
+function canonicalArcSnapshotForScore(
+  walletAddress: string,
+  snapshot: WalletActivitySnapshot | null,
+  multiChain: MultiChainWalletProfile | null
+): WalletActivitySnapshot | null {
+  if (isVersionedArcSnapshot(snapshot)) return snapshot;
+  const arcChain = multiChain?.chains.find((chain) => chain.chain === "Arc Testnet") ?? null;
+  if (!arcChain) {
+    if ((snapshot?.txCount ?? 0) > 0) {
+      console.warn("[arc-identity] legacy_arc_snapshot_excluded", {
+        wallet: normalizeWallet(walletAddress),
+        legacyTxCount: snapshot?.txCount,
+        reason: "no_canonical_arc_chain"
+      });
+    }
+    return null;
+  }
+
+  const txCount = arcChain.status === "indexed" ? Math.max(0, arcChain.txCount) : 0;
+  if (snapshot && snapshot.txCount !== txCount) {
+    console.warn("[arc-identity] legacy_arc_snapshot_reconciled", {
+      wallet: normalizeWallet(walletAddress),
+      legacyTxCount: snapshot.txCount,
+      canonicalArcTxCount: txCount,
+      providerSource: arcChain.providerSource
+    });
+  }
+
+  return {
+    id: snapshot?.id ?? `canonical-arc-${normalizeWallet(walletAddress)}`,
+    walletAddress: normalizeWallet(walletAddress),
+    txCount,
+    volume: arcChain.nativeBalance,
+    counterparties: txCount > 0 ? arcChain.uniqueCounterparties : 0,
+    counterpartyAddresses: txCount > 0 ? arcChain.counterpartyAddresses : [],
+    activeDays: txCount > 0 ? arcChain.activeDays : 0,
+    recentActivityCount: txCount > 0 ? arcChain.recentActivityCount : 0,
+    walletAgeDays: txCount > 0 ? arcChain.walletAgeDays : 0,
+    activityFrequency: txCount > 0 && arcChain.walletAgeDays > 0 ? txCount / arcChain.walletAgeDays : 0,
+    transferCount: txCount,
+    contractInteractionCount: txCount > 0 ? arcChain.contractInteractions : 0,
+    indexerSource: `${ARC_SCORE_MODEL_VERSION}:canonical_chain:${arcChain.providerSource}`,
+    evidenceVersion: ARC_SCORE_MODEL_VERSION,
+    calculatedScore: 0,
+    latestBlock: 0,
+    nativeBalance: arcChain.nativeBalance,
+    lastActivityAt: txCount > 0 ? arcChain.lastSeenAt : null,
+    createdAt: arcChain.indexedAt
+  };
+}
 function parseAttestationTimestamp(row: any) {
-  const value = row.tx_timestamp ?? row.created_at;
+  const value = row.tx_timestamp;
   if (!value) return null;
   const date = new Date(value);
   return Number.isNaN(date.getTime()) ? null : date.toISOString();
@@ -260,7 +522,7 @@ async function getVerifiedArcAttestationActivity(walletAddress: string): Promise
     .not("tx_hash", "is", null);
   if (error) {
     console.warn("[arc-identity] arc_verified_attestation_count", { wallet, count: 0, error: error.message });
-    return { txCount: 0, firstSeenAt: null, lastSeenAt: null, walletAgeDays: 0, activeDays: 0, counterparties: 0, recentActivityCount: 0, latestBlock: 0 };
+    return { txCount: 0, firstSeenAt: null, lastSeenAt: null, walletAgeDays: 0, activeDays: 0, counterparties: 0, counterpartyAddresses: [], recentActivityCount: 0, latestBlock: 0 };
   }
 
   const hashes = new Set<string>();
@@ -301,6 +563,7 @@ async function getVerifiedArcAttestationActivity(walletAddress: string): Promise
     activeDays: activeDays.size,
     counterparties: counterparties.size,
     recentActivityCount,
+    counterpartyAddresses: Array.from(counterparties),
     latestBlock
   };
   console.log("[arc-identity] arc_verified_attestation_count", { wallet, count: activity.txCount, counterparties: activity.counterparties, activeDays: activity.activeDays });
@@ -318,6 +581,7 @@ function mergeArcActivityIntoChain(chain: ChainSnapshot, activity: VerifiedArcAc
     walletAgeDays: Math.max(chain.walletAgeDays, activity.walletAgeDays),
     uniqueCounterparties: Math.max(chain.uniqueCounterparties, activity.counterparties),
     contractInteractions: Math.max(chain.contractInteractions, activity.txCount),
+    counterpartyAddresses: Array.from(new Set([...(chain.counterpartyAddresses ?? []), ...activity.counterpartyAddresses].map(normalizeWallet).filter(Boolean))),
     activeDays: Math.max(chain.activeDays, activity.activeDays),
     recentActivityCount: Math.max(chain.recentActivityCount, activity.recentActivityCount),
     providerSource: chain.providerSource === "arcscan" ? "arcscan_verified_attestations" : chain.providerSource,
@@ -348,6 +612,7 @@ async function mergeArcActivityIntoSnapshot(walletAddress: string, snapshot: Wal
     volume: snapshot?.volume ?? 0,
     counterparties: Math.max(snapshot?.counterparties ?? 0, activity.counterparties),
     activeDays: Math.max(snapshot?.activeDays ?? 0, activity.activeDays),
+    counterpartyAddresses: Array.from(new Set([...(snapshot?.counterpartyAddresses ?? []), ...activity.counterpartyAddresses].map(normalizeWallet).filter(Boolean))),
     recentActivityCount: Math.max(snapshot?.recentActivityCount ?? 0, activity.recentActivityCount),
     walletAgeDays: Math.max(snapshot?.walletAgeDays ?? 0, activity.walletAgeDays),
     activityFrequency: snapshot?.activityFrequency ?? (activity.walletAgeDays > 0 ? activity.txCount / activity.walletAgeDays : 0),
@@ -379,7 +644,7 @@ function chainSnapshotInsertRows(profile: MultiChainWalletProfile, now: string, 
     recent_activity_count: chain.recentActivityCount,
     explorer_url: chain.explorerUrl,
     indexed_at: now,
-    ...(includeProviderColumns ? { provider_source: chain.providerSource, error_message: chain.errorMessage ?? null } : {})
+    ...(includeProviderColumns ? { counterparty_addresses: chain.counterpartyAddresses, provider_source: chain.providerSource, error_message: chain.errorMessage ?? null } : {})
   }));
 }
 
@@ -398,9 +663,8 @@ async function persistGlobalProfile(profile: MultiChainWalletProfile, now: strin
   }, { onConflict: "wallet_address" });
 }
 
-async function persistMultiChainProfile(profile: MultiChainWalletProfile) {
+async function persistMultiChainProfile(profile: MultiChainWalletProfile, now = new Date().toISOString()) {
   const supabase = getSupabaseAdmin();
-  const now = new Date().toISOString();
   try {
     const { error } = await supabase.from("wallet_chain_snapshots").insert(chainSnapshotInsertRows(profile, now, true));
     if (error) throw error;
@@ -414,17 +678,15 @@ async function persistMultiChainProfile(profile: MultiChainWalletProfile) {
   }
 }
 
-async function getCachedMultiChainProfile(walletAddress: string): Promise<MultiChainWalletProfile | null> {
+async function getCachedMultiChainProfile(walletAddress: string, committedAt?: string | null): Promise<MultiChainWalletProfile | null> {
   const supabase = getSupabaseAdmin();
   const wallet = normalizeWallet(walletAddress);
   try {
-    const [{ data: globalRow, error: globalError }, { data: chainRows, error: chainError }] = await Promise.all([
-      supabase.from("wallet_global_profiles").select("*").eq("wallet_address", wallet).maybeSingle(),
-      supabase.from("wallet_chain_snapshots").select("*").eq("wallet_address", wallet).order("indexed_at", { ascending: false }).limit(60)
-    ]);
-    if (globalError) throw globalError;
+    let chainQuery = supabase.from("wallet_chain_snapshots").select("*").eq("wallet_address", wallet);
+    if (committedAt) chainQuery = chainQuery.lte("indexed_at", committedAt);
+    const { data: chainRows, error: chainError } = await chainQuery
+      .order("indexed_at", { ascending: false }).limit(60);
     if (chainError) throw chainError;
-    if (!globalRow) return null;
     const latestByChain = new Map<string, any>();
     for (const row of chainRows ?? []) {
       if (!latestByChain.has(row.chain_name)) latestByChain.set(row.chain_name, row);
@@ -442,6 +704,7 @@ async function getCachedMultiChainProfile(walletAddress: string): Promise<MultiC
         walletAgeDays: 0,
         nativeBalance: 0,
         uniqueCounterparties: 0,
+        counterpartyAddresses: [],
         contractInteractions: 0,
         activeDays: 0,
         recentActivityCount: 0,
@@ -451,14 +714,8 @@ async function getCachedMultiChainProfile(walletAddress: string): Promise<MultiC
         errorMessage: null
       }, arcActivity));
     }
-    return aggregateMultiChainFromChains(wallet, chains, {
-      globalFirstSeenAt: globalRow.global_first_seen_at ?? null,
-      globalWalletAgeDays: Number(globalRow.global_wallet_age_days ?? 0),
-      totalTxCount: Number(globalRow.total_tx_count ?? 0),
-      activeChains: Array.isArray(globalRow.active_chains) ? globalRow.active_chains : [],
-      uniqueCounterparties: Number(globalRow.total_unique_counterparties ?? 0),
-      totalContractInteractions: Number(globalRow.total_contract_interactions ?? 0)
-    });
+    if (chains.length === 0) return null;
+    return aggregateMultiChainFromChains(wallet, chains);
   } catch (error) {
     if (!isMissingSchemaError(error)) throw error;
     return null;
@@ -491,12 +748,14 @@ async function getProfileByWallet(wallet: string) {
   return data ? profileFromRow(data) : null;
 }
 
-async function getLatestSnapshot(wallet: string) {
+async function getLatestSnapshot(wallet: string, committedAt?: string | null) {
   const supabase = getSupabaseAdmin();
-  const { data, error } = await supabase
+  let query = supabase
     .from("wallet_activity_snapshots")
     .select("*")
-    .eq("wallet_address", normalizeWallet(wallet))
+    .eq("wallet_address", normalizeWallet(wallet));
+  if (committedAt) query = query.lte("created_at", committedAt);
+  const { data, error } = await query
     .order("created_at", { ascending: false })
     .limit(1)
     .maybeSingle();
@@ -680,7 +939,7 @@ async function getAttestationStats(wallet: string) {
   const counterparties = new Set<string>();
   const pairCounts = new Map<string, number>();
   const txHashes = new Set<string>();
-  let receivedWeight = 0;
+  let totalWeight = 0;
 
   for (const row of rows) {
     const txHash = String(row.tx_hash ?? "").toLowerCase();
@@ -691,15 +950,15 @@ async function getAttestationStats(wallet: string) {
     const counterparty = from === normalized ? to : from;
     counterparties.add(counterparty);
     pairCounts.set(counterparty, (pairCounts.get(counterparty) ?? 0) + 1);
-    if (to === normalized) receivedWeight += Number(row.weight ?? 0);
+    totalWeight += Number(row.weight ?? 0);
   }
 
-  const repeated = Array.from(pairCounts.values()).filter((count) => count > 1).reduce((sum, count) => sum + count, 0);
+  const repeatedExcess = Array.from(pairCounts.values()).reduce((sum, count) => sum + Math.max(0, count - 1), 0);
   return {
     count: txHashes.size,
     uniqueCounterparties: counterparties.size,
-    weight: receivedWeight,
-    repeatedPairRatio: txHashes.size ? repeated / txHashes.size : 0
+    weight: totalWeight,
+    repeatedPairRatio: txHashes.size ? repeatedExcess / txHashes.size : 0
   };
 }
 
@@ -722,13 +981,43 @@ function refreshJobFromRow(row: any): WalletRefreshJob {
   };
 }
 
+async function requireScoreIntegritySchema() {
+  const supabase = getSupabaseAdmin();
+  const [profileCheck, arcSnapshotCheck, chainSnapshotCheck] = await Promise.all([
+    supabase.from("profiles").select("score_model_version,score_inputs,score_breakdown,score_calculated_at").limit(1),
+    supabase.from("wallet_activity_snapshots").select("evidence_version,counterparty_addresses").limit(1),
+    supabase.from("wallet_chain_snapshots").select("counterparty_addresses").limit(1)
+  ]);
+  const error = profileCheck.error ?? arcSnapshotCheck.error ?? chainSnapshotCheck.error;
+  if (error) {
+    console.warn("[arc-identity] score_integrity_schema_required", {
+      code: error.code ?? null,
+      message: error.message ?? String(error)
+    });
+    throw new Error("ARC Score integrity migration is required before wallet intelligence can refresh");
+  }
+}
+
 async function createRefreshJob(walletAddress: string) {
   const supabase = getSupabaseAdmin();
+  const wallet = normalizeWallet(walletAddress);
+  const staleBefore = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+  const { error: staleError } = await supabase
+    .from("wallet_refresh_jobs")
+    .update({
+      status: "failed",
+      completed_at: new Date().toISOString(),
+      error_message: "Refresh expired before score commit"
+    })
+    .eq("wallet_address", wallet)
+    .in("status", ["started", "indexing_chains", "recomputing_score"])
+    .lt("started_at", staleBefore);
+  if (staleError && !isMissingSchemaError(staleError)) throw staleError;
   const refreshVersion = crypto.randomUUID();
   const { data, error } = await supabase
     .from("wallet_refresh_jobs")
     .insert({
-      wallet_address: normalizeWallet(walletAddress),
+      wallet_address: wallet,
       status: "started",
       refresh_version: refreshVersion,
       chains_total: 0,
@@ -742,6 +1031,7 @@ async function createRefreshJob(walletAddress: string) {
     .single();
   if (error) {
     if (isMissingSchemaError(error)) return null;
+    if (isUniqueViolation(error)) throw new Error("Wallet intelligence refresh already in progress");
     throw error;
   }
   return refreshJobFromRow(data);
@@ -814,7 +1104,7 @@ type CanonicalDirectoryScore = {
   score: number | null;
   riskLevel: Profile["riskLevel"];
   updatedAt: string | null;
-  source: "score_refresh_snapshot" | "profile" | "legacy_profile" | "placeholder";
+  source: "profile_score_v2" | "score_refresh_snapshot" | "profile" | "legacy_profile" | "placeholder";
 };
 
 function validScore(value: unknown) {
@@ -896,25 +1186,35 @@ async function getLatestChainSnapshotRows(wallets: string[]) {
 }
 
 function getCanonicalDirectoryScore(profile: Profile, scoreRow: any | null): CanonicalDirectoryScore {
+  const storedInput = profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+    ? scoreInputFromUnknown(profile.scoreInputs)
+    : null;
+  if (storedInput) {
+    const storedScore = arcScoreFromInput(profile.walletAddress, storedInput, profile.scoreCalculatedAt ?? profile.updatedAt);
+    return {
+      score: storedScore.arcScore,
+      riskLevel: storedScore.riskLevel,
+      updatedAt: profile.scoreCalculatedAt ?? profile.updatedAt,
+      source: "profile_score_v2"
+    };
+  }
   const event = latestEventScore(scoreRow);
   const profileScore = validScore(profile.arcScore);
   const credentialScore = validScore(profile.credentialScore);
-  const eventTime = event.updatedAt ? new Date(event.updatedAt).getTime() : 0;
-  const profileTime = profile.updatedAt ? new Date(profile.updatedAt).getTime() : 0;
-  if (event.score != null && eventTime >= profileTime) {
-    return {
-      score: event.score,
-      riskLevel: event.riskLevel ?? getRiskLevel(event.score),
-      updatedAt: event.updatedAt,
-      source: "score_refresh_snapshot"
-    };
-  }
   if (profileScore != null) {
     return {
       score: profileScore,
       riskLevel: profile.riskLevel,
       updatedAt: profile.updatedAt,
       source: "profile"
+    };
+  }
+  if (event.score != null) {
+    return {
+      score: event.score,
+      riskLevel: event.riskLevel ?? getRiskLevel(event.score),
+      updatedAt: event.updatedAt,
+      source: "score_refresh_snapshot"
     };
   }
   if (credentialScore != null) {
@@ -1022,23 +1322,6 @@ function isPassiveScoreEvent(category: string) {
   return category === "SCORE_RECALCULATION" || category === "TRUST_UPDATE";
 }
 
-function stabilizeScore(previousScore: number, rawScore: ArcScore, category: string, previousStableScore: number | null): { score: ArcScore; rawScore: number; suppressedTinyChange: boolean; wasDampened: boolean; memoryFloor: number | null } {
-  const raw = rawScore.arcScore;
-  if (raw === 0 && isZeroSignalBreakdown(scoreBreakdown(rawScore))) {
-    return { score: { ...rawScore, arcScore: 0, riskLevel: getRiskLevel(0) }, rawScore: raw, suppressedTinyChange: false, wasDampened: previousScore !== 0, memoryFloor: null };
-  }
-  const delta = raw - previousScore;
-  if (Math.abs(delta) < 3) {
-    return { score: { ...rawScore, arcScore: previousScore, riskLevel: getRiskLevel(previousScore) }, rawScore: raw, suppressedTinyChange: true, wasDampened: false, memoryFloor: previousStableScore };
-  }
-  const maxDrop = isPassiveScoreEvent(category) ? 3 : 8;
-  const memoryFloor = previousStableScore != null && isPassiveScoreEvent(category) ? Math.max(0, previousStableScore - 6) : null;
-  const stabilized = delta < -maxDrop ? previousScore - maxDrop : raw;
-  const visibleScore = Math.max(0, Math.min(100, Math.round(memoryFloor == null ? stabilized : Math.max(stabilized, memoryFloor))));
-  const next = { ...rawScore, arcScore: visibleScore, riskLevel: getRiskLevel(visibleScore) };
-  return { score: next, rawScore: raw, suppressedTinyChange: false, wasDampened: next.arcScore !== raw, memoryFloor };
-}
-
 async function getLatestScoreRefreshContext(wallet: string): Promise<{ createdAt: string | null; breakdown: ScoreBreakdown | null; score: number | null; riskLevel: string | null; anomalyScore: number; attestationCount: number | null }> {
   const supabase = getSupabaseAdmin();
   const { data } = await supabase
@@ -1085,6 +1368,7 @@ function recentScoreRefresh(createdAt: string | null) {
 export async function refreshWalletProfile(walletAddress: string): Promise<IdentityRecord | null> {
   const profile = await getProfileByWallet(walletAddress);
   if (!profile) return null;
+  await requireScoreIntegritySchema();
 
   const supabase = getSupabaseAdmin();
   const previousScore = profile.arcScore;
@@ -1093,11 +1377,22 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
 
   try {
     await updateRefreshJob(job, { status: "indexing_chains" });
-    const [analytics, liveArc, multiChainRaw, stats] = await Promise.all([
+    const committedEvidenceAt = profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+      ? profile.scoreCalculatedAt
+      : null;
+    const [analytics, liveArc, multiChainRaw, stats, cachedMultiChain, cachedSnapshot] = await Promise.all([
       getWalletAnalytics(profile.walletAddress, 3400),
       getArcLiveWalletData(profile.walletAddress, 6500),
       getMultiChainWalletProfile(profile.walletAddress),
-      getAttestationStats(profile.walletAddress)
+      getAttestationStats(profile.walletAddress),
+      getCachedMultiChainProfile(profile.walletAddress, committedEvidenceAt).catch((error) => {
+        console.warn("[arc-identity] cached_multichain_floor_unavailable", { wallet: profile.walletAddress, error: error instanceof Error ? error.message : String(error) });
+        return null;
+      }),
+      getLatestSnapshot(profile.walletAddress, committedEvidenceAt).catch((error) => {
+        console.warn("[arc-identity] cached_arc_snapshot_floor_unavailable", { wallet: profile.walletAddress, error: error instanceof Error ? error.message : String(error) });
+        return null;
+      })
     ]);
     const analyticsWithLiveArc = {
       ...analytics,
@@ -1115,13 +1410,24 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
       providerSource: liveArc.providerStatus === "live" ? "live_arc_rpc" : chain.providerSource,
       errorMessage: liveArc.providerStatus === "live" ? null : chain.errorMessage
     } : chain);
-    const multiChain = aggregateMultiChainFromChains(profile.walletAddress, mergedChains, multiChainRaw);
+    const freshMultiChain = aggregateMultiChainFromChains(profile.walletAddress, mergedChains, multiChainRaw);
+    const preliminaryMultiChain = buildStableMultiChainProfile(profile, freshMultiChain, cachedMultiChain);
+    console.log("[arc-identity] score_refresh_stable_evidence_merged", {
+      wallet: profile.walletAddress,
+      freshScoreInputs: { totalTx: freshMultiChain.totalTxCount, activeChains: freshMultiChain.activeChains, globalWalletAgeDays: freshMultiChain.globalWalletAgeDays },
+      cachedScoreInputs: cachedMultiChain ? { totalTx: cachedMultiChain.totalTxCount, activeChains: cachedMultiChain.activeChains, globalWalletAgeDays: cachedMultiChain.globalWalletAgeDays } : null,
+      stableScoreInputs: { totalTx: preliminaryMultiChain.totalTxCount, activeChains: preliminaryMultiChain.activeChains, globalWalletAgeDays: preliminaryMultiChain.globalWalletAgeDays }
+    });
     console.log("[arc-identity] arc_data_source_selected", {
       wallet: profile.walletAddress,
       balanceSource: liveArc.providerStatus === "live" ? "live_arc_rpc" : analyticsWithLiveArc.indexerSource,
       balance: analyticsWithLiveArc.balance,
       latestBlock: analyticsWithLiveArc.latestBlock
     });
+
+    const now = new Date().toISOString();
+    const snapshotLike = stableArcSnapshot(profile.walletAddress, analyticsWithLiveArc, cachedSnapshot, preliminaryMultiChain, now);
+    const multiChain = mergeArcSnapshotIntoMultiChain(preliminaryMultiChain, snapshotLike);
     const counts = chainStatusCounts(multiChain);
     await updateRefreshJob(job, { status: "recomputing_score", ...counts });
 
@@ -1129,42 +1435,31 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
       throw new Error("Refresh produced only provider errors; preserving cached score");
     }
 
-    const now = new Date().toISOString();
-    const snapshotLike = {
-      id: "pending",
-      walletAddress: profile.walletAddress,
-      txCount: analyticsWithLiveArc.txCount,
-      volume: analyticsWithLiveArc.balance,
-      counterparties: analyticsWithLiveArc.uniqueCounterparties,
-      activeDays: analyticsWithLiveArc.activeDays,
-      recentActivityCount: analyticsWithLiveArc.recentActivityCount,
-      walletAgeDays: analyticsWithLiveArc.walletAgeDays,
-      activityFrequency: analyticsWithLiveArc.activityFrequency,
-      transferCount: analyticsWithLiveArc.transferCount,
-      contractInteractionCount: analyticsWithLiveArc.contractInteractionCount,
-      indexerSource: analyticsWithLiveArc.indexerSource,
-      calculatedScore: analyticsWithLiveArc.activityScore,
-      latestBlock: analyticsWithLiveArc.latestBlock,
-      nativeBalance: analyticsWithLiveArc.balance,
-      lastActivityAt: analyticsWithLiveArc.lastActivityAt,
-      createdAt: now
-    };
-
-    const trustGraph = await getTrustGraph(profile.walletAddress).catch(() => null);
-    const { score: rawScore, riskFlags, activityLevel } = buildArcScore(profile, {
+    const previousScoreInput = profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+      ? scoreInputFromUnknown(profile.scoreInputs)
+      : null;
+    const trustGraph = await getTrustGraph(profile.walletAddress).catch((error) => {
+      if (!previousScoreInput) throw error;
+      console.warn("[arc-identity] trust_graph_refresh_unavailable_preserving_score_inputs", {
+        wallet: profile.walletAddress,
+        error: error instanceof Error ? error.message : String(error)
+      });
+      return null;
+    });
+    const { score: rawScore, riskFlags, activityLevel, scoreInput, components: scoreComponents } = buildArcScore(profile, {
       snapshot: snapshotLike,
       multiChain,
       attestationWeight: stats.weight,
       attestationCount: stats.count,
       uniqueAttestationCounterparties: stats.uniqueCounterparties,
       repeatedPairRatio: stats.repeatedPairRatio,
-      propagatedTrustScore: trustGraph?.metrics.propagatedTrustScore ?? 0,
-      trustAnomalyScore: trustGraph?.metrics.anomalyScore ?? 0
+      propagatedTrustScore: trustGraph?.metrics.propagatedTrustScore ?? previousScoreInput?.propagatedTrustScore ?? 0,
+      trustAnomalyScore: trustGraph?.metrics.anomalyScore ?? previousScoreInput?.anomalyScore ?? 0
     });
     const latestContext = await getLatestScoreRefreshContext(profile.walletAddress);
     const previousBreakdown = latestContext.breakdown;
     const nextBreakdownRaw = scoreBreakdown(rawScore);
-    const components = changedComponents(previousBreakdown, nextBreakdownRaw);
+    const changed = changedComponents(previousBreakdown, nextBreakdownRaw);
     const eventCategory = classifyScoreEvent(previousBreakdown, nextBreakdownRaw, {
       previousRiskFlags: profile.riskFlags,
       nextRiskFlags: riskFlags,
@@ -1172,47 +1467,44 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
       nextAnomalyScore: trustGraph?.metrics.anomalyScore ?? 0,
       attestationCountChanged: latestContext.attestationCount != null && latestContext.attestationCount !== stats.count
     });
-    const reasonSummary = buildScoreRefreshReason(previousBreakdown, nextBreakdownRaw, components, counts, rawScore.arcScore - previousScore, eventCategory);
-    console.log("[arc-identity] score_refresh_reason_generated", { wallet: profile.walletAddress, components, reasonSummary });
-    const stabilized = stabilizeScore(previousScore, rawScore, eventCategory, latestContext.score);
-    const score = stabilized.score;
-    if (stabilized.wasDampened || stabilized.suppressedTinyChange) {
-      console.log("[arc-identity] score_refresh_stabilized", { wallet: profile.walletAddress, rawScore: stabilized.rawScore, visibleScore: score.arcScore, suppressedTinyChange: stabilized.suppressedTinyChange, wasDampened: stabilized.wasDampened });
-    }
-    if (rawScore.arcScore - previousScore <= -10 || score.arcScore - previousScore <= -10) {
-      console.log("[arc-identity] score_refresh_large_delta", { wallet: profile.walletAddress, previousScore, rawScore: rawScore.arcScore, visibleScore: score.arcScore, eventCategory, reasonSummary });
+    const reasonSummary = buildScoreRefreshReason(previousBreakdown, nextBreakdownRaw, changed, counts, rawScore.arcScore - previousScore, eventCategory);
+    console.log("[arc-identity] score_refresh_reason_generated", { wallet: profile.walletAddress, components: changed, reasonSummary });
+    const score = rawScore;
+    if (score.arcScore - previousScore <= -10) {
+      console.log("[arc-identity] score_refresh_large_delta", { wallet: profile.walletAddress, previousScore, score: score.arcScore, eventCategory, reasonSummary });
     }
     const scoreTrend = score.arcScore - previousScore;
     const coverageChanged = sortedList(profile.indexedChains) !== sortedList(multiChain?.activeChains ?? []);
     const riskChanged = profile.riskLevel !== score.riskLevel;
     const recentRefresh = recentScoreRefresh(latestContext.createdAt);
     const shouldLogRefresh = shouldInsertScoreRefreshEvent(profile, score, multiChain) &&
-      !stabilized.suppressedTinyChange &&
       !(recentRefresh && Math.abs(scoreTrend) < 5 && !riskChanged && !coverageChanged);
     if (!shouldLogRefresh) {
-      console.log("[arc-identity] score_refresh_suppressed", { wallet: profile.walletAddress, scoreTrend, recentRefresh, riskChanged, coverageChanged, suppressedTinyChange: stabilized.suppressedTinyChange });
+      console.log("[arc-identity] score_refresh_suppressed", { wallet: profile.walletAddress, scoreTrend, recentRefresh, riskChanged, coverageChanged });
     }
 
-    await persistMultiChainProfile(multiChain);
+    await persistMultiChainProfile(multiChain, now);
 
     let { data: snapshotRow, error: snapshotError } = await supabase
       .from("wallet_activity_snapshots")
       .insert({
         wallet_address: profile.walletAddress,
-        tx_count: analyticsWithLiveArc.txCount,
-        volume: analyticsWithLiveArc.balance,
-        counterparties: analyticsWithLiveArc.uniqueCounterparties,
-        active_days: analyticsWithLiveArc.activeDays,
-        recent_activity_count: analyticsWithLiveArc.recentActivityCount,
-        wallet_age_days: analyticsWithLiveArc.walletAgeDays,
-        activity_frequency: analyticsWithLiveArc.activityFrequency,
-        transfer_count: analyticsWithLiveArc.transferCount,
-        contract_interaction_count: analyticsWithLiveArc.contractInteractionCount,
-        indexer_source: analyticsWithLiveArc.indexerSource,
-        calculated_score: analyticsWithLiveArc.activityScore,
-        latest_block: analyticsWithLiveArc.latestBlock,
-        native_balance: analyticsWithLiveArc.balance,
-        last_activity_at: analyticsWithLiveArc.lastActivityAt,
+        tx_count: snapshotLike.txCount,
+        volume: snapshotLike.volume,
+        counterparties: snapshotLike.counterparties,
+        counterparty_addresses: snapshotLike.counterpartyAddresses,
+        evidence_version: snapshotLike.evidenceVersion,
+        active_days: snapshotLike.activeDays,
+        recent_activity_count: snapshotLike.recentActivityCount,
+        wallet_age_days: snapshotLike.walletAgeDays,
+        activity_frequency: snapshotLike.activityFrequency,
+        transfer_count: snapshotLike.transferCount,
+        contract_interaction_count: snapshotLike.contractInteractionCount,
+        indexer_source: snapshotLike.indexerSource,
+        calculated_score: snapshotLike.calculatedScore,
+        latest_block: snapshotLike.latestBlock,
+        native_balance: snapshotLike.nativeBalance,
+        last_activity_at: snapshotLike.lastActivityAt,
         created_at: now
       })
       .select("*")
@@ -1222,14 +1514,14 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
         .from("wallet_activity_snapshots")
         .insert({
           wallet_address: profile.walletAddress,
-          tx_count: analyticsWithLiveArc.txCount,
-          volume: analyticsWithLiveArc.balance,
-          counterparties: analyticsWithLiveArc.uniqueCounterparties,
-          active_days: analyticsWithLiveArc.activeDays,
-          calculated_score: analyticsWithLiveArc.activityScore,
-          latest_block: analyticsWithLiveArc.latestBlock,
-          native_balance: analyticsWithLiveArc.balance,
-          last_activity_at: analyticsWithLiveArc.lastActivityAt,
+          tx_count: snapshotLike.txCount,
+          volume: snapshotLike.volume,
+          counterparties: snapshotLike.counterparties,
+          active_days: snapshotLike.activeDays,
+          calculated_score: snapshotLike.calculatedScore,
+          latest_block: snapshotLike.latestBlock,
+          native_balance: snapshotLike.nativeBalance,
+          last_activity_at: snapshotLike.lastActivityAt,
           created_at: now
         })
         .select("*")
@@ -1261,6 +1553,7 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
       .filter((value): value is string => Boolean(value))
       .sort();
     const latestMultiChainSeenAt = sortedMultiChainSeenAt[sortedMultiChainSeenAt.length - 1] ?? null;
+    const scoreBreakdownPayload = Object.fromEntries(Object.entries(scoreComponents).map(([key, component]) => [key, component.points]));
     let { data: updatedProfileRow, error: profileError } = await supabase
       .from("profiles")
       .update({
@@ -1278,28 +1571,15 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
         active_chain_count: multiChain.activeChains.length,
         credential_score: score.arcScore,
         credential_level: score.riskLevel,
-        indexed_chains: multiChain.activeChains
+        indexed_chains: multiChain.activeChains,
+        score_model_version: score.modelVersion,
+        score_inputs: scoreInput,
+        score_breakdown: scoreBreakdownPayload,
+        score_calculated_at: now
       })
       .eq("id", profile.id)
       .select("id,wallet_address,username,arc_score,risk_level,updated_at")
       .single();
-    if (profileError && isMissingSchemaError(profileError)) {
-      const fallback = await supabase
-        .from("profiles")
-        .update({
-          arc_score: score.arcScore,
-          risk_level: score.riskLevel,
-          tx_count: multiChain.totalTxCount,
-          first_seen: multiChain.globalFirstSeenAt ?? analyticsWithLiveArc.firstSeenAt ?? profile.firstSeen,
-          last_seen: latestDate(analyticsWithLiveArc.lastActivityAt ?? null, latestMultiChainSeenAt) ?? now,
-          updated_at: now
-        })
-        .eq("id", profile.id)
-        .select("id,wallet_address,username,arc_score,risk_level,updated_at")
-        .single();
-      updatedProfileRow = fallback.data;
-      profileError = fallback.error;
-    }
     if (profileError) throw profileError;
     if (!updatedProfileRow || Number(updatedProfileRow.arc_score ?? 0) !== score.arcScore) {
       throw new Error("Score snapshot write verification failed");
@@ -1333,22 +1613,22 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
           chainCoverage: counts,
           previousScore,
           newScore: score.arcScore,
-          rawCalculatedScore: stabilized.rawScore,
+          rawCalculatedScore: score.arcScore,
           scoreDelta: scoreTrend,
           previousBreakdown,
           newBreakdown: scoreBreakdown(score),
           rawBreakdown: nextBreakdownRaw,
-          changedComponents: components,
-          affectedCategories: components,
+          changedComponents: changed,
+          affectedCategories: changed,
           reasonSummary,
           eventCategory,
           isRecalibration: eventCategory === "SCORE_RECALCULATION",
           passiveRecalculation: isPassiveScoreEvent(eventCategory),
           scoreConfidence: (multiChain.totalTxCount < 5 || stats.count === 0) ? "stabilizing" : "normal",
           confidenceMessage: (multiChain.totalTxCount < 5 || stats.count === 0) ? "Score still stabilizing as more activity is indexed." : "Score confidence is based on indexed activity and verified attestations.",
-          stabilized: stabilized.wasDampened,
-          tinyChangeSuppressed: stabilized.suppressedTinyChange,
-          memoryFloor: stabilized.memoryFloor,
+          stabilized: false,
+          tinyChangeSuppressed: false,
+          memoryFloor: null,
           attestationCount: stats.count,
           trustPropagation: trustGraph ? {
             propagatedTrustScore: trustGraph.metrics.propagatedTrustScore,
@@ -1356,7 +1636,9 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
             anomalyScore: trustGraph.metrics.anomalyScore,
             networkMaturity: trustGraph.metrics.networkMaturity
           } : null,
-          scoreBreakdown: score
+          scoreModelVersion: score.modelVersion,
+          scoreInputs: scoreInput,
+          scoreBreakdown: scoreBreakdownPayload
         }
       });
     }
@@ -1365,7 +1647,7 @@ export async function refreshWalletProfile(walletAddress: string): Promise<Ident
     const identity = await getIdentityByWallet(profile.walletAddress, false, snapshot);
     return identity ? {
       ...identity,
-      profile: { ...identity.profile, arcScore: score.arcScore, riskLevel: score.riskLevel, riskFlags, scoreTrend, activityLevel, txCount: multiChain.totalTxCount, globalWalletAgeDays: multiChain.globalWalletAgeDays, arcWalletAgeDays: snapshot.walletAgeDays, activeChainCount: multiChain.activeChains.length, credentialScore: score.arcScore, credentialLevel: score.riskLevel, indexedChains: multiChain.activeChains },
+      profile: { ...identity.profile, arcScore: score.arcScore, riskLevel: score.riskLevel, riskFlags, scoreTrend, activityLevel, txCount: multiChain.totalTxCount, globalWalletAgeDays: multiChain.globalWalletAgeDays, arcWalletAgeDays: snapshot.walletAgeDays, activeChainCount: multiChain.activeChains.length, credentialScore: score.arcScore, credentialLevel: score.riskLevel, indexedChains: multiChain.activeChains, scoreModelVersion: score.modelVersion, scoreInputs: scoreInput, scoreBreakdown: scoreBreakdownPayload, scoreCalculatedAt: now },
       score,
       multiChain,
       refreshJob: committedJob ?? identity.refreshJob
@@ -1387,15 +1669,19 @@ export async function getIdentityByWallet(walletAddress: string, refresh = true,
 
   const profile = await getProfileByWallet(wallet);
   if (!profile) return null;
+  const committedEvidenceAt = profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+    ? profile.scoreCalculatedAt
+    : null;
   const [stats, snapshot, multiChain, refreshJob, trustGraph] = await Promise.all([
     safeIdentityPart(wallet, "attestation_stats", () => getAttestationStats(wallet), emptyAttestationStats()),
-    latestSnapshot ? Promise.resolve(latestSnapshot) : safeIdentityPart<WalletActivitySnapshot | null>(wallet, "latest_snapshot", () => getLatestSnapshot(wallet), null),
-    safeIdentityPart<MultiChainWalletProfile | null>(wallet, "cached_multichain", () => getCachedMultiChainProfile(wallet), null),
+    latestSnapshot ? Promise.resolve(latestSnapshot) : safeIdentityPart<WalletActivitySnapshot | null>(wallet, "latest_snapshot", () => getLatestSnapshot(wallet, committedEvidenceAt), null),
+    safeIdentityPart<MultiChainWalletProfile | null>(wallet, "cached_multichain", () => getCachedMultiChainProfile(wallet, committedEvidenceAt), null),
     safeIdentityPart<WalletRefreshJob | null>(wallet, "latest_refresh_job", () => getLatestRefreshJob(wallet), null),
     safeIdentityPart(wallet, "trust_graph", () => getTrustGraph(wallet), null)
   ]);
-  const { score, riskFlags, activityLevel } = buildArcScore(profile, {
-    snapshot,
+  const canonicalSnapshot = canonicalArcSnapshotForScore(wallet, snapshot, multiChain);
+  const { score: calculatedScore, riskFlags, activityLevel } = buildArcScore(profile, {
+    snapshot: canonicalSnapshot,
     multiChain,
     attestationWeight: stats.weight,
     attestationCount: stats.count,
@@ -1404,20 +1690,29 @@ export async function getIdentityByWallet(walletAddress: string, refresh = true,
     propagatedTrustScore: trustGraph?.metrics.propagatedTrustScore ?? 0,
     trustAnomalyScore: trustGraph?.metrics.anomalyScore ?? 0
   });
+  const persistedInput = profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+    ? scoreInputFromUnknown(profile.scoreInputs)
+    : null;
+  const score = persistedInput
+    ? arcScoreFromInput(profile.walletAddress, persistedInput, profile.scoreCalculatedAt ?? calculatedScore.lastSyncedAt)
+    : calculatedScore;
+  const canonicalRiskFlags = persistedInput ? profile.riskFlags : riskFlags;
 
   return {
     profile: {
       ...profile,
-      arcScore: profile.arcScore || score.arcScore,
-      riskLevel: profile.riskLevel || score.riskLevel,
-      riskFlags: profile.riskFlags.length ? profile.riskFlags : riskFlags,
-      activityLevel: profile.activityLevel || activityLevel,
-      txCount: profile.txCount || snapshot?.txCount || 0
+      arcScore: score.arcScore,
+      riskLevel: score.riskLevel,
+      riskFlags: canonicalRiskFlags,
+      activityLevel: persistedInput ? profile.activityLevel : activityLevel,
+      txCount: multiChain?.totalTxCount ?? profile.txCount
     },
-    score: { ...score, arcScore: profile.arcScore || score.arcScore, riskLevel: profile.riskLevel || score.riskLevel },
-    snapshot,
+    score,
+    snapshot: canonicalSnapshot,
     acceptedAttestations: stats.count,
     uniqueCounterparties: stats.uniqueCounterparties,
+    attestationWeight: stats.weight,
+    repeatedPairRatio: stats.repeatedPairRatio,
     trustGraph,
     multiChain,
     refreshJob
@@ -1450,7 +1745,7 @@ export async function getIdentityByUsername(username: string, refresh = false) {
       error: identityError instanceof Error ? identityError.message : String(identityError)
     });
     const profile = profileFromRow(row);
-    const { score, riskFlags, activityLevel } = buildArcScore(profile, {
+    const { score: calculatedScore, riskFlags, activityLevel } = buildArcScore(profile, {
       snapshot: null,
       multiChain: null,
       attestationWeight: 0,
@@ -1460,15 +1755,21 @@ export async function getIdentityByUsername(username: string, refresh = false) {
       propagatedTrustScore: 0,
       trustAnomalyScore: 0
     });
+    const storedInput = profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+      ? scoreInputFromUnknown(profile.scoreInputs)
+      : null;
+    const score = storedInput
+      ? arcScoreFromInput(profile.walletAddress, storedInput, profile.scoreCalculatedAt ?? calculatedScore.lastSyncedAt)
+      : calculatedScore;
     return {
       profile: {
         ...profile,
-        arcScore: profile.arcScore || score.arcScore,
-        riskLevel: profile.riskLevel || score.riskLevel,
-        riskFlags: profile.riskFlags.length ? profile.riskFlags : riskFlags,
-        activityLevel: profile.activityLevel || activityLevel
+        arcScore: score.arcScore,
+        riskLevel: score.riskLevel,
+        riskFlags: storedInput ? profile.riskFlags : riskFlags,
+        activityLevel: storedInput ? profile.activityLevel : activityLevel
       },
-      score: { ...score, arcScore: profile.arcScore || score.arcScore, riskLevel: profile.riskLevel || score.riskLevel },
+      score,
       snapshot: null,
       acceptedAttestations: 0,
       uniqueCounterparties: 0,
@@ -1530,23 +1831,26 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
   ]);
   const rows = claimedProfiles.map((row) => {
     const profile = profileFromRow(row);
+    const storedInput = versionedProfileScoreInput(profile);
     const walletKey = normalizeWallet(profile.walletAddress);
     const globalRow = latestGlobalRows.get(walletKey) ?? null;
     const chainSnapshots = latestChainRows.get(walletKey) ?? [];
     const arcChain = chainSnapshots.find((chain) => chain.chain === "Arc Testnet") ?? null;
-    const canonicalTotalTx = Math.max(Number(globalRow?.total_tx_count ?? 0), profile.txCount, chainSnapshots.reduce((sum, chain) => sum + Number(chain.txCount ?? 0), 0));
+    const canonicalTotalTx = storedInput?.indexedTx ?? Math.max(Number(globalRow?.total_tx_count ?? 0), profile.txCount, chainSnapshots.reduce((sum, chain) => sum + Number(chain.txCount ?? 0), 0));
     const indexedChainNames = chainSnapshots.filter((chain) => chain.status === "indexed" && chain.txCount > 0).map((chain) => chain.chain);
-    const canonicalActiveChains = Array.from(new Set([...(Array.isArray(globalRow?.active_chains) ? globalRow.active_chains : []), ...profile.indexedChains, ...indexedChainNames])).filter(Boolean);
-    const canonicalGlobalAge = Math.max(Number(globalRow?.global_wallet_age_days ?? 0), profile.globalWalletAgeDays, chainSnapshots.reduce((max, chain) => Math.max(max, chain.walletAgeDays), 0));
-    const canonicalArcAge = Math.max(profile.arcWalletAgeDays, arcChain?.walletAgeDays ?? 0);
+    const derivedActiveChains = Array.from(new Set([...(Array.isArray(globalRow?.active_chains) ? globalRow.active_chains : []), ...profile.indexedChains, ...indexedChainNames])).filter(Boolean);
+    const canonicalActiveChains = storedInput ? profile.indexedChains : derivedActiveChains;
+    const canonicalGlobalAge = storedInput?.walletAgeDays ?? Math.max(Number(globalRow?.global_wallet_age_days ?? 0), profile.globalWalletAgeDays, chainSnapshots.reduce((max, chain) => Math.max(max, chain.walletAgeDays), 0));
+    const canonicalArcAge = storedInput?.arcWalletAgeDays ?? Math.max(profile.arcWalletAgeDays, arcChain?.walletAgeDays ?? 0);
     const canonicalScore = getCanonicalDirectoryScore(profile, latestScoreRows.get(normalizeWallet(profile.walletAddress)) ?? null);
-    const { score, riskFlags, activityLevel } = buildArcScore(profile, {
+    const { score: calculatedScore, riskFlags, activityLevel } = buildArcScore(profile, {
       snapshot: arcChain ? {
         id: `directory-arc-${profile.walletAddress}`,
         walletAddress: profile.walletAddress,
         txCount: arcChain.txCount,
         volume: 0,
         counterparties: arcChain.uniqueCounterparties,
+        counterpartyAddresses: arcChain.counterpartyAddresses,
         activeDays: arcChain.activeDays,
         recentActivityCount: arcChain.recentActivityCount,
         walletAgeDays: arcChain.walletAgeDays,
@@ -1568,8 +1872,11 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
       propagatedTrustScore: 0,
       trustAnomalyScore: 0
     });
-    const cachedArcScore = canonicalScore.score ?? (profile.arcScore || score.arcScore);
-    const cachedRiskLevel = canonicalScore.riskLevel || profile.riskLevel || score.riskLevel;
+    const score = storedInput
+      ? arcScoreFromInput(profile.walletAddress, storedInput, profile.scoreCalculatedAt ?? calculatedScore.lastSyncedAt)
+      : calculatedScore;
+    const cachedArcScore = canonicalScore.score ?? score.arcScore;
+    const cachedRiskLevel = canonicalScore.riskLevel || score.riskLevel;
     const directoryScoreUpdatedAt = canonicalScore.updatedAt ?? globalRow?.updated_at ?? profile.updatedAt;
     const directoryScoreSource = canonicalScore.source;
     console.log("[arc-identity] directory_score_source_selected", {
@@ -1616,6 +1923,7 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
         volume: 0,
         counterparties: arcChain.uniqueCounterparties,
         activeDays: arcChain.activeDays,
+        counterpartyAddresses: arcChain.counterpartyAddresses,
         recentActivityCount: arcChain.recentActivityCount,
         walletAgeDays: arcChain.walletAgeDays,
         activityFrequency: arcChain.walletAgeDays > 0 ? arcChain.txCount / arcChain.walletAgeDays : 0,
@@ -1790,15 +2098,16 @@ export async function createAttestation(fromWallet: string, toWallet: string, tx
   if (from === to) throw new Error("Self-attestation is not allowed");
 
   const supabase = getSupabaseAdmin();
-  const [fromIdentity, toIdentity, fromSnapshot] = await Promise.all([
+  const [fromIdentity, toIdentity] = await Promise.all([
     getIdentityByWallet(from, false),
-    getIdentityByWallet(to, false),
-    getLatestSnapshot(from)
+    getIdentityByWallet(to, false)
   ]);
+  const fromSnapshot = fromIdentity?.snapshot ?? null;
   const fromProfile = fromIdentity?.profile ?? null;
   const toProfile = toIdentity?.profile ?? null;
   if (!fromProfile?.verifiedWallet || !fromProfile.username) throw new Error("Connected wallet must have a verified claimed profile");
   if (!toProfile?.verifiedWallet || !toProfile.username) throw new Error("Counterparty must have a verified claimed profile");
+  const senderScore = fromIdentity!.score.arcScore;
   if (!hasMultichainAttestationEligibility(fromIdentity)) throw new Error(attestationEligibilityError("Connected wallet"));
   if (!hasMultichainAttestationEligibility(toIdentity)) throw new Error(attestationEligibilityError("Counterparty"));
 
@@ -1836,7 +2145,7 @@ export async function createAttestation(fromWallet: string, toWallet: string, tx
     return (rowFrom === from && rowTo === to) || (rowFrom === to && rowTo === from);
   }).length;
   const diversityMultiplier = pairHistoryCount === 0 ? 1 : 0.65;
-  const trustMultiplier = senderTrustMultiplier(fromProfile.arcScore);
+  const trustMultiplier = senderTrustMultiplier(senderScore);
   const sizeMultiplier = scoreTransactionSize(verifiedTx.value);
   const walletAgeMultiplier = Math.min(1.25, 0.75 + Math.min(fromSnapshot?.walletAgeDays ?? 0, 60) / 120);
   const weight = Math.round(diminishingMultiplier(pairHistoryCount) * diversityMultiplier * trustMultiplier * sizeMultiplier * walletAgeMultiplier * 100) / 100;
@@ -1846,7 +2155,7 @@ export async function createAttestation(fromWallet: string, toWallet: string, tx
     to_wallet: to,
     type,
     weight,
-    sender_score_at: fromProfile.arcScore,
+    sender_score_at: senderScore,
     pair_history_count: pairHistoryCount,
     tx_hash: verifiedTx.txHash,
     tx_block_number: verifiedTx.blockNumber,
@@ -1867,7 +2176,7 @@ export async function createAttestation(fromWallet: string, toWallet: string, tx
 
   const reputationEventPayload = [
     { wallet_address: from, event_type: "transaction_attestation_sent", score_delta: 0, metadata: { fromUsername: fromProfile.username, toUsername: toProfile.username, toWallet: to, weight, pairHistoryCount, txHash: verifiedTx.txHash, txValue: verifiedTx.value, type } },
-    { wallet_address: to, event_type: "transaction_attestation_received", score_delta: 0, metadata: { fromUsername: fromProfile.username, toUsername: toProfile.username, fromWallet: from, weight, senderScoreAt: fromProfile.arcScore, pairHistoryCount, txHash: verifiedTx.txHash, txValue: verifiedTx.value, type } }
+    { wallet_address: to, event_type: "transaction_attestation_received", score_delta: 0, metadata: { fromUsername: fromProfile.username, toUsername: toProfile.username, fromWallet: from, weight, senderScoreAt: senderScore, pairHistoryCount, txHash: verifiedTx.txHash, txValue: verifiedTx.value, type } }
   ];
   logAttestationPersistence("inserting_reputation_event", { table: "reputation_events", payload: reputationEventPayload });
   const { error: reputationError } = await supabase.from("reputation_events").insert(reputationEventPayload);

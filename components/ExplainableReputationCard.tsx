@@ -27,13 +27,8 @@ function formatLabel(key: string) {
   return key.replaceAll("_", " ");
 }
 
-function shortReason(key: string, points: number) {
-  if (points === 0) return "No verified signal detected for this component yet.";
-  if (key === "wallet_age") return "Longer wallet history adds maturity context.";
-  if (key === "activity") return "Arc activity and consistent usage strengthen reputation.";
-  if (key === "attestations") return "Verified attestations add relationship-backed trust.";
-  if (key === "network") return "Counterparties and coverage add network context.";
-  return "Risk patterns reduce the final score.";
+function shortReason(reason: string) {
+  return reason || "No verified signal detected for this component yet.";
 }
 
 export function ExplainableReputationCard({ wallet, arcId, initialReputation }: Props) {
@@ -111,7 +106,7 @@ export function ExplainableReputationCard({ wallet, arcId, initialReputation }: 
                   />
                 </div>
                 <p className="mt-2 text-xs leading-5 text-slate-400 line-clamp-2">
-                  {shortReason(key, points)}
+                  {shortReason(component.reason)}
                 </p>
               </div>
             ))}

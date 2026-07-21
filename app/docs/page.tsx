@@ -47,13 +47,14 @@ const primitives = [
 ];
 
 const scoreComponents = [
-  ["Global Wallet Age", "Based on the earliest real indexed transaction across supported chains."],
-  ["Cross-chain Activity", "Based on indexed transaction volume, active chains, recent activity, and contract interaction history."],
-  ["Arc Activity", "Based on Arc Testnet footprint, Arc attestations, Arc counterparties, active days, and Arc balance signals."],
-  ["Counterparty Diversity", "Based on unique counterparties across indexed chains, with Arc relationships treated as higher-signal context."],
-  ["Verified Attestations", "Based only on transaction-backed attestations with unique tx hashes and registered counterparties."],
-  ["Trust Propagation", "A capped network signal from verified trust edges. It can help, but it cannot dominate the base score."],
-  ["Risk Penalty", "Applied when anomaly signals, low confidence, repetitive behavior, or suspicious trust patterns appear."]
+  ["Global Wallet Age | 20 points", "Maturity from the earliest real indexed transaction across supported chains."],
+  ["Chain Coverage | 5 points", "Supporting context from active chains with successfully indexed activity."],
+  ["Indexed Transaction Activity | 15 points", "Maturity context from real indexed transactions; raw volume alone cannot dominate the score."],
+  ["Counterparty Diversity | 15 points", "Unique global counterparties plus higher-signal Arc and verified transaction relationships."],
+  ["Arc Activity | 25 points", "Arc Testnet transactions, Arc counterparties, active days, Arc age, and current balance signal."],
+  ["Verified Attestations | 15 points", "Only transaction-backed attestations with unique tx hashes and registered counterparties."],
+  ["Trust Propagation | 5 points", "A tightly capped signal from verified trust edges. Network influence cannot dominate wallet behavior."],
+  ["Risk Penalty | up to 10 points", "Applied only from supported anomaly evidence or excessive repeated-pair concentration."]
 ];
 
 const attestationChecks = [
@@ -220,10 +221,13 @@ export default function DocsPage() {
                   ARC Identity exposes one primary score. Supporting components explain why the score moved, but they are not separate competing scores.
                 </p>
                 <p>
-                  The score combines global wallet credibility, Arc-specific activity, verified attestations, trust graph context, and risk analysis. It is clamped from 0 to 100 and mapped into familiar risk levels: High Risk, New / Unproven, Reliable, and Trusted.
+                  Score model <span className="font-bold text-white">arc_score_v2_2026_07</span> combines global wallet maturity, Arc-specific activity, verified transaction attestations, capped trust propagation, and evidence-based risk controls. Component points sum to the score after any risk penalty, then clamp from 0 to 100.
                 </p>
                 <p>
                   Claiming a username or creating a profile does not grant reputation points. A fresh wallet with no indexed activity, no Arc footprint, no verified transaction attestations, and no trust graph evidence starts from the real component total: 0. The score rises only when ARC Identity can verify meaningful wallet behavior.
+                </p>
+                <p>
+                  A wallet with more global transactions or a greater age can still have a lower total than another wallet when its Arc footprint, verified counterparties, attestations, or trust evidence are weaker. Compare the component points, not a single raw metric: every point in the total is disclosed below.
                 </p>
               </div>
               <div className="mt-6 grid gap-3">
@@ -237,7 +241,7 @@ export default function DocsPage() {
               <div className="mt-6 rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.06] p-5">
                 <p className="text-sm font-black text-cyan-50">Score stability</p>
                 <p className="mt-2 text-sm leading-7 text-cyan-50/80">
-                  Refreshes are dampened to avoid scary unexplained drops. Passive recalculations are labeled as score recalibrations, while strong negative styling is reserved for real risk events, anomaly signals, or suspicious behavior.
+                  The same persisted evidence always produces the same score. A refresh commits atomically only after indexing finishes, and temporary provider failures preserve the last verified evidence instead of treating unavailable chains as zero. Repeating refresh cannot walk a score up or down.
                 </p>
               </div>
             </SectionShell>
@@ -326,16 +330,19 @@ export default function DocsPage() {
   "walletAddress": "0x...",
   "username": "example.arcid",
   "arcIdentityScore": 72,
+  "scoreModelVersion": "arc_score_v2_2026_07",
   "riskLevel": "Reliable",
   "cacheStatus": "cached",
   "refreshStatus": "committed",
-  "dataSource": "arc_rpc_plus_transaction_verified_attestations",
+  "dataSource": "cached",
   "breakdown": {
     "globalWalletAge": 16,
-    "crossChainActivity": 12,
+    "crossChainActivity": 4,
+    "transactionActivity": 11,
     "arcActivity": 18,
-    "verifiedAttestations": 15,
-    "propagatedTrust": 6,
+    "counterpartyDiversity": 9,
+    "verifiedAttestations": 10,
+    "propagatedTrust": 4,
     "riskPenalty": 0
   },
   "explanations": {

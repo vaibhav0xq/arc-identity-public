@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { ensureWalletProfile } from "@/lib/db";
 import { profileRouteFor, usernameBase } from "@/lib/username";
-import { publicNoStoreHeaders } from "@/lib/api-contract";
+import { publicNoStoreHeaders, sanitizeUserProfile } from "@/lib/api-contract";
 
 function errorMessage(error: unknown) {
   if (error instanceof Error) return error.message;
@@ -20,6 +20,7 @@ export async function POST(request: Request) {
     const body = await request.json();
     const profile = await ensureWalletProfile(body.walletAddress, body.signature, body.signatureMessage);
     const username = profile?.username ?? null;
+    const publicProfile = profile ? sanitizeUserProfile(profile) : null;
     console.log("[arc-identity] ensure_lookup_result", {
       wallet: body.walletAddress,
       username,
@@ -27,7 +28,7 @@ export async function POST(request: Request) {
       verifiedWallet: Boolean(profile?.verifiedWallet)
     });
     return NextResponse.json({
-      profile,
+      profile: publicProfile,
       username,
       usernameBase: username ? usernameBase(username) : null,
       usernameClaimed: Boolean(username),

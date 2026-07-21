@@ -86,10 +86,10 @@ const SCORE_WEIGHTS = {
 } as const;
 
 const CANONICAL_GROUP_MAX = {
-  wallet_age: 10,
+  wallet_age: 20,
   activity: 40,
-  attestations: 30,
-  network: 20,
+  attestations: 15,
+  network: 25,
   risk: 10
 } as const;
 
@@ -232,18 +232,8 @@ function canonicalBreakdownFromIdentity(identity: IdentityRecord) {
     wallet_age: Math.round(identity.score.longevityScore),
     activity: Math.round(identity.score.balanceSignalScore + identity.score.consistencyScore),
     attestations: Math.round(identity.score.attestationScore),
-    network: Math.round(identity.score.counterpartyDiversityScore + identity.score.activityScore),
+    network: Math.round(identity.score.counterpartyDiversityScore + identity.score.activityScore + identity.score.trustPropagationScore),
     risk: -Math.round(identity.score.riskPenalty)
-  };
-}
-
-function alignBreakdownToScore(breakdown: NonNullable<ReputationScoreInput["canonicalBreakdown"]>, score: number) {
-  const current = breakdown.wallet_age + breakdown.activity + breakdown.attestations + breakdown.network + breakdown.risk;
-  const delta = Math.round(score - current);
-  if (delta === 0) return breakdown;
-  return {
-    ...breakdown,
-    activity: breakdown.activity + delta
   };
 }
 
@@ -320,7 +310,7 @@ export function reputationInputFromIdentity(identity: IdentityRecord, attestatio
     riskFlags,
     historicalActivityPattern: activityPattern(identity),
     repeatedInteractionRatio: 0,
-    lastUpdated: identity.score.lastSyncedAt ?? identity.profile.updatedAt
+    lastUpdated: identity.profile.scoreCalculatedAt ?? identity.score.lastSyncedAt ?? identity.profile.updatedAt
   };
 }
 
@@ -332,9 +322,7 @@ export function buildExplainableReputation(input: ReputationScoreInput): Explain
   const risk = scoreRisk(input);
   const modelScore = clamp(walletAge.contribution + activity.contribution + attestationScore.component.contribution + network.contribution + risk.contribution);
   const score = clamp(typeof input.canonicalScore === "number" ? input.canonicalScore : modelScore);
-  const canonicalBreakdown = input.canonicalBreakdown && typeof input.canonicalScore === "number"
-    ? alignBreakdownToScore(input.canonicalBreakdown, score)
-    : null;
+  const canonicalBreakdown = input.canonicalBreakdown && typeof input.canonicalScore === "number" ? input.canonicalBreakdown : null;
   const finalWalletAge = canonicalBreakdown
     ? canonicalComponent(canonicalBreakdown.wallet_age, CANONICAL_GROUP_MAX.wallet_age, walletAge.reason)
     : walletAge;
@@ -374,7 +362,7 @@ export function buildExplainableReputation(input: ReputationScoreInput): Explain
   return {
     wallet: input.wallet,
     score: Math.round(score),
-    modelScore: Math.round(modelScore),
+    modelScore: Math.round(typeof input.canonicalScore === "number" ? score : modelScore),
     scoreBasis: typeof input.canonicalScore === "number" ? "canonical_arc_score" : "v1_model",
     tier: tierForScore(score),
     riskBadge: riskBadgeForRisk(risk.normalized),

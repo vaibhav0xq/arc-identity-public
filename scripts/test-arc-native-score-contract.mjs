@@ -30,6 +30,9 @@ function expect(condition, message, details = {}) {
 function score(input) {
   return buildScoreContract({
     walletAgeDays: 0,
+    arcWalletAgeDays: 0,
+    arcBalance: 0,
+    attestationWeight: 0,
     activeChains: 0,
     indexedTx: 0,
     uniqueCounterparties: 0,
@@ -60,9 +63,12 @@ const arcNativeTrusted = score({
   uniqueCounterparties: 4,
   arcTx: 36,
   arcCounterparties: 6,
+  arcWalletAgeDays: 90,
+  arcBalance: 5,
   arcActiveDays: 35,
   verifiedAttestations: 5,
   verifiedAttestationCounterparties: 4,
+  attestationWeight: 10,
   propagatedTrustScore: 24
 });
 
@@ -78,10 +84,11 @@ const chainExplorerContext = score({
   providerLimited: false
 });
 
-expect(ARC_SCORE_COMPONENT_MAX.arcActivity === 35, "Arc activity should be a primary score component", ARC_SCORE_COMPONENT_MAX);
-expect(ARC_SCORE_COMPONENT_MAX.attestations === 30, "Verified attestations should be a primary score component", ARC_SCORE_COMPONENT_MAX);
-expect(ARC_SCORE_COMPONENT_MAX.crossChain + ARC_SCORE_COMPONENT_MAX.transactionActivity <= 10, "Generic chain activity should be secondary", ARC_SCORE_COMPONENT_MAX);
-expect(ARC_SCORE_COMPONENT_MAX.walletAge <= 10, "Global wallet age should support confidence without dominating", ARC_SCORE_COMPONENT_MAX);
+expect(ARC_SCORE_COMPONENT_MAX.arcActivity === 25, "Arc activity should be a primary score component", ARC_SCORE_COMPONENT_MAX);
+expect(ARC_SCORE_COMPONENT_MAX.attestations === 15, "Verified attestations should remain capped", ARC_SCORE_COMPONENT_MAX);
+expect(ARC_SCORE_COMPONENT_MAX.crossChain + ARC_SCORE_COMPONENT_MAX.transactionActivity === 20, "Generic indexed activity should provide bounded context", ARC_SCORE_COMPONENT_MAX);
+expect(ARC_SCORE_COMPONENT_MAX.walletAge === 20, "Global wallet age should provide bounded anti-sybil confidence", ARC_SCORE_COMPONENT_MAX);
+expect(ARC_SCORE_COMPONENT_MAX.propagatedTrust === 5, "Propagated trust must remain tightly capped", ARC_SCORE_COMPONENT_MAX);
 
 expect(genericWhale.score < 56, "Generic non-Arc transaction volume alone must not produce a high ARC Score", genericWhale);
 expect(arcNativeTrusted.score >= 75, "Arc activity plus verified attestations and trusted counterparties should produce a high ARC Score", arcNativeTrusted);

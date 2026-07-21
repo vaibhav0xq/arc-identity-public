@@ -180,7 +180,7 @@ async function runCase(index) {
   assert(score.json.username === canonicalUsername, "score endpoint should return canonical username", score.json);
   assert(score.json.usernameClaimed === true, "score endpoint should mark username claimed", score.json);
   assertBaselineIdentity(score.json, "score endpoint fresh identity");
-  assert(score.json.riskLevel === "New / Unproven", "fresh wallet should receive baseline risk tier", score.json);
+  assert(score.json.riskLevel === "High Risk", "fresh zero-evidence wallet should receive the high-risk tier", score.json);
 
   const duplicateUsername = await request("/api/profile/create", {
     method: "POST",

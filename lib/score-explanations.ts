@@ -8,6 +8,7 @@ export type ScoreExplanations = {
   arcActivity: string;
   indexedChainDepth: string;
   verifiedAttestations: string;
+  propagatedTrust: string;
   riskPenalty: string;
 };
 
@@ -22,6 +23,7 @@ export function buildScoreExplanations(identity: IdentityRecord | null): ScoreEx
       arcActivity: missing,
       indexedChainDepth: missing,
       verifiedAttestations: missing,
+      propagatedTrust: missing,
       riskPenalty: missing
     };
   }
@@ -32,9 +34,10 @@ export function buildScoreExplanations(identity: IdentityRecord | null): ScoreEx
   const limitedChains = chains.filter((chain) => chain.status === "limited");
   const noActivityChains = chains.filter((chain) => chain.status === "no_activity");
   const globalAge = multi?.globalWalletAgeDays ?? identity.profile.globalWalletAgeDays ?? 0;
+  const arcChain = chains.find((chain) => chain.chain === "Arc Testnet");
   const totalTx = multi?.totalTxCount ?? 0;
   const uniqueCounterparties = multi?.uniqueCounterparties ?? 0;
-  const arcTx = identity.snapshot?.txCount ?? identity.profile.txCount ?? 0;
+  const arcTx = identity.snapshot?.txCount ?? arcChain?.txCount ?? 0;
   const arcCounterparties = identity.snapshot?.counterparties ?? 0;
   const arcActiveDays = identity.snapshot?.activeDays ?? 0;
   const attestationCount = identity.acceptedAttestations ?? 0;
@@ -63,6 +66,9 @@ export function buildScoreExplanations(identity: IdentityRecord | null): ScoreEx
     verifiedAttestations: attestationCount > 0
       ? `${components.attestations.reason} Verified counterparties: ${attestationCounterparties}.`
       : "No verified transaction attestations exist yet.",
+    propagatedTrust: components.propagatedTrust.points > 0
+      ? components.propagatedTrust.reason
+      : "No propagated trust contribution is currently applied.",
     riskPenalty: identity.score.riskPenalty > 0 && riskFlags.length > 0
       ? `Penalty applied because ${riskFlags.join(", ").replaceAll("_", " ")}.`
       : freshWallet ? "No risk penalty is applied while ARC Intelligence initializes." : "No risk penalty is currently applied."

@@ -24,6 +24,10 @@ export type Profile = {
   credentialScore: number;
   credentialLevel: RiskLevel;
   indexedChains: string[];
+  scoreModelVersion: string | null;
+  scoreInputs: Record<string, unknown> | null;
+  scoreBreakdown: Record<string, number> | null;
+  scoreCalculatedAt: string | null;
 };
 
 
@@ -39,6 +43,7 @@ export type ChainSnapshot = {
   walletAgeDays: number;
   nativeBalance: number;
   uniqueCounterparties: number;
+  counterpartyAddresses: string[];
   contractInteractions: number;
   activeDays: number;
   recentActivityCount: number;
@@ -64,11 +69,13 @@ export type WalletActivitySnapshot = {
   txCount: number;
   volume: number;
   counterparties: number;
+  counterpartyAddresses: string[];
   activeDays: number;
   recentActivityCount: number;
   walletAgeDays: number;
   activityFrequency: number;
   transferCount: number;
+  evidenceVersion?: string | null;
   contractInteractionCount: number;
   indexerSource: string;
   calculatedScore: number;
@@ -87,6 +94,7 @@ export type WalletAnalytics = {
   lastActivityAt: string | null;
   activeDays: number;
   uniqueCounterparties: number;
+  counterpartyAddresses: string[];
   recentActivityCount: number;
   walletAgeDays: number;
   activityFrequency: number;
@@ -217,6 +225,7 @@ export type ArcScore = {
   consistencyScore: number;
   riskPenalty: number;
   lastSyncedAt: string;
+  modelVersion: string;
 };
 
 export type ScoreExplanations = {
@@ -226,6 +235,7 @@ export type ScoreExplanations = {
   arcActivity: string;
   indexedChainDepth: string;
   verifiedAttestations: string;
+  propagatedTrust: string;
   riskPenalty: string;
 };
 
@@ -255,6 +265,8 @@ export type IdentityRecord = {
   snapshot: WalletActivitySnapshot | null;
   acceptedAttestations: number;
   uniqueCounterparties: number;
+  attestationWeight?: number;
+  repeatedPairRatio?: number;
   attestations?: Attestation[];
   reputationEvents?: ReputationEvent[];
   trustConnections?: { profile: Profile; attestations: Attestation[] }[];

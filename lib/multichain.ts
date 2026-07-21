@@ -143,6 +143,7 @@ function emptySnapshot(config: ChainConfig, walletAddress: string, status: Chain
     walletAgeDays: 0,
     nativeBalance: 0,
     uniqueCounterparties: 0,
+    counterpartyAddresses: [],
     contractInteractions: 0,
     activeDays: 0,
     recentActivityCount: 0,
@@ -572,6 +573,7 @@ function analyzeTransactions(config: ChainConfig, walletAddress: string, rows: I
     walletAgeDays,
     nativeBalance,
     uniqueCounterparties: counterparties.size,
+    counterpartyAddresses: Array.from(counterparties),
     contractInteractions,
     activeDays: activeDays.size,
     recentActivityCount
@@ -595,6 +597,7 @@ async function indexArc(config: ChainConfig, walletAddress: string) {
   const activeDays = new Set(Array.from(attestations.activeDays));
   if (arc.activeDays > 0 && arc.lastActivityAt) activeDays.add(arc.lastActivityAt.slice(0, 10));
   const txCount = Math.max(arc.txCount, attestations.txCount);
+  const counterpartyAddresses = Array.from(new Set([...(arc.counterpartyAddresses ?? []), ...Array.from(attestations.counterparties)]));
   const walletAgeDays = firstSeenAt ? Math.max(1, Math.floor((Date.now() - new Date(firstSeenAt).getTime()) / 86400000)) : 0;
   const snapshot = {
     ...emptySnapshot(config, wallet, status, attestations.txCount > 0 ? "arcscan_verified_attestations" : "arcscan"),
@@ -603,7 +606,8 @@ async function indexArc(config: ChainConfig, walletAddress: string) {
     lastSeenAt,
     walletAgeDays,
     nativeBalance: arc.balance,
-    uniqueCounterparties: Math.max(arc.uniqueCounterparties, attestations.counterparties.size),
+    uniqueCounterparties: Math.max(counterpartyAddresses.length, arc.uniqueCounterparties, attestations.counterparties.size),
+    counterpartyAddresses,
     contractInteractions: Math.max(arc.contractInteractionCount, attestations.txCount),
     activeDays: Math.max(arc.activeDays, activeDays.size),
     recentActivityCount: Math.max(arc.recentActivityCount, attestations.recentActivityCount)
@@ -707,13 +711,14 @@ export async function getMultiChainWalletProfile(walletAddress: string): Promise
       active.reduce((max, chain) => Math.max(max, chain.walletAgeDays), 0)
     );
 
+    const uniqueCounterparties = new Set(active.flatMap((chain) => chain.counterpartyAddresses ?? []));
     const profile = {
       walletAddress: wallet,
       globalFirstSeenAt,
       globalWalletAgeDays,
       totalTxCount: active.reduce((sum, chain) => sum + chain.txCount, 0),
       activeChains: active.map((chain) => chain.chain),
-      uniqueCounterparties: active.reduce((sum, chain) => sum + chain.uniqueCounterparties, 0),
+      uniqueCounterparties: Math.max(uniqueCounterparties.size, active.filter((chain) => (chain.counterpartyAddresses?.length ?? 0) === 0).reduce((max, chain) => Math.max(max, chain.uniqueCounterparties), 0)),
       totalContractInteractions: active.reduce((sum, chain) => sum + chain.contractInteractions, 0),
       chains: chainSnapshots
     };

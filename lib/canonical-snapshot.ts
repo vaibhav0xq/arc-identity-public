@@ -1,4 +1,4 @@
-import { scoreComponentsFromIdentity } from "@/lib/score-contract";
+import { ARC_SCORE_MODEL_VERSION, scoreComponentsFromIdentity, scoreInputFromUnknown } from "@/lib/score-contract";
 import { buildScoreExplanations } from "@/lib/score-explanations";
 import { getActiveChainCount, getIndexedTxCount, hasIndexedActivity, scoreDataSource } from "@/lib/score-precedence";
 import type { IdentityRecord } from "@/lib/types";
@@ -50,6 +50,9 @@ export function getCanonicalWalletSnapshot(identity: IdentityRecord | null) {
 
   const chainRows = identity.multiChain?.chains ?? [];
   const arcChain = chainRows.find((chain) => chain.chain === "Arc Testnet") ?? null;
+  const committedInput = identity.profile.scoreModelVersion === ARC_SCORE_MODEL_VERSION
+    ? scoreInputFromUnknown(identity.profile.scoreInputs)
+    : null;
   const indexedChainNames = chainRows
     .filter((chain) => chain.status === "indexed" && Number(chain.txCount ?? 0) > 0)
     .map((chain) => chain.chain);
@@ -58,19 +61,21 @@ export function getCanonicalWalletSnapshot(identity: IdentityRecord | null) {
     ...(identity.profile.indexedChains ?? []),
     ...indexedChainNames
   ])).filter(Boolean);
-  const totalTx = Math.max(
+  const derivedTotalTx = Math.max(
     Number(identity.multiChain?.totalTxCount ?? 0),
     Number(identity.profile.txCount ?? 0),
     chainRows.reduce((sum, chain) => sum + Number(chain.txCount ?? 0), 0)
   );
-  const globalWalletAgeDays = Math.max(
+  const totalTx = committedInput?.indexedTx ?? derivedTotalTx;
+  const derivedGlobalWalletAgeDays = Math.max(
     Number(identity.multiChain?.globalWalletAgeDays ?? 0),
     Number(identity.profile.globalWalletAgeDays ?? 0),
     chainRows.reduce((max, chain) => Math.max(max, Number(chain.walletAgeDays ?? 0)), 0)
   );
-  const indexedTx = getIndexedTxCount(identity);
-  const activeChainCount = getActiveChainCount(identity);
-  const indexedActivity = hasIndexedActivity(identity);
+  const globalWalletAgeDays = committedInput?.walletAgeDays ?? derivedGlobalWalletAgeDays;
+  const indexedTx = committedInput?.indexedTx ?? getIndexedTxCount(identity);
+  const activeChainCount = committedInput?.activeChains ?? getActiveChainCount(identity);
+  const indexedActivity = committedInput ? indexedTx > 0 || activeChainCount > 0 : hasIndexedActivity(identity);
   const providerUnavailable = !indexedActivity && chainRows.some((chain) => chain.status === "error" || chain.status === "limited" || chain.status === "not_configured");
   const dataSource = providerUnavailable ? "provider_unavailable" : scoreDataSource({
     dataSource: indexedActivity ? "cached" : "baseline",
@@ -80,10 +85,8 @@ export function getCanonicalWalletSnapshot(identity: IdentityRecord | null) {
   const arcBalance = identity.snapshot?.nativeBalance ?? arcChain?.nativeBalance ?? null;
   const arcBalanceSource = identity.snapshot ? "cached_wallet_activity_snapshot" : arcChain?.providerSource ?? "unavailable";
   const scoreUpdatedAt = latestIso([
-    identity.profile.updatedAt,
-    identity.snapshot?.createdAt,
-    identity.multiChain?.globalFirstSeenAt,
-    ...chainRows.map((chain) => chain.indexedAt)
+    identity.profile.scoreCalculatedAt,
+    identity.refreshJob?.status === "committed" ? identity.refreshJob.completedAt : null
   ]);
 
   return {

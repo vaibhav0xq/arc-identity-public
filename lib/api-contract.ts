@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import type { ChainSnapshot, IdentityRecord } from "@/lib/types";
+import type { ChainSnapshot, IdentityRecord, Profile } from "@/lib/types";
 
 export const publicNoStoreHeaders = {
   "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate"
@@ -38,6 +38,7 @@ function publicCoverageMessage(status?: string | null) {
 export function sanitizeChainSnapshot(chain: ChainSnapshot): ChainSnapshot {
   return {
     ...chain,
+    counterpartyAddresses: [],
     providerSource: publicSource(chain.providerSource),
     errorMessage: publicCoverageMessage(chain.status)
   };
@@ -64,10 +65,15 @@ export function sanitizeCanonicalSnapshot<T extends Record<string, any>>(snapsho
   };
 }
 
+export function sanitizeUserProfile(profile: Profile): Profile {
+  return { ...profile, signature: null, scoreInputs: null };
+}
+
 export function sanitizeIdentityRecord(identity: IdentityRecord): IdentityRecord {
   return {
     ...identity,
-    snapshot: identity.snapshot ? { ...identity.snapshot, indexerSource: publicSource(identity.snapshot.indexerSource) } : identity.snapshot,
+    profile: sanitizeUserProfile(identity.profile),
+    snapshot: identity.snapshot ? { ...identity.snapshot, counterpartyAddresses: [], indexerSource: publicSource(identity.snapshot.indexerSource) } : identity.snapshot,
     multiChain: identity.multiChain ? {
       ...identity.multiChain,
       chains: identity.multiChain.chains.map(sanitizeChainSnapshot)

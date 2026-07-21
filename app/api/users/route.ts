@@ -4,7 +4,7 @@ export const revalidate = 0;
 import { NextResponse } from "next/server";
 import { unstable_noStore as noStore } from "next/cache";
 import { listUsers, isMissingSchemaError, normalizeDirectoryLimit, normalizeDirectorySort } from "@/lib/db";
-import { publicNoStoreHeaders } from "@/lib/api-contract";
+import { publicNoStoreHeaders, sanitizeIdentityRecord } from "@/lib/api-contract";
 
 export async function GET(request: Request) {
   noStore();
@@ -15,7 +15,7 @@ export async function GET(request: Request) {
     const limit = normalizeDirectoryLimit(searchParams.get("limit"));
     const query = searchParams.get("q") ?? searchParams.get("search") ?? "";
     console.log("[arc-identity] directory_fetch_started", { endpoint: "/api/users", sort, limit, hasSearch: Boolean(query.trim()) });
-    const users = await listUsers(sort, limit, query);
+    const users = (await listUsers(sort, limit, query)).map((user) => sanitizeIdentityRecord(user));
     console.log("[arc-identity] directory_fetch_success", { endpoint: "/api/users", count: users.length, durationMs: Date.now() - started });
     console.log("[arc-identity] directory_fetch_duration", { endpoint: "/api/users", durationMs: Date.now() - started });
     console.log("[arc-identity] directory_result_count", { count: users.length });

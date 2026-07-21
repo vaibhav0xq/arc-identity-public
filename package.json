@@ -6,7 +6,10 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:score-contract": "node --experimental-strip-types scripts/test-score-contract-v2.mjs",
+    "test:score-api": "node scripts/test-score-integrity-v2.mjs",
+    "backfill:score-v2": "node scripts/backfill-score-model-v2.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.105.3",

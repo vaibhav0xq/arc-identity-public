@@ -2,7 +2,7 @@
 
 # Arc Identity
 
-**Wallet intelligence for the Arc economy. Trust, with a record behind it.**
+**Built on Arc. Wallet intelligence for the Arc economy. Trust, with a record behind it.**
 
 Arc Identity turns public wallet history into a verified financial credential readable by people, protocols and the systems moving value.
 
@@ -13,7 +13,7 @@ Arc Identity turns public wallet history into a verified financial credential re
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
-![Arc Testnet](https://img.shields.io/badge/Arc-Testnet-d4af37)
+![Built on Arc](https://img.shields.io/badge/Built_on-Arc-d4af37)
 ![Wallet Intelligence](https://img.shields.io/badge/Wallet-Intelligence-111827)
 ![Reputation Graph](https://img.shields.io/badge/Reputation-Graph-2f6f5f)
 ![Verified Attestations](https://img.shields.io/badge/Verified-Attestations-b8893a)
@@ -21,6 +21,8 @@ Arc Identity turns public wallet history into a verified financial credential re
 </div>
 
 ---
+
+Arc Identity is built on Arc and designed around Arc testnet activity. It is an independent project and is not affiliated with Circle or any network operator.
 
 ## Repository docs
 

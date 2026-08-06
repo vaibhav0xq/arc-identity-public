@@ -22,6 +22,15 @@ Arc Identity turns public wallet history into a verified financial credential re
 
 ---
 
+## Repository docs
+
+| Document | Purpose |
+| --- | --- |
+| [Privacy](./PRIVACY.md) | Public copy of the privacy policy |
+| [Terms](./TERMS.md) | Public copy of the terms of use |
+| [Security](./SECURITY.md) | Vulnerability reporting and user safety rules |
+| [Contributing](./CONTRIBUTING.md) | Local setup, review rules and contribution guidelines |
+
 ## What it does
 
 Most reputation tools rank wallets by volume. Arc Identity ranks them by evidence.
@@ -35,47 +44,52 @@ The engine indexes public activity across supported networks, verifies transacti
 
 ## Product tour
 
-### Landing page
+<table>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Landing page</h3>
+      <p>The public face of the credential. Start with the address. Leave with a record.</p>
+      <img src="./public/screenshots/landing-page.png" alt="Landing page" width="100%" />
+    </td>
+    <td width="50%" valign="top">
+      <h3>Identity workspace</h3>
+      <p>The signed-in overview with score, evidence ledger and signature-verified wallet ownership.</p>
+      <img src="./public/screenshots/identity-workspace.png" alt="Identity workspace" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Directory</h3>
+      <p>A searchable public registry of claimed identities with score, risk, age and chain coverage.</p>
+      <img src="./public/screenshots/directory-registry.png" alt="Directory" width="100%" />
+    </td>
+    <td width="50%" valign="top">
+      <h3>Verified attestations</h3>
+      <p>Transaction-backed claims that are checked onchain before they affect trust.</p>
+      <img src="./public/screenshots/verify-attestation.png" alt="Verify attestation" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td width="50%" valign="top">
+      <h3>Trust graph</h3>
+      <p>Counterparties plotted around a wallet, where closer edges mean stronger verified relationships.</p>
+      <img src="./public/screenshots/trust-graph.png" alt="Trust graph" width="100%" />
+    </td>
+    <td width="50%" valign="top">
+      <h3>Developer API</h3>
+      <p>Credential JSON with score, provenance, coverage and trust context in one response.</p>
+      <img src="./public/screenshots/reputation-api.png" alt="Developer API" width="100%" />
+    </td>
+  </tr>
+  <tr>
+    <td colspan="2" valign="top">
+      <h3>Closing section</h3>
+      <p>The final product statement and public links.</p>
+      <img src="./public/screenshots/landing-page-ending.png" alt="Landing page closing section" width="100%" />
+    </td>
+  </tr>
+</table>
 
-The public face of the credential. Start with the address. Leave with a record.
-
-![Landing page](./public/screenshots/landing-page.png)
-
-### Landing page closing section
-
-The final product statement and public links.
-
-![Landing page closing section](./public/screenshots/landing-page-ending.png)
-
-### Identity workspace
-
-The signed-in overview. Score, evidence ledger and record status for a claimed identity, with signature-verified wallet ownership.
-
-![Identity workspace](./public/screenshots/identity-workspace.png)
-
-### Trust graph
-
-Counterparties are plotted around the wallet. Closer means stronger. Edges only exist where verified transactions exist.
-
-![Trust graph](./public/screenshots/trust-graph.png)
-
-### Directory
-
-A searchable public registry of claimed identities, sortable by score with risk level, credential age and chain coverage at a glance.
-
-![Directory](./public/screenshots/directory-registry.png)
-
-### Verified attestations
-
-Attestations are claims backed by real transactions. The verification flow checks the transaction on chain before anything is recorded.
-
-![Verify attestation](./public/screenshots/verify-attestation.png)
-
-### Developer API
-
-Query any credential as JSON. Score, provenance, coverage and trust context ship together in one response.
-
-![Developer API](./public/screenshots/reputation-api.png)
 
 ## Identity Score model
 

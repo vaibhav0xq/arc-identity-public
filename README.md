@@ -208,7 +208,7 @@ The app is available at `http://localhost:3000`.
 
 No legitimate Arc Identity surface will ever ask for private keys or seed phrases. Wallet ownership is proven by signature only.
 
-Found a vulnerability? See [SECURITY.md](./SECURITY.md) for how to report it responsibly.
+Found a vulnerability? See [SECURITY.md](./SECURITY.md) for how to report it responsibly. Repository copies of the public policy pages are available in [PRIVACY.md](./PRIVACY.md) and [TERMS.md](./TERMS.md).
 
 ## Contributing
 

@@ -83,8 +83,8 @@ The engine indexes public activity across supported networks, verifies transacti
   </tr>
   <tr>
     <td colspan="2" valign="top">
-      <h3>Closing section</h3>
-      <p>The final product statement and public links.</p>
+      <h3>Public record footer</h3>
+      <p>The final trust statement, resource links and project contact surface.</p>
       <img src="./public/screenshots/landing-page-ending.png" alt="Landing page closing section" width="100%" />
     </td>
   </tr>

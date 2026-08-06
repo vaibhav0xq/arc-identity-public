@@ -109,8 +109,8 @@ function validateUsername(value: string) {
   if (value.length < 3) return { valid: false, message: "Minimum 3 characters." };
   if (value.length > 30) return { valid: false, message: "Maximum 30 characters." };
   if (value.includes(" ")) return { valid: false, message: "No spaces allowed." };
-  if (!/^[a-z0-9][a-z0-9_-]*[a-z0-9]$/.test(value)) return { valid: false, message: "Use lowercase letters, numbers, underscore, or hyphen only. Start and end with a letter or number." };
-  return { valid: true, message: "Lowercase letters, numbers, underscore, or hyphen only." };
+  if (!/^[a-z0-9][a-z0-9_-]*[a-z0-9]$/.test(value)) return { valid: false, message: "Use lowercase letters, numbers, underscore or hyphen only. Start and end with a letter or number." };
+  return { valid: true, message: "Lowercase letters, numbers, underscore or hyphen only." };
 }
 
 export default function CreateProfilePage() {
@@ -354,7 +354,7 @@ export default function CreateProfilePage() {
       const revealUrl = revealRouteFor(claimedUsername, claimedWallet);
       setPostClaimRevealContext(claimedWallet, claimedUsername, profileUrl, "claim-success");
       onboardingCompleteRef.current = true;
-      setSuccess("Identity created. Opening your ARC Score...");
+      setSuccess("Identity created. Opening your Identity Score...");
       console.log("[arc-identity] username_claim_success", { wallet: claimedWallet, username: claimedUsername });
       console.log("[arc-identity] username_claim_redirect_url", { wallet: claimedWallet, username: claimedUsername, profileUrl, revealUrl });
       console.log("[arc-identity] post_claim_identity_cache_updated", { wallet: claimedWallet, username: claimedUsername });
@@ -428,7 +428,7 @@ export default function CreateProfilePage() {
                 ) : null}
                 <label className="block">
                   <span className="text-sm font-medium text-slate-300">Username</span>
-                  <div className="mt-2 flex rounded border border-white/10 bg-white/[0.04]">
+                  <div className={`mt-2 flex rounded border bg-white/[0.04] transition-colors ${usernameValidation.valid && availability === "taken" ? "border-risk/60" : "border-white/10"}`}>
                     <input
                       value={username}
                       onChange={(event) => {
@@ -445,10 +445,20 @@ export default function CreateProfilePage() {
                   </div>
                   <div className="mt-2 grid min-h-[4.75rem] content-start gap-1 text-xs leading-5 transition-none">
                     <p className={usernameValidation.valid ? "text-emerald-100/80" : "text-slate-500"}>{usernameValidation.message}</p>
-                    {usernameValidation.valid && availability === "checking" ? <p className="text-cyan-100/80">Checking username...</p> : null}
-                    {usernameValidation.valid && availability === "available" ? <p className="text-emerald-100/80">Username available.</p> : null}
-                    {usernameValidation.valid && availability === "taken" ? <p className="text-rose-100">Username already taken.</p> : null}
-                    {usernameValidation.valid && availability === "error" ? <p className="text-slate-500">Availability check unavailable. You can still try claiming.</p> : null}
+                    {usernameValidation.valid && availability === "checking" ? <p className="text-mutedc">Checking username...</p> : null}
+                    {usernameValidation.valid && availability === "available" ? (
+                      <p className="flex items-center gap-1.5 font-semibold text-verified">
+                        <svg width="11" height="11" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M2 6.5L4.8 9.3L10 3.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="square" /></svg>
+                        Username available.
+                      </p>
+                    ) : null}
+                    {usernameValidation.valid && availability === "taken" ? (
+                      <p role="alert" className="mt-1 flex w-fit items-center gap-2 rounded-[2px] border border-risk/40 bg-risk-bg px-3 py-2 font-semibold text-risk">
+                        <svg width="12" height="12" viewBox="0 0 12 12" fill="none" aria-hidden="true"><path d="M6 1L11.2 10.5H0.8L6 1Z" stroke="currentColor" strokeWidth="1.3" strokeLinejoin="round" /><path d="M6 4.5V7" stroke="currentColor" strokeWidth="1.3" strokeLinecap="square" /><circle cx="6" cy="8.8" r="0.7" fill="currentColor" /></svg>
+                        This username is already taken. Try a different one.
+                      </p>
+                    ) : null}
+                    {usernameValidation.valid && availability === "error" ? <p className="text-mutedc">Availability check unavailable. You can still try claiming.</p> : null}
                     {checkingProfile ? <p className="text-slate-500">New wallet? Claim a username to complete your ARC Identity.</p> : null}
                   </div>
                 </label>
@@ -456,7 +466,7 @@ export default function CreateProfilePage() {
             ) : null}
             <div className="min-h-[3.25rem]" aria-live="polite">
               {success ? <p className="rounded border border-emerald-300/20 bg-emerald-300/10 p-3 text-sm text-emerald-100">{success}</p> : null}
-              {error ? <p className="rounded border border-rose-300/20 bg-rose-400/10 p-3 text-sm text-rose-100">{error}</p> : null}
+              {error ? <p role="alert" className="rounded-[2px] border border-risk/40 bg-risk-bg p-3 text-sm font-semibold text-risk">{error}</p> : null}
             </div>
             {claimFormReady() ? (
               <button type="submit" disabled={!canClaim} className="rounded bg-emerald-300 px-5 py-4 font-black text-slate-950 transition hover:bg-emerald-200 disabled:cursor-not-allowed disabled:opacity-50">

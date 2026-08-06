@@ -1,11 +1,13 @@
 import type { Metadata } from "next";
-import { Outfit, Plus_Jakarta_Sans } from "next/font/google";
+import { Newsreader, Plus_Jakarta_Sans, DM_Mono } from "next/font/google";
 import { ARC_PUBLIC_APP_URL } from "@/lib/links";
 import "./globals.css";
 
-const outfit = Outfit({
+const newsreader = Newsreader({
   subsets: ["latin"],
-  variable: "--font-outfit",
+  weight: ["400", "500", "600"],
+  style: ["normal", "italic"],
+  variable: "--font-newsreader",
   display: "swap"
 });
 
@@ -15,7 +17,14 @@ const jakarta = Plus_Jakarta_Sans({
   display: "swap"
 });
 
-const metadataDescription = "Payments are solved, trust isn't. ARC Identity is an onchain reputation and wallet intelligence platform for Arc stablecoin users - transaction-verified trust scoring, multichain analytics, and portable identity.";
+const dmMono = DM_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-dm-mono",
+  display: "swap"
+});
+
+const metadataDescription = "Payments are solved, trust isn't. ARC Identity is an onchain reputation and wallet intelligence platform for Arc stablecoin users - transaction-verified trust scoring, multichain analytics and portable identity.";
 const brandIcon = "/brand/arc-identity-icon.png";
 const brandIcon32 = "/brand/arc-identity-icon-32.png";
 const brandIcon192 = "/brand/arc-identity-icon-192.png";
@@ -67,7 +76,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${outfit.variable} ${jakarta.variable}`}>
+    <html lang="en" className={`${newsreader.variable} ${jakarta.variable} ${dmMono.variable}`}>
       <body>{children}</body>
     </html>
   );

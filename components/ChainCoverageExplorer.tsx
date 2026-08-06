@@ -37,10 +37,10 @@ function statusLabel(chain: ChainSnapshot) {
 
 function statusClass(chain: ChainSnapshot) {
   const status = displayStatus(chain);
-  if (status === "indexed") return "border-emerald-300/25 bg-emerald-300/10 text-emerald-100";
-  if (status === "no_activity" || status === "pending") return "border-white/10 bg-white/[0.06] text-slate-300";
-  if (status === "limited") return "border-amber-300/25 bg-amber-300/10 text-amber-100";
-  return "border-rose-300/25 bg-rose-400/10 text-rose-100";
+  if (status === "indexed") return "border-verified/50 bg-verified-bg text-verified";
+  if (status === "no_activity" || status === "pending") return "border-linec bg-paper-deep text-mutedc";
+  if (status === "limited") return "border-limited/50 bg-limited-bg text-limited";
+  return "border-risk/50 bg-risk-bg text-risk";
 }
 
 function providerText(chain: ChainSnapshot) {
@@ -108,37 +108,38 @@ export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }:
   }, [chains, query]);
 
   return (
-    <section className="arc-surface rounded-2xl p-7">
+    <section className="r4-panel">
       <div className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <p className="arc-section-label">{title}</p>
-          <p className="mt-2.5 max-w-2xl text-[0.8125rem] leading-relaxed text-slate-400">Chain-level infrastructure intelligence is available when needed, while the main view stays focused on score, trust, and verified activity.</p>
+          <p className="mt-2.5 max-w-2xl text-[0.8125rem] leading-relaxed text-mutedc">Chain-level infrastructure intelligence is available when needed, while the main view stays focused on score, trust and verified activity.</p>
         </div>
-        <button onClick={() => setOpen(true)} className="arc-button-primary px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60" disabled={chains.length === 0}>
-          View Chains
+        <button onClick={() => setOpen(true)} className="inline-flex w-fit shrink-0 items-center gap-1.5 rounded-[2px] border border-linec px-2.5 py-[5px] font-mono text-[0.625rem] font-bold uppercase tracking-[0.14em] text-ink transition-colors hover:border-gold hover:bg-gold/10 disabled:cursor-not-allowed disabled:opacity-60" disabled={chains.length === 0}>
+          View chains
+          <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true"><path d="M1.5 8.5L8.5 1.5M8.5 1.5H3.5M8.5 1.5V6.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="square" /></svg>
         </button>
       </div>
 
-      <div className="mt-6 grid gap-3.5 sm:grid-cols-3">
-        <div className="arc-metric-card !border-emerald-300/15 !bg-emerald-300/[0.06]">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-emerald-100/70">Indexed chains</p>
-          <p className="mt-2 text-2xl font-extrabold tabular-nums text-white">{summary.indexed}</p>
+      <div className="mt-6 grid gap-x-5 sm:grid-cols-3 sm:divide-x sm:divide-linec">
+        <div className="flex flex-col sm:pr-5">
+          <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-verified">Indexed chains</p>
+          <p className={`mt-auto pt-2 text-2xl font-extrabold tabular-nums ${summary.indexed > 0 ? "text-verified" : "text-mutedc"}`}>{summary.indexed}</p>
         </div>
-        <div className="arc-metric-card">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">No activity chains</p>
-          <p className="mt-2 text-2xl font-extrabold tabular-nums text-white">{summary.noActivity}</p>
+        <div className="flex flex-col sm:px-5">
+          <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-mutedc">No activity chains</p>
+          <p className="mt-auto pt-2 text-2xl font-extrabold tabular-nums text-ink">{summary.noActivity}</p>
         </div>
-        <div className="arc-metric-card !border-amber-300/15 !bg-amber-300/[0.06]">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-amber-100/70">Limited/provider</p>
-          <p className="mt-2 text-2xl font-extrabold tabular-nums text-white">{summary.limitedProvider}</p>
+        <div className="flex flex-col sm:pl-5">
+          <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-limited">Limited/provider</p>
+          <p className={`mt-auto pt-2 text-2xl font-extrabold tabular-nums ${summary.limitedProvider > 0 ? "text-limited" : "text-mutedc"}`}>{summary.limitedProvider}</p>
         </div>
       </div>
 
-      {chains.length === 0 ? <p className="mt-4 text-sm text-slate-400">Indexing limited by provider availability. Refresh intelligence to check again.</p> : null}
+      {chains.length === 0 ? <p className="mt-4 text-sm text-mutedc">Indexing limited by provider availability. Refresh intelligence to check again.</p> : null}
 
       {mounted && open ? createPortal(
         <div
-          className="fixed inset-0 z-[9999] flex items-center justify-center bg-slate-950/88 p-3 backdrop-blur-md sm:p-6"
+          className="fixed inset-0 z-[9999] flex items-center justify-center bg-ink/70 p-3 sm:p-6"
           role="dialog"
           aria-modal="true"
           aria-label="Chain intelligence explorer"
@@ -146,41 +147,41 @@ export function ChainCoverageExplorer({ chains = [], title = "Chain Coverage" }:
             if (event.target === event.currentTarget) setOpen(false);
           }}
         >
-          <div className="flex h-[min(92dvh,820px)] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/[0.08] bg-[rgba(8,10,13,0.98)] shadow-[0_40px_140px_rgba(0,0,0,0.75),0_0_120px_rgba(212,175,55,0.16)] sm:h-[min(85dvh,820px)]">
-            <div className="shrink-0 border-b border-white/[0.06] bg-[rgba(13,14,17,0.96)] p-5 backdrop-blur-xl sm:p-6">
+          <div className="flex h-[min(92dvh,820px)] w-full max-w-5xl flex-col overflow-hidden rounded-[2px] border border-line-dark bg-bone shadow-panel sm:h-[min(85dvh,820px)]">
+            <div className="shrink-0 border-b border-linec bg-paper-deep p-5 sm:p-6">
               <div className="flex items-start justify-between gap-4">
                 <div className="min-w-0">
                   <p className="arc-section-label">Chain Explorer</p>
-                  <h3 className="mt-2.5 text-2xl font-extrabold text-white">Full chain intelligence</h3>
-                  <p className="mt-2 text-sm text-slate-400">Built to scale across many networks without crowding the identity view.</p>
+                  <h3 className="mt-2.5 text-2xl font-extrabold text-ink">Full chain intelligence</h3>
+                  <p className="mt-2 text-sm text-mutedc">Built to scale across many networks without crowding the identity view.</p>
                 </div>
                 <button onClick={() => setOpen(false)} className="arc-button-secondary shrink-0 px-3.5 py-2 text-sm font-bold" aria-label="Close chain explorer">Close</button>
               </div>
               <input
                 value={query}
                 onChange={(event) => setQuery(event.target.value)}
-                placeholder="Filter chains by name, status, or provider"
+                placeholder="Filter chains by name, status or provider"
                 className="arc-input mt-5 w-full px-4 py-3 text-sm outline-none placeholder:text-slate-500"
               />
             </div>
 
             <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4 sm:p-5">
               <div className="grid gap-3.5">
-                {filteredChains.length === 0 ? <p className="rounded-xl border border-white/[0.06] bg-white/[0.025] p-4 text-sm text-slate-400">No chains match this filter.</p> : filteredChains.map((chain) => {
+                {filteredChains.length === 0 ? <p className="border-t border-linec p-4 text-sm text-mutedc">No chains match this filter.</p> : filteredChains.map((chain) => {
                   const content = (
-                    <div className="arc-card-hover grid gap-4 rounded-xl border border-white/[0.06] bg-white/[0.025] p-4 transition duration-200 md:grid-cols-[1.2fr_0.8fr_0.6fr_0.6fr_0.8fr_1fr] md:items-center">
+                      <div className="grid gap-4 border-t border-linec py-4 md:grid-cols-[1.2fr_0.8fr_0.6fr_0.6fr_0.8fr_1fr] md:items-center">
                       <div className="min-w-0">
-                        <p className="truncate font-extrabold text-white">{chain.chain}</p>
-                        <p className="mt-1 text-xs text-slate-500">Chain ID {chain.chainId}</p>
+                        <p className="truncate font-extrabold text-ink">{chain.chain}</p>
+                        <p className="mt-1 font-mono text-xs text-mutedc">Chain ID {chain.chainId}</p>
                       </div>
-                      <span className={`w-fit rounded-md border px-2.5 py-1 text-[0.6875rem] font-extrabold uppercase tracking-[0.12em] ${statusClass(chain)}`}>{statusLabel(chain)}</span>
-                      <div><p className="text-xs text-slate-500">Tx count</p><p className="font-bold text-white">{chain.txCount}</p></div>
-                      <div><p className="text-xs text-slate-500">Age</p><p className="font-bold text-white">{chain.walletAgeDays}d</p></div>
-                      <div><p className="text-xs text-slate-500">Counterparties</p><p className="font-bold text-white">{chain.uniqueCounterparties}</p></div>
+                      <span className={`w-fit rounded-[2px] border px-2.5 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] ${statusClass(chain)}`}>{statusLabel(chain)}</span>
+                      <div><p className="arc-section-label">Tx count</p><p className="mt-1 font-mono font-bold text-ink">{chain.txCount}</p></div>
+                      <div><p className="arc-section-label">Age</p><p className="mt-1 font-mono font-bold text-ink">{chain.walletAgeDays}d</p></div>
+                      <div><p className="arc-section-label">Counterparties</p><p className="mt-1 font-mono font-bold text-ink">{chain.uniqueCounterparties}</p></div>
                       <div className="min-w-0">
-                        <p className="text-xs text-slate-500">Last activity</p>
-                        <p className="truncate text-sm font-bold text-white">{formatDate(chain.lastSeenAt)}</p>
-                        <p className="mt-1 truncate text-xs text-slate-500">{providerText(chain)}</p>
+                        <p className="arc-section-label">Last activity</p>
+                        <p className="mt-1 truncate text-sm font-bold text-ink">{formatDate(chain.lastSeenAt)}</p>
+                        <p className="mt-1 truncate text-xs text-mutedc">{providerText(chain)}</p>
                       </div>
                     </div>
                   );

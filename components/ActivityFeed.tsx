@@ -2,7 +2,7 @@ import type { Activity } from "@/lib/types";
 
 export function ActivityFeed({ activities }: { activities: Activity[] }) {
   return (
-    <div className="arc-surface rounded-2xl p-7">
+    <div className="arc-surface rounded-[2px] p-7">
       <div className="mb-5 flex items-center justify-between">
         <h2 className="text-xl font-extrabold text-white">Recent activity</h2>
         <span className="rounded-md bg-white/[0.06] px-2.5 py-1 text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-slate-400">
@@ -13,7 +13,7 @@ export function ActivityFeed({ activities }: { activities: Activity[] }) {
         {activities.slice(0, 6).map((activity) => (
           <div
             key={activity.id}
-            className="arc-card-hover flex items-start justify-between gap-4 rounded-xl border border-white/[0.06] bg-white/[0.025] p-4"
+            className="arc-card-hover flex items-start justify-between gap-4 rounded-[2px] border border-white/[0.06] bg-white/[0.025] p-4"
           >
             <div>
               <p className="font-bold text-white">{activity.description}</p>

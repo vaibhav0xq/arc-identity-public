@@ -126,7 +126,7 @@ export function buildScoreContract(input: ScoreContractInput): ScoreContractResu
       max: ARC_SCORE_COMPONENT_MAX.walletAge,
       reason: walletAgeDays > 0
         ? `Wallet maturity contributes ${walletAgePoints}/${ARC_SCORE_COMPONENT_MAX.walletAge} as anti-sybil confidence from ${walletAgeDays} indexed days.`
-        : "No indexed wallet age detected yet. Wallet maturity supports ARC Score but does not dominate it.",
+        : "No indexed wallet age detected yet. Wallet maturity supports Identity Score but does not dominate it.",
       sourceValue: `${walletAgeDays}d`
     },
     crossChain: {
@@ -142,14 +142,14 @@ export function buildScoreContract(input: ScoreContractInput): ScoreContractResu
       max: ARC_SCORE_COMPONENT_MAX.transactionActivity,
       reason: indexedTx > 0
         ? `Generic indexed activity contributes ${transactionPoints}/${ARC_SCORE_COMPONENT_MAX.transactionActivity} as maturity context from ${indexedTx} transaction${indexedTx === 1 ? "" : "s"}.`
-        : input.providerLimited ? "Provider coverage is limited, so transaction activity is not treated as confirmed zero." : "No indexed transactions detected yet. Non-Arc transaction volume is not the main ARC Score driver.",
+        : input.providerLimited ? "Provider coverage is limited, so transaction activity is not treated as confirmed zero." : "No indexed transactions detected yet. Non-Arc transaction volume is not the main Identity Score driver.",
       sourceValue: indexedTx
     },
     diversity: {
       points: diversityPoints,
       max: ARC_SCORE_COMPONENT_MAX.diversity,
       reason: diversityValue > 0
-        ? `Verified and Arc-weighted counterparty diversity contributes ${diversityPoints}/${ARC_SCORE_COMPONENT_MAX.diversity} from ${arcCounterparties} Arc, ${verifiedAttestationCounterparties} verified, and ${uniqueCounterparties} global counterparties.`
+        ? `Verified and Arc-weighted counterparty diversity contributes ${diversityPoints}/${ARC_SCORE_COMPONENT_MAX.diversity} from ${arcCounterparties} Arc, ${verifiedAttestationCounterparties} verified and ${uniqueCounterparties} global counterparties.`
         : "No verified or Arc-native counterparties detected yet.",
       sourceValue: diversityValue
     },
@@ -157,15 +157,15 @@ export function buildScoreContract(input: ScoreContractInput): ScoreContractResu
       points: arcActivityPoints,
       max: ARC_SCORE_COMPONENT_MAX.arcActivity,
       reason: arcTx > 0
-        ? `Arc ecosystem activity contributes ${arcActivityPoints}/${ARC_SCORE_COMPONENT_MAX.arcActivity} from ${arcTx} Arc transaction${arcTx === 1 ? "" : "s"}, ${arcCounterparties} Arc counterparties, ${arcActiveDays} active day${arcActiveDays === 1 ? "" : "s"}, ${arcWalletAgeDays} indexed Arc days, and the current Arc balance signal.`
-        : "No Arc Testnet activity detected yet. ARC Score is primarily based on Arc ecosystem behavior.",
+        ? `Arc ecosystem activity contributes ${arcActivityPoints}/${ARC_SCORE_COMPONENT_MAX.arcActivity} from ${arcTx} Arc transaction${arcTx === 1 ? "" : "s"}, ${arcCounterparties} Arc counterparties, ${arcActiveDays} active day${arcActiveDays === 1 ? "" : "s"}, ${arcWalletAgeDays} indexed Arc days and the current Arc balance signal.`
+        : "No Arc Testnet activity detected yet. Identity Score is primarily based on Arc ecosystem behavior.",
       sourceValue: arcTx
     },
     attestations: {
       points: attestationPoints,
       max: ARC_SCORE_COMPONENT_MAX.attestations,
       reason: verifiedAttestations > 0
-        ? `Verified transaction-backed trust contributes ${attestationPoints}/${ARC_SCORE_COMPONENT_MAX.attestations} from ${verifiedAttestations} attestation${verifiedAttestations === 1 ? "" : "s"}, ${verifiedAttestationCounterparties} verified counterparties, and ${attestationWeight.toFixed(2)} weighted trust evidence.`
+        ? `Verified transaction-backed trust contributes ${attestationPoints}/${ARC_SCORE_COMPONENT_MAX.attestations} from ${verifiedAttestations} attestation${verifiedAttestations === 1 ? "" : "s"}, ${verifiedAttestationCounterparties} verified counterparties and ${attestationWeight.toFixed(2)} weighted trust evidence.`
         : "No verified transaction-backed attestations yet. Attestations are a capped secondary reputation signal.",
       sourceValue: verifiedAttestations
     },

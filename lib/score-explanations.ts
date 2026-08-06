@@ -12,7 +12,7 @@ export type ScoreExplanations = {
   riskPenalty: string;
 };
 
-const missing = "ARC Intelligence will update as Arc ecosystem activity, verified attestations, and trusted counterparties grow.";
+const missing = "ARC Intelligence will update as Arc ecosystem activity, verified attestations and trusted counterparties grow.";
 
 export function buildScoreExplanations(identity: IdentityRecord | null): ScoreExplanations {
   if (!identity) {
@@ -52,14 +52,14 @@ export function buildScoreExplanations(identity: IdentityRecord | null): ScoreEx
       ? components.walletAge.reason
       : freshWallet ? "This wallet appears freshly created." : missing,
     crossChainActivity: totalTx > 0 && (multi?.activeChains.length ?? 0) > 0
-      ? `${components.crossChain.reason} ${components.transactionActivity.reason} These global signals remain wallet intelligence context, not the primary ARC Score driver.`
-      : providerLimited ? "Provider coverage limited. ARC is showing baseline or cached data until providers recover." : "No indexed activity detected yet.",
+      ? `${components.crossChain.reason} ${components.transactionActivity.reason} These global signals remain wallet intelligence context, not the primary Identity Score driver.`
+      : providerLimited ? "Provider coverage limited. Showing baseline or cached data until providers recover." : "No indexed activity detected yet.",
     counterpartyDiversity: components.diversity.points > 0
       ? components.diversity.reason
       : "No verified or Arc-native counterparties detected yet.",
     arcActivity: arcTx > 0
       ? `${components.arcActivity.reason} Includes ${arcCounterparties} Arc counterparties and ${arcActiveDays} active days.`
-      : "No Arc Testnet activity detected yet. ARC Score is primarily based on Arc ecosystem behavior.",
+      : "No Arc Testnet activity detected yet. Identity Score is primarily based on Arc ecosystem behavior.",
     indexedChainDepth: chains.length > 0
       ? `${components.transactionActivity.reason} Coverage: ${indexedChains.length} indexed chains, ${limitedChains.length} limited provider, ${noActivityChains.length} no-activity chains. Chain explorer data supports maturity and anti-sybil context while Arc-native behavior drives reputation.`
       : providerLimited ? "Provider coverage limited. Transaction activity is not treated as confirmed zero." : "No indexed transactions detected yet.",

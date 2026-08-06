@@ -12,7 +12,7 @@ export default function MyProfileResolverPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { identity, refreshIdentity } = useArcIdentity();
   const [resolverState, setResolverState] = useState<ResolverState>("idle");
-  const [message, setMessage] = useState("Opening your ARC Identity...");
+  const [message, setMessage] = useState("Opening your Arc Identity...");
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
@@ -27,20 +27,20 @@ export default function MyProfileResolverPage() {
 
     async function resolveProfile() {
       transition("resolving");
-      setMessage("Opening your ARC Identity...");
+      setMessage("Opening your Arc Identity...");
       console.log("[arc-identity] resolver_started", { wallet, status: identity.status, source: identity.source });
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
         if (cancelled) return;
         console.warn("[arc-identity] resolver_timeout", { wallet });
-        setMessage("Could not open your ARC Identity. Retry.");
+        setMessage("Could not open your Arc Identity. Retry.");
         transition("failed", { reason: "timeout" });
       }, 8000);
 
       if (identity.status === "disconnected") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         transition("failed", { reason: "disconnected" });
-        setMessage("Connect your wallet to open your ARC Identity.");
+        setMessage("Connect your wallet to open your Arc Identity.");
         return;
       }
 
@@ -80,20 +80,21 @@ export default function MyProfileResolverPage() {
     <ArcShell>
       <WalletGate
         sectionLabel="Public profile"
-        title="Connect your wallet to open your ARC Identity."
-        description="Connect your wallet to open your public ARC Identity profile."
+        title="Connect your wallet to open your Arc Identity."
+        description="Connect your wallet to open your public Arc Identity profile."
       >
       <section className="mx-auto flex min-h-[64vh] max-w-2xl items-center py-10">
-        <div className="arc-surface w-full rounded-3xl p-7 text-center sm:p-10">
-          <p className="arc-section-label">ARC Identity</p>
-          <h1 className="mt-4 text-3xl font-black text-white">{message}</h1>
-          <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-slate-400">
-            Resolving your connected wallet to the canonical public ARC Identity profile.
+         <div className="r4-panel w-full text-center">
+           <div className="r4-panel-body p-7 sm:p-10">
+           <p className="kicker">PUBLIC WALLET CREDENTIAL</p>
+            <h1 className="mt-4 font-heading text-3xl font-semibold text-ink">{message}</h1>
+           <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-mutedc">
+            Resolving your connected wallet to the canonical public Arc Identity profile.
           </p>
           {resolverState === "resolving" || resolverState === "success" ? (
-            <div className="mx-auto mt-8 h-1.5 max-w-sm overflow-hidden rounded-full bg-white/[0.06]">
-              <div className="h-full w-2/3 animate-pulse rounded-full bg-gradient-to-r from-emerald-300 via-teal-200 to-cyan-300" />
-            </div>
+             <div className="mx-auto mt-8 h-1.5 max-w-sm overflow-hidden rounded-full bg-linec">
+               <div className="h-full w-2/3 animate-pulse rounded-full bg-gold" />
+           </div>
           ) : resolverState === "failed" ? (
             <div className="mt-7 flex flex-wrap justify-center gap-3">
               <button onClick={() => setRetryKey((value) => value + 1)} className="arc-button-primary px-5 py-3 text-sm font-extrabold">
@@ -104,6 +105,7 @@ export default function MyProfileResolverPage() {
               </Link>
             </div>
           ) : null}
+          </div>
         </div>
       </section>
       </WalletGate>

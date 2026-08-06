@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArcShell } from "@/components/ArcShell";
+import { TxLink } from "@/components/TxLink";
 import { useArcIdentity } from "@/hooks/useArcIdentity";
 import type { Attestation, IdentityRecord, InteractionType } from "@/lib/types";
 import { fetchJsonWithTimeout } from "@/lib/timeouts";
@@ -58,11 +59,6 @@ function mapAttestationRow(row: AttestationRow): Attestation {
   };
 }
 
-function ExplorerLink({ txHash }: { txHash: string | null }) {
-  const explorer = process.env.NEXT_PUBLIC_ARC_EXPLORER_URL;
-  if (!txHash || !explorer) return null;
-  return <a href={`${explorer.replace(/\/$/, "")}/tx/${txHash}`} className="text-emerald-200 underline decoration-emerald-300/40 underline-offset-4">View transaction</a>;
-}
 
 function interactionLabel(type: InteractionType) {
   return interactionTypes.find((item) => item.value === type)?.label ?? type.replaceAll("_", " ");
@@ -138,44 +134,15 @@ function InteractionTypePicker({
   value,
   onChange
 }: {
-  value: InteractionType;
+  value: InteractionType | "";
   onChange: (value: InteractionType) => void;
 }) {
-  const [open, setOpen] = useState(false);
   const rootRef = useRef<HTMLDivElement>(null);
-  const selected = interactionTypes.find((item) => item.value === value) ?? interactionTypes[0];
 
-  useEffect(() => {
-    if (!open) return;
-    function onPointerDown(event: MouseEvent) {
-      if (!rootRef.current?.contains(event.target as Node)) setOpen(false);
-    }
-    function onKeyDown(event: globalThis.KeyboardEvent) {
-      if (event.key === "Escape") setOpen(false);
-    }
-    document.addEventListener("mousedown", onPointerDown);
-    document.addEventListener("keydown", onKeyDown);
-    return () => {
-      document.removeEventListener("mousedown", onPointerDown);
-      document.removeEventListener("keydown", onKeyDown);
-    };
-  }, [open]);
-
-  return (
-    <div ref={rootRef} className="relative grid min-w-0 w-full gap-2 transition-all duration-300 ease-out">
-      <span className="text-sm font-medium text-slate-300">Interaction type</span>
-      <button
-        type="button"
-        onClick={() => setOpen((current) => !current)}
-        className="arc-input flex min-w-0 w-full items-center justify-between gap-3 px-4 py-3 text-left font-bold text-white outline-none transition-all duration-300 ease-out hover:border-emerald-300/25 hover:bg-white/[0.07]"
-        aria-haspopup="listbox"
-        aria-expanded={open}
-      >
-        <span>{selected.label}</span>
-        <span className={`text-xs text-emerald-200 transition ${open ? "rotate-180" : ""}`}>v</span>
-      </button>
-      {open ? (
-        <div className="absolute left-0 right-0 top-[4.9rem] z-[90] max-w-[calc(100vw-2rem)] overflow-hidden rounded-xl border border-emerald-300/15 bg-[rgba(7,14,20,0.98)] shadow-[0_22px_70px_rgba(0,0,0,0.45)] backdrop-blur-xl transition-all duration-300 ease-out" role="listbox">
+    return (
+      <div ref={rootRef} className="grid min-w-0 w-full gap-3">
+        <span className="kicker">02 / Interaction context</span>
+        <div className="context-picks grid gap-2 sm:grid-cols-2" role="listbox" aria-label="Interaction context">
           {interactionTypes.map((item) => {
             const active = item.value === value;
             return (
@@ -184,22 +151,18 @@ function InteractionTypePicker({
                 type="button"
                 role="option"
                 aria-selected={active}
-                onClick={() => {
-                  onChange(item.value);
-                  setOpen(false);
-                }}
-                className={`block w-full px-4 py-3 text-left transition ${active ? "bg-emerald-300/12 text-emerald-100" : "text-slate-200 hover:bg-white/[0.06]"}`}
+                onClick={() => onChange(item.value)}
+                className={`rounded-[2px] border px-3 py-3 text-left transition ${active ? "border-verified bg-verified-bg text-verified" : "border-linec bg-bone text-ink hover:border-gold"}`}
               >
-                <span className="block text-sm font-bold">{item.label}</span>
-                <span className="mt-1 block text-xs text-slate-500">{item.description}</span>
+                <span className="block text-sm font-semibold">{item.label}</span>
+                <span className="mt-1 block text-xs text-mutedc">{item.description}</span>
               </button>
             );
           })}
         </div>
-      ) : null}
-      <span className="text-xs leading-5 text-slate-500">Choose the closest economic context for this transaction.</span>
-    </div>
-  );
+        <span className="text-xs leading-5 text-mutedc">Choose the closest economic context for this transaction.</span>
+      </div>
+    );
 }
 
 function CounterpartyPicker({
@@ -248,10 +211,16 @@ function CounterpartyPicker({
   }
 
   function clearSelection() {
+    // Keep the previous identity in the search box (pre-selected) so the
+    // user can refine it instead of retyping from scratch.
+    const previousQuery = selectedCounterparty?.profile.username ?? "";
     onSelect("");
-    setSearchQuery("");
+    setSearchQuery(previousQuery);
     setOpen(true);
-    window.setTimeout(() => inputRef.current?.focus(), 0);
+    window.setTimeout(() => {
+      inputRef.current?.focus();
+      inputRef.current?.select();
+    }, 0);
   }
 
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
@@ -277,75 +246,78 @@ function CounterpartyPicker({
   }
 
   return (
-    <div className="relative grid min-w-0 w-full gap-2 transition-all duration-300 ease-out">
-      <span className="text-sm font-medium text-slate-300">Registered counterparty</span>
+    <div className="relative grid min-w-0 w-full gap-2">
+      <span className="arc-section-label">01 / Registered counterparty</span>
       {!selectedCounterparty ? (
-        <input
-          ref={inputRef}
-          value={searchQuery}
-          onChange={(event) => {
-            setSearchQuery(event.target.value);
-            setOpen(true);
-            setActiveIndex(0);
-          }}
-          onFocus={() => setOpen(true)}
-          onKeyDown={handleKeyDown}
-          className="arc-input min-w-0 w-full px-4 py-3 text-white outline-none placeholder:text-slate-500 transition-all duration-300 ease-out"
-          placeholder={loading ? "Loading registered identities..." : "Search username, username.arcid, or wallet address"}
-          aria-label="Search registered counterparty"
-        />
-      ) : null}
-      {!selectedCounterparty && open ? (
-        <div className="absolute left-0 right-0 top-[4.9rem] z-[90] max-h-72 max-w-[calc(100vw-2rem)] overflow-y-auto rounded-xl border border-white/[0.08] bg-[rgba(8,16,22,0.98)] shadow-panel backdrop-blur-xl transition-all duration-300 ease-out">
-          {loading ? (
-            <p className="p-4 text-sm text-slate-400">Loading registered counterparties...</p>
-          ) : !canSearch ? (
-            <p className="p-4 text-sm text-slate-400">Type at least 2 characters to search registered identities.</p>
-          ) : filtered.length === 0 ? (
-            <p className="p-4 text-sm text-slate-400">No registered ARC Identity found.</p>
-          ) : (
-            <>
-              {filtered.map((item, index) => {
-                const active = index === activeIndex;
-                return (
-                  <button key={item.profile.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(item)} className={active ? "block w-full bg-white/[0.08] p-4 text-left transition-all duration-300 ease-out" : "block w-full p-4 text-left transition-all duration-300 ease-out hover:bg-white/[0.06]"}>
-                    <div className="grid grid-cols-[1fr_auto] items-center gap-3">
-                      <div className="min-w-0">
-                        <p className="truncate font-black text-white">{item.profile.username}</p>
-                        <p className="mt-1 truncate text-xs text-slate-500">{shortenAddress(item.profile.walletAddress)}</p>
-                      </div>
-                      <span className={`rounded border px-2 py-1 text-xs font-black ${riskClass(item.score.riskLevel)}`}>{item.score.arcScore} - {item.score.riskLevel}</span>
-                    </div>
-                  </button>
-                );
-              })}
-              {hasMoreResults ? <p className="border-t border-white/10 p-3 text-xs text-slate-500">Showing top 8 results. Keep typing to narrow down.</p> : null}
-            </>
-          )}
+        <div className="relative min-w-0 w-full">
+          <input
+            ref={inputRef}
+            value={searchQuery}
+            onChange={(event) => {
+              setSearchQuery(event.target.value);
+              setOpen(true);
+              setActiveIndex(0);
+            }}
+            onFocus={() => setOpen(true)}
+            onBlur={() => setOpen(false)}
+            onKeyDown={handleKeyDown}
+            className="arc-input min-w-0 w-full border-linec px-4 py-3 font-mono text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
+            placeholder={loading ? "Loading registered identities..." : "Search username, username.arcid or wallet address"}
+            aria-label="Search registered counterparty"
+          />
+          {/* Dropdown only appears once there is something to search — the caption
+              below the field already explains what to type. */}
+          {open && canSearch ? (
+            <div className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-72 overflow-y-auto rounded-[2px] border border-linec bg-bone shadow-panel">
+              {loading ? (
+                <p className="p-4 text-sm text-mutedc">Loading registered counterparties...</p>
+              ) : filtered.length === 0 ? (
+                <p className="p-4 text-sm text-mutedc">No registered Arc Identity found.</p>
+              ) : (
+                <>
+                  {filtered.map((item, index) => {
+                    const active = index === activeIndex;
+                    return (
+                      <button key={item.profile.id} type="button" onMouseDown={(event) => event.preventDefault()} onClick={() => choose(item)} className={active ? "block w-full bg-paper p-4 text-left" : "block w-full p-4 text-left hover:bg-paper"}>
+                        <div className="grid grid-cols-[1fr_auto] items-center gap-3">
+                          <div className="min-w-0">
+                            <p className="truncate font-semibold text-ink">{item.profile.username}</p>
+                            <p className="mt-1 truncate font-mono text-xs text-mutedc">{shortenAddress(item.profile.walletAddress)}</p>
+                          </div>
+                          <span className={`rounded border px-2 py-1 text-xs font-black ${riskClass(item.score.riskLevel)}`}>{item.score.arcScore} - {item.score.riskLevel}</span>
+                        </div>
+                      </button>
+                    );
+                  })}
+                  {hasMoreResults ? <p className="border-t border-linec p-3 text-xs text-mutedc">Showing top 8 results. Keep typing to narrow down.</p> : null}
+                </>
+              )}
+            </div>
+          ) : null}
         </div>
       ) : null}
       {error ? (
-        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-amber-300/20 bg-amber-300/10 px-3 py-2 text-xs text-amber-50/85">
+         <div className="flex flex-wrap items-center justify-between gap-2 rounded-[2px] border border-limited bg-limited-bg px-3 py-2 text-xs text-limited">
           <span>Couldn&apos;t load registered identities. Retry.</span>
-          <button type="button" onClick={onRetry} className="rounded border border-amber-200/20 px-2 py-1 font-bold text-amber-50 transition hover:bg-amber-200/10">Retry</button>
+           <button type="button" onClick={onRetry} className="arc-button-secondary px-2 py-1 text-xs">Retry</button>
         </div>
       ) : null}
       {selectedCounterparty ? (
-        <div className="min-w-0 rounded-xl border border-emerald-300/25 bg-emerald-300/[0.09] p-4 shadow-[0_18px_50px_rgba(16,185,129,0.08)] transition-all duration-300 ease-out">
-          <p className="mb-3 text-[0.6875rem] font-black uppercase tracking-[0.18em] text-emerald-100">Selected identity</p>
+         <div className="min-w-0 rounded-[2px] border border-verified bg-verified-bg p-4">
+           <p className="arc-section-label mb-3 text-verified">Selected identity</p>
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
-              <p className="truncate text-sm font-black text-white">{selectedCounterparty.profile.username}</p>
-              <p className="mt-1 truncate text-xs text-emerald-100/70">{shortenAddress(selectedCounterparty.profile.walletAddress)}</p>
+               <p className="truncate text-sm font-semibold text-ink">{selectedCounterparty.profile.username}</p>
+               <p className="mt-1 truncate font-mono text-xs text-verified">{shortenAddress(selectedCounterparty.profile.walletAddress)}</p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`rounded border px-2 py-1 text-xs font-black ${riskClass(selectedCounterparty.score.riskLevel)}`}>{selectedCounterparty.score.arcScore} - {selectedCounterparty.score.riskLevel}</span>
-              <button type="button" onClick={clearSelection} className="rounded border border-white/10 px-2 py-1 text-xs font-bold text-white transition hover:bg-white/10" aria-label="Change selected counterparty">Change</button>
+               <button type="button" onClick={clearSelection} className="arc-button-secondary px-2 py-1 text-xs" aria-label="Change selected counterparty">Change</button>
             </div>
           </div>
         </div>
       ) : null}
-      <span className="text-xs leading-5 text-slate-500">{selectedCounterparty ? "ARC Identity will verify this identity against the submitted transaction." : "Search by username, username.arcid, or wallet address. Your own identity is excluded."}</span>
+       <span className="text-xs leading-5 text-mutedc">{selectedCounterparty ? "Arc Identity will verify this identity against the submitted transaction." : "Search by username, username.arcid or wallet address. Your own identity is excluded."}</span>
     </div>
   );
 }
@@ -358,7 +330,7 @@ export default function AttestationsPage() {
   const [users, setUsers] = useState<IdentityRecord[]>([]);
   const [toWallet, setToWallet] = useState("");
   const [txHash, setTxHash] = useState("");
-  const [interactionType, setInteractionType] = useState<InteractionType>("payment");
+  const [interactionType, setInteractionType] = useState<InteractionType | "">("");
   const [history, setHistory] = useState<Attestation[]>([]);
   const [message, setMessage] = useState("Loading transaction attestations...");
   const [submitting, setSubmitting] = useState(false);
@@ -403,7 +375,7 @@ export default function AttestationsPage() {
     setWallet(current);
     if (identity.status === "checking") {
       setIdentityStatus("checking");
-      setMessage("Checking ARC Identity...");
+      setMessage("Checking Arc Identity...");
       setUsersLoading(false);
       console.log("[arc-identity] attestations_final_decision", { requestId, state: "checking" });
       return;
@@ -419,7 +391,7 @@ export default function AttestationsPage() {
     }
     if (identity.status === "unclaimed") {
       setIdentityStatus("unregistered");
-      setMessage("Claim your ARC Identity before creating attestations.");
+      setMessage("Claim your Arc Identity before creating attestations.");
       setUsersLoading(false);
       setHistoryLoaded(false);
       registeredWalletRef.current = "";
@@ -433,7 +405,7 @@ export default function AttestationsPage() {
         console.log("[arc-identity] attestations_final_decision", { requestId, state: "registered", reason: "previous_success_preserved" });
       } else {
         setIdentityStatus("failed");
-        setMessage("Could not verify your ARC Identity. Retry the identity check.");
+        setMessage("Could not verify your Arc Identity. Retry the identity check.");
         console.log("[arc-identity] attestations_final_decision", { requestId, state: "failed" });
       }
       setUsersLoading(false);
@@ -488,7 +460,7 @@ export default function AttestationsPage() {
     const validationMessage = attestationFormError();
     if (!wallet || validationMessage) {
       setSubmitSuccess("");
-      setSubmitError(validationMessage || "Connect a verified ARC Identity wallet before submitting an attestation.");
+      setSubmitError(validationMessage || "Connect a verified Arc Identity wallet before submitting an attestation.");
       return;
     }
     setSubmitting(true);
@@ -584,7 +556,7 @@ export default function AttestationsPage() {
 
   function attestationFormError() {
     if (submitting) return "";
-    if (!selectedCounterparty) return "Select a registered ARC Identity counterparty.";
+    if (!selectedCounterparty) return "Select a registered Arc Identity counterparty.";
     if (wallet && normalizeWallet(wallet) === normalizeWallet(selectedCounterparty.profile.walletAddress)) return "You cannot submit an attestation with your own wallet as the counterparty.";
     if (!isInteractionType(interactionType)) return "Choose a supported interaction type.";
     if (!txHash.trim()) return "Paste the Arc transaction hash involving both wallets.";
@@ -595,140 +567,145 @@ export default function AttestationsPage() {
   const formDisabledReason = attestationFormError();
   const formReady = Boolean(selectedCounterparty && isInteractionType(interactionType) && looksLikeTxHash(txHash) && normalizeWallet(wallet) !== normalizeWallet(selectedCounterparty.profile.walletAddress));
   const verifyButtonLabel = submitting ? (submitStatus === "creating" ? "Creating attestation..." : "Verifying transaction...") : submitSuccess ? "Attestation verified" : formReady ? "Verify transaction attestation" : "Complete all fields";
+  const stepStates = [
+    { number: "01", title: "Counterparty", detail: selectedCounterparty ? `${selectedCounterparty.profile.username ?? shortenAddress(selectedCounterparty.profile.walletAddress)} selected` : "Select an identity", done: Boolean(selectedCounterparty) },
+    { number: "02", title: "Context", detail: interactionType ? interactionLabel(interactionType) : "Choose context", done: isInteractionType(interactionType) },
+    { number: "03", title: "Transaction", detail: txHash ? "Hash entered" : "Submit hash", done: looksLikeTxHash(txHash) },
+    { number: "04", title: "Evidence", detail: submitSuccess ? "Record verified" : "Verify record", done: Boolean(submitSuccess) }
+  ];
 
   return (
     <ArcShell>
-      <section className="fade-in mx-auto grid w-full max-w-[1680px] gap-6 px-4 py-8 transition-all duration-300 ease-out sm:px-6 md:gap-8 lg:px-10 xl:px-14">
-        <div className="max-w-4xl transition-all duration-300 ease-out">
-          <div className="flex flex-wrap items-center gap-4">
-            <p className="arc-section-label">Verified Attestations</p>
-            <span className="rounded-md border border-amber-300/25 bg-amber-300/10 px-3 py-1 text-[0.6875rem] font-bold uppercase tracking-[0.16em] text-amber-100">Early Access</span>
-          </div>
-          <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-white lg:text-5xl">Transaction-verified reputation</h1>
-          <p className="mt-4 text-[1.0625rem] leading-relaxed text-slate-300">Create transaction-backed trust evidence from real Arc Testnet activity between registered ARC identities.</p>
-        </div>
-
-        <div className="rounded-2xl border border-cyan-300/20 bg-cyan-300/[0.08] p-5 shadow-panel transition-all duration-300 ease-out sm:p-7">
-          <div className="max-w-4xl">
-            <p className="text-[0.6875rem] font-bold uppercase tracking-[0.18em] text-cyan-100">Launch status</p>
-            <p className="mt-2.5 text-[0.875rem] leading-relaxed text-cyan-50/80">Verified Attestations currently supports transaction-backed reputation on Arc Testnet. Additional safeguards and verification workflows are actively evolving.</p>
-          </div>
-        </div>
+      <section className="fade-in grid w-full gap-7">
+        <header className="max-w-4xl">
+          <p className="kicker">Evidence ledger / transaction-backed</p>
+          <h1 className="mt-4 text-6xl tracking-tight lg:text-8xl">Verify an attestation</h1>
+          <p className="mt-4 text-lg leading-relaxed text-mutedc">Turn a real interaction into a durable trust edge.</p>
+        </header>
 
         {identityStatus !== "registered" ? (
-          <div className="grid grid-cols-1 gap-6 transition-all duration-300 ease-out md:gap-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-            <div className="arc-surface min-w-0 rounded-2xl p-6 transition-all duration-300 ease-out sm:p-8">
-              <p className="arc-section-label">{identityStatus === "checking" ? "Checking identity" : identityStatus === "failed" ? "Retry available" : "Identity required"}</p>
-              <h2 className="mt-3 text-2xl font-extrabold text-white">
+         <div className="grid grid-cols-1 gap-6 transition-all duration-300 ease-out md:gap-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
+              <div className="r4-panel min-w-0">
+               <p className="kicker">{identityStatus === "checking" ? "Checking identity" : identityStatus === "failed" ? "Retry available" : "Identity required"}</p>
+               <h2 className="mt-3 text-2xl">
                 {identityStatus === "checking"
-                  ? "Checking ARC Identity..."
+                  ? "Checking Arc Identity..."
                   : identityStatus === "failed"
-                    ? "Could not verify your ARC Identity."
+                    ? "Could not verify your Arc Identity."
                     : identityStatus === "disconnected"
                       ? "Connect your wallet to continue."
-                      : "Claim your ARC Identity before creating attestations."}
+                      : "Claim your Arc Identity before creating attestations."}
               </h2>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+               <p className="mt-3 max-w-2xl text-sm leading-6 text-mutedc">
                 {identityStatus === "checking"
-                  ? "Looking up the connected wallet directly against the ARC Identity registry."
+                  ? "Looking up the connected wallet directly against the Arc Identity registry."
                   : identityStatus === "failed"
                     ? "The registry lookup did not complete. Retry the check without leaving this page."
-                    : "Claim your ARC Identity to create verified attestations."}
+                    : "Claim your Arc Identity to create verified attestations."}
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
-                {identityStatus === "unregistered" || identityStatus === "disconnected" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim ARC Identity</a> : null}
+                {identityStatus === "unregistered" || identityStatus === "disconnected" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim Arc Identity</a> : null}
                 {identityStatus !== "checking" ? <button type="button" onClick={() => void refreshIdentity(identity.normalizedWallet)} className="arc-button-secondary px-5 py-3 text-sm font-bold">Retry check</button> : null}
               </div>
             </div>
-            <div className="grid min-w-0 gap-6 md:gap-8">
-              <div className="arc-card-hover rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 transition-all duration-300 ease-out sm:p-7">
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-slate-300">How it works</p>
-                <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-400">
-                  <p><span className="font-bold text-white">1.</span> Connect and verify your wallet.</p>
-                  <p><span className="font-bold text-white">2.</span> Claim your ARC Identity username.</p>
-                  <p><span className="font-bold text-white">3.</span> Return here to verify real Arc transactions.</p>
+             <div className="grid min-w-0 gap-6 border-t border-linec pt-6 md:gap-8">
+                  <div className="r4-panel">
+                  <p className="kicker">How it works</p>
+                 <div className="mt-4 grid gap-3 text-sm leading-6 text-mutedc">
+                   <p><span className="font-bold text-gold">1.</span> Connect and verify your wallet.</p>
+                   <p><span className="font-bold text-gold">2.</span> Claim your Arc Identity username.</p>
+                   <p><span className="font-bold text-gold">3.</span> Return here to verify real Arc transactions.</p>
                 </div>
               </div>
-              <div className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] p-6 transition-all duration-300 ease-out sm:p-7">
-                <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-100">Anti-sybil guidance</p>
-                <p className="mt-3 text-sm leading-6 text-amber-50/80">Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity, or abusive verification behavior may reduce trust confidence and trigger anomaly detection.</p>
+                <div className="r4-panel border-t-2 border-limited bg-transparent px-0 py-5">
+                  <p className="kicker text-limited">Anti-sybil guidance</p>
+                 <p className="mt-3 text-sm leading-6 text-limited">Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity or abusive verification behavior may reduce trust confidence and trigger anomaly detection.</p>
               </div>
             </div>
           </div>
         ) : (
           <>
+         <div className="stepper">
+           {stepStates.map((step, index) => {
+             const active = !step.done && (index === 0 || stepStates[index - 1].done);
+             return (
+               <div key={step.number} className={`step ${step.done ? "done" : ""} ${active ? "active" : ""}`}>
+                 <b>{step.number} · {step.title}</b>
+                 <span className={step.done || active ? "" : "text-quiet"}>{step.detail}</span>
+               </div>
+             );
+           })}
+         </div>
         <div className="grid grid-cols-1 gap-6 transition-all duration-300 ease-out md:gap-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-          <div className="arc-surface min-w-0 rounded-2xl p-5 transition-all duration-300 ease-out sm:p-7">
+           <div className="r4-panel min-w-0 p-5 sm:p-7">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-emerald-200">Verification workflow</p>
-              <p className="mt-2 text-sm leading-6 text-slate-400">Choose who you interacted with, select the interaction context, then paste the Arc transaction hash. ARC Identity verifies the transaction before adding it to reputation history.</p>
-            </div>
-            <div className="mt-5 grid gap-3 rounded-2xl border border-white/[0.06] bg-white/[0.025] p-4 sm:grid-cols-2 xl:grid-cols-4">
-              {[
-                ["1", "Select a registered ARC Identity"],
-                ["2", "Choose interaction type"],
-                ["3", "Paste Arc transaction hash"],
-                ["4", "Verify transaction-backed attestation"]
-              ].map(([step, label]) => (
-                <div key={step} className="flex items-start gap-3">
-                  <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full border border-emerald-300/25 bg-emerald-300/10 text-xs font-black text-emerald-100">{step}</span>
-                  <p className="text-sm font-bold leading-5 text-slate-200">{label}</p>
-                </div>
-              ))}
+                <p className="kicker">Steps 01–03 / interaction record</p>
+                <h2 className="mt-2 text-3xl">What happened?</h2>
             </div>
             <div className="mt-6 grid min-w-0 gap-5 md:grid-cols-2">
               <CounterpartyPicker users={users} selectedWallet={toWallet} onSelect={setToWallet} loading={usersLoading} error={usersError} onRetry={() => void load()} />
               <InteractionTypePicker value={interactionType} onChange={setInteractionType} />
-              <label className="grid min-w-0 gap-2 md:col-span-2">
-                <span className="text-sm font-medium text-slate-300">Arc transaction hash</span>
-                <input value={txHash} onChange={(event) => setTxHash(event.target.value.trim())} className="arc-input min-w-0 w-full px-4 py-3 text-white outline-none transition-all duration-300 ease-out" placeholder="0x..." />
-                <span className="text-xs leading-5 text-slate-500">{toWallet ? "Use the transaction hash from the Arc transfer involving both wallets." : "Select a counterparty first so ARC Identity knows which wallets to verify."}</span>
+               <label className="grid min-w-0 gap-2 md:col-span-2">
+                  <span className="kicker">03 / Arc transaction hash</span>
+                  <input value={txHash} onChange={(event) => setTxHash(event.target.value.trim())} className="arc-input min-w-0 w-full border-linec px-4 py-3 font-mono text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20" placeholder="0x..." />
+                 <span className="text-xs leading-5 text-mutedc">{toWallet ? "Use the transaction hash from the Arc transfer involving both wallets." : "Select a counterparty first so Arc Identity knows which wallets to verify."}</span>
               </label>
-              {!formReady && formDisabledReason ? <p className="rounded-lg border border-white/10 bg-white/[0.035] px-3 py-2 text-xs leading-5 text-slate-400 md:col-span-2">{formDisabledReason}</p> : null}
-              <button onClick={sendRequest} disabled={!formReady || submitting} className="arc-button-primary w-full px-5 py-3 font-black disabled:cursor-not-allowed disabled:opacity-50 md:col-span-2">{verifyButtonLabel}</button>
+               {!formReady && formDisabledReason ? <p className="rounded-[2px] border border-linec bg-paper-deep px-3 py-2 text-xs leading-5 text-mutedc md:col-span-2">{formDisabledReason}</p> : null}
+               <button onClick={sendRequest} disabled={!formReady || submitting} className="arc-button-primary w-full px-5 py-3 font-black disabled:cursor-not-allowed disabled:opacity-60 disabled:text-mutedc md:col-span-2">{verifyButtonLabel}</button>
             </div>
           </div>
 
-          <div className="grid min-w-0 gap-6 md:gap-8">
-            <div className="arc-card-hover rounded-2xl border border-white/[0.06] bg-white/[0.03] p-6 transition-all duration-300 ease-out sm:p-7">
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-slate-300">How it works</p>
-              <div className="mt-4 grid gap-3 text-sm leading-6 text-slate-400">
-                <p><span className="font-bold text-white">1.</span> Select a registered counterparty.</p>
-                <p><span className="font-bold text-white">2.</span> Choose the interaction type.</p>
-                <p><span className="font-bold text-white">3.</span> Paste the Arc transaction hash involving both wallets.</p>
-                <p><span className="font-bold text-white">4.</span> ARC Identity verifies the transaction before trust is created.</p>
+           <div className="grid min-w-0 gap-6 md:gap-8">
+              <div className="r4-panel p-6 sm:p-7">
+                <div className="r4-panel-head -mx-6 -mt-6"><span>Verification preview</span><span className="chip amber"><span className="dot" />In progress</span></div>
+                <div className="pt-5">
+                <p className="kicker">New trust edge</p>
+                <h2 className="mt-3 text-2xl">{identity.username ?? shortenAddress(wallet)} ↔ {selectedCounterparty?.profile.username ?? "counterparty"}</h2>
+                <p className="mt-3 text-sm leading-7 text-mutedc">Context: <b className="text-ink">{interactionType ? interactionLabel(interactionType) : "Not chosen yet"}</b><br />Status: waiting for transaction evidence<br />Expected weight: recalculated after confirmation</p>
+                </div>
+              </div>
+              <div className="verify-note">
+                Only a transaction visible on Arc can become verified evidence. We never infer a relationship from a name alone.
+              </div>
+              <div className="r4-panel p-6 sm:p-7">
+                <p className="kicker">How it works</p>
+               <div className="mt-4 grid gap-3 text-sm leading-6 text-mutedc">
+                 <p><span className="font-bold text-gold">1.</span> Select a registered counterparty.</p>
+                 <p><span className="font-bold text-gold">2.</span> Choose the interaction type.</p>
+                 <p><span className="font-bold text-gold">3.</span> Paste the Arc transaction hash involving both wallets.</p>
+                 <p><span className="font-bold text-gold">4.</span> Arc Identity verifies the transaction before trust is created.</p>
               </div>
             </div>
-            <div className="rounded-2xl border border-amber-300/20 bg-amber-300/[0.08] p-6 transition-all duration-300 ease-out sm:p-7">
-              <p className="text-sm font-bold uppercase tracking-[0.18em] text-amber-100">Anti-sybil guidance</p>
-              <p className="mt-3 text-sm leading-6 text-amber-50/80">Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity, or abusive verification behavior may reduce trust confidence and trigger anomaly detection.</p>
+              <div className="r4-panel border-limited bg-limited-bg p-6 sm:p-7">
+                <p className="kicker text-limited">Anti-sybil guidance</p>
+               <p className="mt-3 text-sm leading-6 text-limited">Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity or abusive verification behavior may reduce trust confidence and trigger anomaly detection.</p>
             </div>
           </div>
         </div>
         {message ? (
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded border border-white/10 bg-white/[0.04] p-4 text-slate-300">
+           <div className="flex flex-wrap items-center justify-between gap-3 rounded-[2px] border border-linec bg-paper-deep p-4 text-mutedc">
             <span>{message}</span>
-            {wallet ? <button type="button" onClick={() => void load()} className="rounded border border-white/10 px-3 py-2 text-xs font-bold text-white transition hover:bg-white/10">Retry</button> : null}
+             {wallet ? <button type="button" onClick={() => void load()} className="arc-button-secondary px-3 py-2 text-xs font-bold">Retry</button> : null}
           </div>
         ) : null}
-        {submitSuccess ? <div className="rounded border border-emerald-300/20 bg-emerald-300/10 p-4 text-emerald-100">{submitSuccess}</div> : null}
-        {submitError ? <div className="rounded border border-rose-300/20 bg-rose-400/10 p-4 text-rose-100">{submitError}</div> : null}
-        <section className="arc-surface rounded-2xl p-5 transition-all duration-300 ease-out sm:p-7">
+         {submitSuccess ? <div className="rounded-[2px] border border-verified bg-verified-bg p-4 text-verified">{submitSuccess}</div> : null}
+         {submitError ? <div className="rounded-[2px] border border-limited bg-limited-bg p-4 text-limited">{submitError}</div> : null}
+           <section className="r4-panel">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-sm uppercase tracking-[0.22em] text-emerald-200">Verified reputation history</p>
-              <p className="mt-2 text-sm text-slate-400">Accepted transaction-backed attestations connected to this wallet.</p>
+                <p className="kicker text-verified">Verified reputation history</p>
+               <p className="mt-2 text-sm text-mutedc">Accepted transaction-backed attestations connected to this wallet.</p>
             </div>
-            <span className="rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-bold text-slate-300">{history.length} records</span>
+             <span className="rounded-[2px] border border-linec bg-paper-deep px-3 py-2 font-mono text-xs text-mutedc">{history.length} records</span>
           </div>
           {historyLoading || !historyLoaded ? (
-            <p className="mt-3 text-slate-400">Loading verified attestations...</p>
+              <div className="mt-8 border-t border-linec pt-5"><p className="kicker">Ledger loading</p><h3 className="mt-2 text-2xl">Reading verified evidence</h3><p className="mt-2 text-sm text-mutedc">Pulling the latest transaction-backed records for this wallet.</p></div>
           ) : historyError ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-amber-300/20 bg-amber-300/10 p-4 text-amber-50/85">
               <span>{historyError}</span>
               <button type="button" onClick={() => void retryHistoryLoad()} className="rounded border border-amber-200/20 px-3 py-2 text-xs font-bold text-amber-50 transition hover:bg-amber-200/10">Retry</button>
             </div>
-          ) : history.length === 0 ? <p className="mt-3 max-w-2xl text-slate-400">No verified attestations yet. Complete your first transaction-backed attestation to start building portable trust.</p> : (
+           ) : history.length === 0 ? <div className="mt-8 border-t border-linec pt-5"><p className="kicker">Ledger is quiet</p><h3 className="mt-2 text-2xl">No verified attestations yet</h3><p className="mt-2 max-w-2xl text-sm leading-6 text-mutedc">Complete your first transaction-backed attestation to start building portable trust.</p></div> : (
             <div className="mt-4 grid gap-3">
               {(showAllHistory ? history : history.slice(0, 3)).map((item) => {
                 const from = formatIdentity(item.fromUsername, item.fromWallet);
@@ -736,52 +713,53 @@ export default function AttestationsPage() {
                 const expanded = Boolean(expandedHistory[item.id]);
                 const highlighted = Boolean(item.txHash && item.txHash.toLowerCase() === highlightedTxHash);
                 return (
-                  <div key={item.id} className={`rounded border p-3 transition ${highlighted ? "border-emerald-300/40 bg-emerald-300/[0.08] shadow-[0_0_30px_rgba(16,185,129,0.08)]" : "border-white/10 bg-white/[0.045]"}`}>
-                    <div className="grid gap-3 lg:grid-cols-[0.8fr_1.3fr_0.45fr_0.45fr_0.75fr_0.75fr] lg:items-center">
+                    <div key={item.id} className={`ledger-row !block ${highlighted ? "border-verified bg-verified-bg" : ""}`}>
+                    <div className="grid gap-3 lg:grid-cols-[0.8fr_1.3fr_0.45fr_0.45fr_0.75fr_auto] lg:items-center">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="rounded border border-cyan-300/20 bg-cyan-300/10 px-2 py-1 text-xs font-black uppercase tracking-[0.12em] text-cyan-100">{interactionLabel(item.type)}</span>
-                        <span className="rounded border border-emerald-300/20 bg-emerald-300/10 px-2 py-1 text-xs font-black uppercase tracking-[0.12em] text-emerald-100">Verified</span>
+                         <span className="rounded-[2px] border border-gold bg-gold-bg px-2 py-1 font-mono text-[0.65rem] uppercase tracking-[0.12em] text-gold">{interactionLabel(item.type)}</span>
+                         <span className="rounded-[2px] border border-verified bg-verified-bg px-2 py-1 font-mono text-[0.65rem] uppercase tracking-[0.12em] text-verified">Verified</span>
                       </div>
                       <div className="min-w-0">
                         <div className="grid gap-2 sm:grid-cols-[1fr_auto_1fr] sm:items-center">
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-white">{from.primary}</p>
-                            {item.fromUsername ? <p className="truncate text-xs text-slate-500">{from.secondary}</p> : null}
+                             <p className="truncate text-sm font-semibold text-ink">{from.primary}</p>
+                             {item.fromUsername ? <p className="truncate font-mono text-xs text-mutedc">{from.secondary}</p> : null}
                           </div>
-                          <span className="hidden text-xs font-bold uppercase tracking-[0.16em] text-slate-500 sm:block">to</span>
+                           <span className="hidden font-mono text-xs uppercase tracking-[0.16em] text-quiet sm:block">to</span>
                           <div className="min-w-0">
-                            <p className="truncate text-sm font-black text-white">{to.primary}</p>
-                            {item.toUsername ? <p className="truncate text-xs text-slate-500">{to.secondary}</p> : null}
+                             <p className="truncate text-sm font-semibold text-ink">{to.primary}</p>
+                             {item.toUsername ? <p className="truncate font-mono text-xs text-mutedc">{to.secondary}</p> : null}
                           </div>
                         </div>
                       </div>
-                      <p><span className="block text-xs text-slate-500 lg:hidden">Trust weight</span><span className="font-bold text-white">{item.weight}</span></p>
-                      <p><span className="block text-xs text-slate-500 lg:hidden">Value</span><span className="font-bold text-white">{item.txValue}</span></p>
-                      <p><span className="block text-xs text-slate-500 lg:hidden">Verified date</span><span className="font-bold text-slate-200">{formatTimestamp(item.txTimestamp ?? item.createdAt)}</span></p>
-                      <div className="flex flex-wrap items-center gap-3 text-sm">
-                        <button type="button" onClick={() => setExpandedHistory((current) => ({ ...current, [item.id]: !expanded }))} className="font-bold text-white underline decoration-white/20 underline-offset-4 transition hover:text-emerald-200">
+                       <p><span className="arc-section-label block lg:hidden">Trust weight</span><span className="font-mono text-sm font-medium text-ink">{item.weight}</span></p>
+                       <p><span className="arc-section-label block lg:hidden">Value</span><span className="font-mono text-sm font-medium text-ink">{item.txValue}</span></p>
+                       <p><span className="arc-section-label block lg:hidden">Verified date</span><span className="text-sm font-medium text-mutedc">{formatTimestamp(item.txTimestamp ?? item.createdAt)}</span></p>
+                      <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap lg:justify-end">
+                         <button type="button" onClick={() => setExpandedHistory((current) => ({ ...current, [item.id]: !expanded }))} className="inline-flex w-fit shrink-0 items-center gap-1.5 whitespace-nowrap rounded-[2px] border border-linec px-2.5 py-[5px] font-mono text-[0.625rem] font-bold uppercase tracking-[0.14em] text-ink transition-colors hover:border-gold hover:bg-gold/10">
                           {expanded ? "Hide details" : "View details"}
+                          <svg width="9" height="9" viewBox="0 0 10 10" fill="none" aria-hidden="true" className={`transition-transform ${expanded ? "rotate-180" : ""}`}><path d="M1.5 3.5L5 7L8.5 3.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="square" /></svg>
                         </button>
-                        <ExplorerLink txHash={item.txHash} />
+                        <TxLink txHash={item.txHash} />
                       </div>
                     </div>
                     {expanded ? (
-                      <div className="mt-3 grid gap-3 border-t border-white/10 pt-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
-                        <p className="min-w-0"><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">From wallet</span><span className="break-all font-bold text-slate-200">{item.fromWallet}</span></p>
-                        <p className="min-w-0"><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">To wallet</span><span className="break-all font-bold text-slate-200">{item.toWallet}</span></p>
-                        <p className="min-w-0"><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">Tx hash</span><span className="break-all font-bold text-slate-200">{item.txHash ?? "Unavailable"}</span></p>
-                        <p><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">Block number</span><span className="font-bold text-slate-200">{item.txBlockNumber ?? "Unavailable"}</span></p>
-                        <p><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">Timestamp</span><span className="font-bold text-slate-200">{formatTimestamp(item.txTimestamp ?? item.createdAt)}</span></p>
-                        <p><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">Verification status</span><span className="font-bold text-emerald-100">{item.verifiedTransaction ? "Verified transaction" : "Unverified"}</span></p>
-                        <p><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">From username</span><span className="font-bold text-slate-200">{item.fromUsername ?? "No public username"}</span></p>
-                        <p><span className="block text-xs uppercase tracking-[0.14em] text-slate-500">To username</span><span className="font-bold text-slate-200">{item.toUsername ?? "No public username"}</span></p>
+                       <div className="mt-3 grid gap-3 border-t border-linec pt-3 text-sm sm:grid-cols-2 lg:grid-cols-3">
+                         <p className="min-w-0"><span className="arc-section-label block">From wallet</span><span className="break-all font-mono text-xs text-ink">{item.fromWallet}</span></p>
+                         <p className="min-w-0"><span className="arc-section-label block">To wallet</span><span className="break-all font-mono text-xs text-ink">{item.toWallet}</span></p>
+                         <p className="min-w-0"><span className="arc-section-label block">Tx hash</span><span className="break-all font-mono text-xs text-ink">{item.txHash ?? "Unavailable"}</span></p>
+                        <p><span className="arc-section-label block">Block number</span><span className="font-mono text-xs text-ink">{item.txBlockNumber ?? "Unavailable"}</span></p>
+                        <p><span className="arc-section-label block">Timestamp</span><span className="font-mono text-xs text-ink">{formatTimestamp(item.txTimestamp ?? item.createdAt)}</span></p>
+                         <p><span className="arc-section-label block">Verification status</span><span className="font-semibold text-verified">{item.verifiedTransaction ? "Verified transaction" : "Unverified"}</span></p>
+                        <p><span className="arc-section-label block">From username</span><span className="text-sm text-ink">{item.fromUsername ?? "No public username"}</span></p>
+                        <p><span className="arc-section-label block">To username</span><span className="text-sm text-ink">{item.toUsername ?? "No public username"}</span></p>
                       </div>
                     ) : null}
                   </div>
                 );
               })}
               {history.length > 3 ? (
-                <button type="button" onClick={() => setShowAllHistory((current) => !current)} className="rounded border border-white/10 bg-white/[0.04] px-4 py-3 text-sm font-bold text-white transition hover:bg-white/[0.07]">
+                 <button type="button" onClick={() => setShowAllHistory((current) => !current)} className="arc-button-secondary px-4 py-3 text-sm">
                   {showAllHistory ? "Show less" : "Show all attestations"}
                 </button>
               ) : null}
@@ -790,11 +768,14 @@ export default function AttestationsPage() {
         </section>
           </>
         )}
-        <section className="arc-surface rounded-2xl p-5 transition-all duration-300 ease-out sm:p-7">
-          <p className="text-sm uppercase tracking-[0.22em] text-emerald-200">Upcoming verification layers</p>
-          <div className="mt-4 flex flex-wrap gap-3">
-            {["Reciprocal attestations", "Trust confidence expansion", "Merchant reputation", "Advanced anomaly detection", "Multi-party verification"].map((item) => (
-              <div key={item} className="rounded border border-white/10 bg-white/[0.04] px-3 py-2 text-sm font-bold text-slate-300 transition-all duration-300 ease-out">{item}</div>
+         <section className="r4-panel">
+            <p className="kicker text-gold">Upcoming verification layers</p>
+          <div className="mt-4 flex flex-wrap items-center gap-y-2 text-sm font-semibold text-mutedc">
+            {["Reciprocal attestations", "Trust confidence expansion", "Merchant reputation", "Advanced anomaly detection", "Multi-party verification"].map((item, index) => (
+              <span key={item} className="flex items-center">
+                {index > 0 ? <span aria-hidden className="mx-3 inline-block h-3 w-px bg-linec" /> : null}
+                {item}
+              </span>
             ))}
           </div>
         </section>

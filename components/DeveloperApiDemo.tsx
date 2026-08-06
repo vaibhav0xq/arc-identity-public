@@ -47,7 +47,7 @@ export function DeveloperApiDemo() {
   async function fetchScore() {
     const input = normalizeLookupInput(lookupValue);
     if (!input) {
-      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or ARC Identity username."));
+      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or Arc Identity username."));
       return;
     }
 
@@ -59,7 +59,7 @@ export function DeveloperApiDemo() {
         })();
 
     if (!endpoint) {
-      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or ARC Identity username."));
+      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or Arc Identity username."));
       return;
     }
 
@@ -96,29 +96,39 @@ export function DeveloperApiDemo() {
   }
 
   return (
-    <div className="arc-surface min-w-0 rounded-2xl p-5 sm:p-7">
-      <p className="arc-section-label">
-        Live API demo
-      </p>
-      <div className="mt-5 flex flex-col gap-4 sm:flex-row">
-        <input
-          value={lookupValue}
-          onChange={(event) => setLookupValue(event.target.value)}
-          className="arc-input min-w-0 flex-1 px-5 py-3.5 text-sm outline-none"
-          placeholder="Wallet address or username.arcid"
-        />
-        <button
-          onClick={fetchScore}
-          disabled={loading}
-          className="arc-button-primary px-6 py-3.5 font-extrabold"
-        >
-          {loading ? "Fetching..." : "Fetch ARC Score"}
-        </button>
+    <section className="r4-panel min-w-0" aria-labelledby="live-demo-title">
+      <div className="r4-panel-head items-end px-0">
+        <div>
+          <p className="kicker">Live request / no mock data</p>
+          <h2 id="live-demo-title" className="mt-1 font-heading text-2xl font-semibold sm:text-3xl">Query a credential record</h2>
+        </div>
+        <span className="font-mono text-[0.625rem] text-quiet">GET /score · GET /profile</span>
       </div>
-      <pre className="mt-5 min-h-52 max-w-full overflow-auto rounded-xl border border-white/[0.06] bg-[rgba(8,16,22,0.95)] p-4 font-mono text-xs leading-relaxed text-emerald-50/80 sm:p-5 sm:text-sm">
-        {JSON.stringify(result ?? { ready: "Enter a wallet or ARC Identity username and fetch ARC Score" }, null, 2)}
-      </pre>
-    </div>
+      <div className="r4-panel-body px-0 sm:px-0">
+        <div className="flex flex-col gap-3 sm:flex-row">
+          <input
+            value={lookupValue}
+            onChange={(event) => setLookupValue(event.target.value)}
+            className="arc-input min-w-0 flex-1 px-4 py-3.5 font-mono text-sm outline-none"
+            placeholder="Wallet address or username.arcid"
+          />
+          <button
+            onClick={fetchScore}
+            disabled={loading}
+            className="arc-button-primary px-6 py-3.5 font-semibold"
+          >
+            {loading ? "Fetching..." : "Fetch Identity Score"}
+          </button>
+        </div>
+        <div className="mt-4 flex items-center justify-between gap-3">
+          <span className="kicker">Raw response</span>
+          <span className={loading ? "chip amber" : "chip"}><span className="dot" />{loading ? "request active" : result ? "response received" : "ready"}</span>
+        </div>
+        <pre className="arc-code-block mt-3 min-h-52 max-w-full overflow-auto p-4 text-xs leading-relaxed text-bone sm:p-5 sm:text-sm">
+          {JSON.stringify(result ?? { ready: "Enter a wallet or Arc Identity username and fetch Identity Score" }, null, 2)}
+        </pre>
+      </div>
+    </section>
   );
 }
 

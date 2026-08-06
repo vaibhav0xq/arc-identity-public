@@ -994,7 +994,7 @@ async function requireScoreIntegritySchema() {
       code: error.code ?? null,
       message: error.message ?? String(error)
     });
-    throw new Error("ARC Score integrity migration is required before wallet intelligence can refresh");
+    throw new Error("Identity Score integrity migration is required before wallet intelligence can refresh");
   }
 }
 
@@ -1298,7 +1298,7 @@ function reasonForComponent(component: string, previous: ScoreBreakdown | null, 
 }
 
 function buildScoreRefreshReason(previous: ScoreBreakdown | null, next: ScoreBreakdown, components: string[], counts: ReturnType<typeof chainStatusCounts>, scoreDelta: number, category: string) {
-  if (isZeroSignalBreakdown(next)) return "No indexed wallet activity, Arc activity, verified attestations, or trust graph evidence was detected. Profile creation does not add reputation, so ARC Score now reflects the verified signal total.";
+  if (isZeroSignalBreakdown(next)) return "No indexed wallet activity, Arc activity, verified attestations or trust graph evidence was detected. Profile creation does not add reputation, so Identity Score now reflects the verified signal total.";
   if (components.length === 0) return category === "SCORE_RECALCULATION" ? "Score recalibration completed from current Arc-native reputation signals and supporting wallet context." : "Score recalculated from current Arc-native reputation signals and supporting wallet context.";
   const reasons = components.slice(0, 3).map((component) => reasonForComponent(component, previous, next));
   if (scoreDelta <= -10) {

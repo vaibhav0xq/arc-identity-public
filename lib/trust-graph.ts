@@ -176,7 +176,7 @@ function maturityReason(input: {
 }) {
   if (input.maturity === "suspicious_cluster") return "Trust activity shows concentrated or circular patterns that require review.";
   if (input.maturity === "isolated") return "No verified transaction-backed trust edges are available yet.";
-  return `Based on ${input.peerCount} verified peers, ${input.reciprocalCount} reciprocal relationships, and ${Math.round(input.trustConfidence)}% trust confidence.`;
+  return `Based on ${input.peerCount} verified peers, ${input.reciprocalCount} reciprocal relationships and ${Math.round(input.trustConfidence)}% trust confidence.`;
 }
 
 function severityFromScore(score: number) {

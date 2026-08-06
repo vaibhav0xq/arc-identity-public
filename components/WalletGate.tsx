@@ -15,8 +15,8 @@ type WalletGateProps = {
 export function WalletGate({
   children,
   requireClaimed = false,
-  sectionLabel = "ARC Identity",
-  title = "Connect your wallet to access ARC Identity.",
+  sectionLabel = "Arc Identity",
+  title = "Connect your wallet to access Arc Identity.",
   description = "Connect your wallet to continue."
 }: WalletGateProps) {
   const { identity, refreshIdentity } = useArcIdentity();
@@ -32,30 +32,30 @@ export function WalletGate({
   const cardTitle = checking
     ? "Checking wallet connection..."
     : unclaimed
-      ? "Claim your ARC Identity to continue."
+      ? "Claim your Arc Identity to continue."
       : error
         ? "Could not verify wallet connection."
         : title;
 
   const cardDescription = checking
-    ? "Preparing your ARC Identity session."
+    ? "Preparing your Arc Identity session."
     : unclaimed
-      ? "Claim a username to activate your public ARC Identity."
+      ? "Claim a username to activate your public Arc Identity."
       : error
         ? identity.error ?? "We could not complete this step. Retry or reconnect your wallet."
         : description;
 
   return (
-    <section className="fade-in py-10">
-      <div className="mb-10">
-        <p className="arc-section-label">ARC Identity</p>
-        <h1 className="mt-3 text-4xl font-extrabold tracking-tight text-white lg:text-5xl">{sectionLabel}</h1>
+    <section className="fade-in py-8 lg:py-12">
+      <div className="mb-8 lg:mb-10">
+        <p className="kicker">Arc Identity</p>
+        <h1 className="mt-3 text-5xl tracking-[-0.055em] text-ink lg:text-6xl">{sectionLabel}</h1>
       </div>
 
-      <div className="arc-surface rounded-2xl p-8 text-left text-slate-300 shadow-panel">
-        <p className="arc-section-label">ARC Identity setup</p>
-        <h2 className="mt-3 max-w-3xl text-2xl font-extrabold text-white sm:text-3xl">{cardTitle}</h2>
-        <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">{cardDescription}</p>
+      <div className="r4-panel max-w-3xl pt-5 text-left text-mutedc lg:pt-7">
+        <p className="kicker">Arc Identity setup</p>
+        <h2 className="mt-3 max-w-3xl text-3xl tracking-[-0.04em] text-ink sm:text-4xl">{cardTitle}</h2>
+        <p className="mt-4 max-w-2xl text-sm leading-7 text-mutedc">{cardDescription}</p>
         <div className="mt-6 flex flex-wrap items-center gap-3">
           {disconnected ? <WalletConnectButton /> : null}
           {unclaimed ? (

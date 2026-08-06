@@ -320,7 +320,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ wall
     return NextResponse.json(await scoreResponse(identity, "cached", lastIndexedAt, refreshRecommended, refreshInProgress), { headers });
   } catch (error) {
     console.warn("[arc-identity] score_api_failed", { error: error instanceof Error ? error.message : "Unable to load score" });
-    return publicApiError("Score unavailable", "Could not load ARC Score. Please retry.", 500);
+    return publicApiError("Score unavailable", "Could not load Identity Score. Please retry.", 500);
   }
 }
 

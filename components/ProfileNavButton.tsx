@@ -52,11 +52,11 @@ export function ProfileNavButton() {
         type="button"
         onClick={openProfile}
         disabled={identity.status === "checking"}
-        className="h-10 w-full whitespace-nowrap rounded-lg border border-emerald-300/25 bg-emerald-300/10 px-4 text-sm font-bold text-emerald-100 transition duration-200 hover:border-emerald-300/40 hover:bg-emerald-300/15 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70 lg:w-auto"
+        className="h-10 w-full whitespace-nowrap rounded-[2px] border border-emerald-300/25 bg-emerald-300/10 px-4 text-sm font-bold text-emerald-100 transition duration-200 hover:border-emerald-300/40 hover:bg-emerald-300/15 active:scale-[0.99] disabled:cursor-not-allowed disabled:opacity-70 lg:w-auto"
       >
         {label}
       </button>
-      {error ? <span className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-44 rounded-lg border border-rose-300/20 bg-rose-950/95 px-3 py-2 text-xs font-semibold text-rose-100 shadow-xl">{error}</span> : null}
+      {error ? <span className="absolute left-0 top-[calc(100%+0.35rem)] z-50 w-44 rounded-[2px] border border-rose-300/20 bg-rose-950/95 px-3 py-2 text-xs font-semibold text-rose-100 shadow-xl">{error}</span> : null}
     </span>
   );
 }

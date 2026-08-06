@@ -46,7 +46,7 @@ function sourceLabel(source: string | null | undefined) {
   return source.replaceAll("_", " ");
 }
 
-export function OnchainActivityCard({ onchain, arcChain, liveArc }: { onchain: WalletActivitySnapshot | null; arcChain?: ChainSnapshot | null; liveArc?: ArcFreshness | null }) {
+export function OnchainActivityCard({ onchain, arcChain, liveArc, embedded = false }: { onchain: WalletActivitySnapshot | null; arcChain?: ChainSnapshot | null; liveArc?: ArcFreshness | null; embedded?: boolean }) {
   const txCount = Math.max(onchain?.txCount ?? 0, arcChain?.txCount ?? 0);
   const counterparties = Math.max(onchain?.counterparties ?? 0, arcChain?.uniqueCounterparties ?? 0);
   const activeDays = Math.max(onchain?.activeDays ?? 0, arcChain?.activeDays ?? 0);
@@ -74,14 +74,15 @@ export function OnchainActivityCard({ onchain, arcChain, liveArc }: { onchain: W
   ];
 
   return (
-    <section className="arc-surface rounded-2xl p-5 sm:p-7">
+    // Embedded: rendered flat inside a parent surface (no box-in-box chrome).
+    <section className={embedded ? "border-t border-linec pt-6" : "r4-panel pt-6"}>
       <div className="flex flex-wrap items-start justify-between gap-5">
         <div className="min-w-0">
           <p className="arc-section-label">Arc Network Footprint</p>
-          <h2 className="mt-2.5 text-2xl font-extrabold text-white">
+          <h2 className="mt-2.5 text-2xl font-extrabold text-ink">
             {providerUnavailable ? "Some Arc data is temporarily unavailable" : confirmedNoActivity || baselineFresh ? "Fresh wallet detected" : "Arc Network intelligence"}
           </h2>
-          <p className="mt-2 max-w-2xl text-[0.8125rem] leading-relaxed text-slate-400">
+          <p className="mt-2 max-w-2xl text-[0.8125rem] leading-relaxed text-mutedc">
             {providerUnavailable
               ? "ARC Identity is keeping the latest safe wallet intelligence visible while live Arc data is unavailable."
               : confirmedNoActivity || baselineFresh
@@ -89,32 +90,32 @@ export function OnchainActivityCard({ onchain, arcChain, liveArc }: { onchain: W
                 : "Derived from Arc explorer/indexer history when available, with Arc RPC verification and recent block scan support."}
           </p>
         </div>
-        <div className="w-full rounded-xl border border-emerald-300/15 bg-emerald-300/[0.06] px-4 py-3 text-left sm:w-auto sm:text-right">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-emerald-100/70">Latest block</p>
-          <p className="mt-1 break-words text-2xl font-extrabold tabular-nums text-emerald-100">{formatNumber(latestBlock)}</p>
-          <p className="mt-1 text-[0.6875rem] font-bold uppercase tracking-[0.12em] text-emerald-100/60">{freshness}</p>
+          <div className="w-full text-left sm:w-auto sm:text-right">
+           <p className="kicker">Latest block</p>
+           <p className="mt-1 break-words text-2xl font-extrabold tabular-nums text-ink">{formatNumber(latestBlock)}</p>
+           <p className={`mt-1 font-mono text-[0.6875rem] font-bold uppercase tracking-[0.12em] ${liveArc?.providerStatus === "live" ? "text-verified" : liveArc?.providerStatus === "unavailable" ? "text-mutedc" : "text-limited"}`}>{freshness}</p>
         </div>
       </div>
       <div className="mt-4 flex flex-wrap items-center gap-2 text-[0.6875rem] font-bold uppercase tracking-[0.18em]">
         <span className="break-words text-slate-500">Source: {sourceLabel(indexerSource)}</span>
-        <span className="rounded-full border border-white/[0.08] bg-white/[0.035] px-2 py-1 text-slate-400">{freshness}</span>
-        {updatedAt ? <span className="text-slate-500">Updated {formatDateTime(updatedAt)}</span> : null}
+        <span className={`chip ${liveArc?.providerStatus === "live" ? "green" : liveArc?.providerStatus === "unavailable" ? "" : "amber"}`}><span className="dot" />{freshness}</span>
+        {updatedAt ? <span className="text-quiet">Updated {formatDateTime(updatedAt)}</span> : null}
       </div>
-      <div className="mt-5 grid gap-3.5 sm:grid-cols-3">
+      <div className="mt-5 grid gap-x-6 sm:grid-cols-2 lg:grid-cols-3">
         {metrics.map(([label, value]) => (
-          <div key={label} className="arc-metric-card min-w-0">
-            <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">{label}</p>
-            <p className="mt-2.5 break-words text-xl font-extrabold tabular-nums text-white">{value}</p>
+          <div key={label} className="flex min-w-0 flex-col border-t border-linec py-4">
+            <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-mutedc">{label}</p>
+            <p className="mt-auto break-words pt-2.5 text-xl font-extrabold tabular-nums text-ink">{value}</p>
           </div>
         ))}
-        <div className="arc-metric-card min-w-0 sm:col-span-2">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Native USDC balance</p>
-          <p className="mt-2.5 break-words text-xl font-extrabold tabular-nums text-white">{liveArc?.balanceFormatted ?? formatBalance(nativeBalance)}</p>
-          <p className="mt-1.5 text-xs font-bold text-slate-500">{freshness}</p>
+        <div className="min-w-0 border-t border-linec py-4 sm:col-span-2">
+          <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-mutedc">Native USDC balance</p>
+          <p className="mt-2.5 break-words text-xl font-extrabold tabular-nums text-ink">{liveArc?.balanceFormatted ?? formatBalance(nativeBalance)}</p>
+          <p className="mt-1.5 text-xs font-bold text-quiet">{freshness}</p>
         </div>
-        <div className="arc-metric-card min-w-0">
-          <p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Last activity</p>
-          <p className="mt-2.5 break-words text-[0.8125rem] font-bold text-white">
+        <div className="min-w-0 border-t border-linec py-4">
+          <p className="font-mono text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-mutedc">Last activity</p>
+          <p className="mt-2.5 break-words text-[0.8125rem] font-bold text-ink">
             {formatDateTime(lastActivityAt)}
           </p>
         </div>

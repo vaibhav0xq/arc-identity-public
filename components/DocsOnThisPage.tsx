@@ -55,10 +55,10 @@ export function DocsOnThisPage({ items }: { items: DocsNavItem[] }) {
   return (
     <nav
       aria-label="On this page"
-      className="rounded-2xl border border-white/[0.08] bg-white/[0.03] p-5 md:max-h-[calc(100dvh-9.5rem)] md:overflow-y-auto lg:max-h-[calc(100dvh-8.75rem)]"
+      className="r4-panel md:max-h-[calc(100dvh-9.5rem)] md:overflow-y-auto lg:max-h-[calc(100dvh-8.75rem)]"
     >
-      <p className="text-sm font-black uppercase tracking-[0.18em] text-slate-300">On this page</p>
-      <div className="mt-4 grid gap-2">
+      <p className="kicker">On this page</p>
+      <div className="mt-4 grid">
         {items.map((item) => {
           const id = item.href.slice(1);
           const active = id === activeId;
@@ -69,8 +69,8 @@ export function DocsOnThisPage({ items }: { items: DocsNavItem[] }) {
               aria-current={active ? "location" : undefined}
               onClick={(event) => handleClick(event, item.href)}
               className={active
-                ? "rounded-xl border border-amber-200/25 bg-amber-200/[0.10] px-3 py-2.5 text-sm font-black text-amber-50 shadow-[0_0_24px_rgba(212,175,55,0.08)] transition"
-                : "rounded-xl border border-white/[0.05] bg-white/[0.025] px-3 py-2.5 text-sm font-semibold text-slate-300 transition hover:border-emerald-300/20 hover:bg-emerald-300/[0.06] hover:text-white"}
+                ? "border-l-2 border-gold bg-[#eee4cd]/60 px-3 py-2.5 text-sm font-semibold text-ink transition"
+                : "border-l border-linec px-3 py-2.5 text-sm font-medium text-mutedc transition hover:border-line-dark hover:text-ink"}
             >
               {item.label}
             </a>

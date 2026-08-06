@@ -10,12 +10,13 @@ import { DecisionPanel } from "@/components/DecisionPanel";
 import { OnchainActivityCard } from "@/components/OnchainActivityCard";
 import { ScoreRing } from "@/components/ScoreRing";
 import { TrustGraphCard } from "@/components/TrustGraphCard";
+import { TxLink } from "@/components/TxLink";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import type { Attestation, ChainSnapshot, IdentityRecord, ReputationEvent, ScoreExplanations, TrustGraph, WalletActivitySnapshot } from "@/lib/types";
 import { fetchJsonWithTimeout } from "@/lib/timeouts";
 import { publicAppUrl } from "@/lib/links";
 import { maybeArcUsername, profileRouteFor } from "@/lib/username";
-import { ARC_SCORE_MODEL_VERSION } from "@/lib/score-contract";
+import { ARC_SCORE_COMPONENT_MAX, ARC_SCORE_MODEL_VERSION } from "@/lib/score-contract";
 import { shortenAddress } from "@/lib/wallet";
 import { getBadge } from "@/lib/score";
 import { deriveIntelligenceState, intelligenceStateCopy } from "@/lib/intelligence-state";
@@ -97,9 +98,14 @@ type DashboardSessionState = {
   signatureVerified: boolean;
 };
 
-type DashboardLoadTrigger = "initial" | "session" | "focus" | "visibility";
+type DashboardLoadTrigger = "initial" | "session" | "focus" | "visibility" | "indexing_poll";
 
 const PASSIVE_REFRESH_MIN_INTERVAL_MS = 60_000;
+// First-index polling: while the backend runs the very first index for a wallet,
+// the score endpoint returns an unconfirmed baseline. Instead of parking the UI in
+// a loading state forever, re-check a few times, then show the honest result.
+const INDEXING_POLL_MAX_ATTEMPTS = 5;
+const INDEXING_POLL_DELAY_MS = 6_000;
 const MAX_PROMINENT_LOCAL_CACHE_AGE_MS = 6 * 60 * 60 * 1000;
 
 type DisplayedDashboardSnapshot = {
@@ -118,10 +124,10 @@ function refreshCompletionMessage(state: ReturnType<typeof deriveIntelligenceSta
 }
 
 function dashboardStatusClass(message: string) {
-  if (/failed/i.test(message)) return "mt-4 rounded-xl border border-rose-300/15 bg-rose-400/[0.06] p-3.5 text-sm text-rose-100";
-  if (/temporarily unavailable/i.test(message)) return "mt-4 rounded-xl border border-amber-300/15 bg-amber-300/[0.07] p-3.5 text-sm text-amber-50/90";
-  if (/refreshing|loading|checking|pending|waiting|updating/i.test(message)) return "mt-4 rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] p-3.5 text-sm text-cyan-100";
-  if (/cached/i.test(message)) return "mt-4 rounded-xl border border-white/[0.06] bg-white/[0.025] p-3.5 text-sm text-slate-300";
+  if (/failed/i.test(message)) return "mt-4 rounded-[2px] border border-rose-300/15 bg-rose-400/[0.06] p-3.5 text-sm text-rose-100";
+  if (/temporarily unavailable/i.test(message)) return "mt-4 rounded-[2px] border border-amber-300/15 bg-amber-300/[0.07] p-3.5 text-sm text-amber-50/90";
+  if (/refreshing|loading|checking|pending|waiting|updating/i.test(message)) return "mt-4 rounded-[2px] border border-cyan-300/15 bg-cyan-300/[0.06] p-3.5 text-sm text-cyan-100";
+  if (/cached/i.test(message)) return "mt-4 rounded-[2px] border border-white/[0.06] bg-white/[0.025] p-3.5 text-sm text-slate-300";
   return "mt-4 text-sm text-emerald-100/80";
 }
 
@@ -298,7 +304,7 @@ function isConfirmedFreshScore(score: ScoreLookupResponse | null | undefined) {
 }
 
 function dashboardPendingMessage(hasSignature: boolean) {
-  return hasSignature ? "Checking ARC Identity..." : "Verifying wallet session...";
+  return hasSignature ? "Checking Arc Identity..." : "Verifying wallet session...";
 }
 
 function timestampMs(value?: string | null) {
@@ -370,11 +376,6 @@ function clearIdentityCaches(wallet: string, clearUsername = false) {
   console.log("[arc-identity] dashboard_cleared_stale_locked_cache", { wallet, clearUsername });
 }
 
-function TxLink({ txHash }: { txHash: string | null }) {
-  const explorer = process.env.NEXT_PUBLIC_ARC_EXPLORER_URL;
-  if (!txHash || !explorer) return null;
-  return <a href={`${explorer.replace(/\/$/, "")}/tx/${txHash}`} className="mt-2 inline-flex text-sm font-bold text-emerald-200 underline decoration-emerald-300/40 underline-offset-4">View transaction</a>;
-}
 function IdentitySummary({ identity, onCopyProfile, historyAction, refreshing = false }: { identity: IdentityRecord; onCopyProfile: () => void; historyAction: React.ReactNode; refreshing?: boolean }) {
   const globalAge = identity.multiChain?.globalWalletAgeDays ?? identity.profile.globalWalletAgeDays;
   const activeChains = identity.multiChain?.activeChains.length ?? identity.profile.activeChainCount;
@@ -384,23 +385,23 @@ function IdentitySummary({ identity, onCopyProfile, historyAction, refreshing = 
   const arcChain = identity.multiChain?.chains.find((chain) => chain.chain.toLowerCase().includes("arc")) ?? null;
 
   return (
-    <section className="arc-surface relative overflow-hidden rounded-2xl p-5 sm:p-8 lg:p-14">
+    <section className="relative overflow-hidden rounded-[2px] border border-line-dark bg-graphite p-5 text-bone shadow-plate sm:p-7 lg:p-9">
       <div className="arc-ambient pointer-events-none absolute inset-0 opacity-60" />
-      <div className="pointer-events-none absolute inset-y-0 right-0 w-1/2 bg-gradient-to-l from-emerald-300/[0.07] via-cyan-300/[0.03] to-transparent" />
-      <div className="relative grid min-w-0 gap-8 sm:gap-12 xl:grid-cols-[0.7fr_1.3fr] xl:items-center">
+      <div className="pointer-events-none absolute inset-0 opacity-20 [background-image:linear-gradient(rgba(242,238,227,.12)_1px,transparent_1px),linear-gradient(90deg,rgba(242,238,227,.12)_1px,transparent_1px)] [background-size:32px_32px]" />
+      <div className="relative grid min-w-0 gap-8 sm:gap-10 xl:grid-cols-[0.65fr_1.35fr] xl:items-center">
       <div className="flex flex-col items-center justify-center gap-6 text-center">
         <ScoreRing score={identity.score.arcScore} pulsing={refreshing} />
-        <span className={username ? "rounded-lg border border-emerald-300/20 bg-emerald-300/[0.08] px-3.5 py-2 text-[0.6875rem] font-extrabold uppercase tracking-[0.18em] text-emerald-100" : "rounded-lg border border-amber-300/20 bg-amber-300/[0.08] px-3.5 py-2 text-[0.6875rem] font-extrabold uppercase tracking-[0.18em] text-amber-100"}>{username ? "Public Identity Active" : "Username Not Claimed"}</span>
+        <span className={username ? "rounded-[2px] border border-verified/40 bg-verified-bg px-3.5 py-2 font-mono text-[0.6875rem] font-extrabold uppercase tracking-[0.18em] text-verified" : "rounded-[2px] border border-limited/40 bg-limited-bg px-3.5 py-2 font-mono text-[0.6875rem] font-extrabold uppercase tracking-[0.18em] text-limited"}>{username ? "Public Identity Active" : "Username Not Claimed"}</span>
       </div>
       <div>
         <p className="arc-section-label">Identity Summary</p>
-        <h2 className="mt-3 break-words text-2xl font-extrabold text-white sm:text-3xl">{username ?? "Claim your ARC Identity"}</h2>
-        <p className="mt-3 break-all text-slate-400 sm:break-normal">{shortenAddress(identity.profile.walletAddress)}</p>
-        <p className="mt-5 text-xl font-bold text-white">{getBadge(identity.score.arcScore)}</p>
-        <div className="mt-9 grid gap-3.5 sm:grid-cols-3">
-          <div className="arc-metric-card"><p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Risk level</p><p className="mt-2.5 font-extrabold text-white">{identity.score.riskLevel}</p></div>
-          <div className="arc-metric-card"><p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Global wallet age</p><p className="mt-2.5 font-extrabold tabular-nums text-white">{globalAge}d</p></div>
-          <div className="arc-metric-card"><p className="text-[0.6875rem] font-semibold uppercase tracking-[0.14em] text-slate-400">Indexed tx</p><p className="mt-2.5 font-extrabold tabular-nums text-white">{totalTx}</p><p className="mt-0.5 text-xs text-slate-500">{activeChains} chains</p></div>
+        <h2 className="mt-3 break-words text-2xl font-extrabold text-bone sm:text-3xl">{username ?? "Claim your Arc Identity"}</h2>
+        <p className="mt-3 break-all font-mono text-sm text-[#b6b9ae] sm:break-normal">{shortenAddress(identity.profile.walletAddress)}</p>
+        <p className="mt-5 text-xl font-bold text-gold">{getBadge(identity.score.arcScore)}</p>
+        <div className="mt-9 grid gap-x-5 sm:grid-cols-3 sm:divide-x sm:divide-[#555a52]">
+          <div className="py-2 sm:pr-5"><p className="kicker text-[#b6b9ae]">Risk level</p><p className="mt-2 font-extrabold text-bone">{identity.score.riskLevel}</p></div>
+          <div className="py-2 sm:px-5"><p className="kicker text-[#b6b9ae]">Global wallet age</p><p className="mt-2 font-extrabold tabular-nums text-bone">{globalAge}d</p></div>
+          <div className="py-2 sm:pl-5"><p className="kicker text-[#b6b9ae]">Indexed tx</p><p className="mt-2 font-extrabold tabular-nums text-bone">{totalTx}</p><p className="mt-0.5 text-xs text-[#9b9d94]">{activeChains} chains</p></div>
         </div>
         <div className="mt-9 grid gap-3 sm:flex sm:flex-wrap sm:items-center">
           {username ? (
@@ -422,36 +423,33 @@ function IdentitySummary({ identity, onCopyProfile, historyAction, refreshing = 
   );
 }
 
-function DataTransparency() {
-  return <section className="rounded-xl border border-cyan-300/15 bg-cyan-300/[0.06] p-5 text-sm leading-relaxed text-cyan-50/80 shadow-panel"><b className="text-cyan-100">Data Transparency</b><br />ARC Score is primarily based on Arc ecosystem activity, verified attestations, and trust graph strength. Global wallet maturity and chain coverage remain visible as supporting confidence signals. Chain explorer data is wallet intelligence context, not the primary reputation driver.</section>;
-}
 function ScoreBreakdownChart({ identity }: { identity: IdentityRecord }) {
   const rows = [
-    ["Chain Coverage Context", identity.score.activityScore, identity.explanations?.crossChainActivity],
-    ["Wallet Maturity", identity.score.longevityScore, identity.explanations?.globalWalletAge],
-    ["Verified Counterparties", identity.score.counterpartyDiversityScore, identity.explanations?.counterpartyDiversity],
-    ["Arc Activity", identity.score.balanceSignalScore, identity.explanations?.arcActivity],
-    ["Attestations", identity.score.attestationScore, identity.explanations?.verifiedAttestations],
-    ["Trust Propagation", identity.score.trustPropagationScore, identity.trustGraph?.explanations?.[0] ?? "No propagated trust contribution yet."],
-    ["Global Activity Context", identity.score.consistencyScore, identity.explanations?.indexedChainDepth]
+    ["Global wallet age", identity.score.longevityScore, ARC_SCORE_COMPONENT_MAX.walletAge],
+    ["Chain coverage", identity.score.activityScore, ARC_SCORE_COMPONENT_MAX.crossChain],
+    ["Indexed transactions", identity.score.consistencyScore, ARC_SCORE_COMPONENT_MAX.transactionActivity],
+    ["Counterparty diversity", identity.score.counterpartyDiversityScore, ARC_SCORE_COMPONENT_MAX.diversity],
+    ["Arc activity", identity.score.balanceSignalScore, ARC_SCORE_COMPONENT_MAX.arcActivity],
+    ["Verified attestations", identity.score.attestationScore, ARC_SCORE_COMPONENT_MAX.attestations],
+    ["Trust propagation", identity.score.trustPropagationScore, ARC_SCORE_COMPONENT_MAX.propagatedTrust]
   ] as const;
 
   return (
-    <section className="arc-surface rounded-2xl p-7">
+    <section>
       <p className="arc-section-label">Score breakdown chart</p>
-      <div className="mt-7 grid gap-3.5">
-        {rows.map(([label, value, explanation]) => (
-          <div key={label} className="arc-card-hover rounded-xl border border-white/[0.06] bg-white/[0.025] p-4 text-sm">
-            <div className="grid grid-cols-[1fr_auto] gap-3 sm:grid-cols-[9rem_1fr_3rem] sm:items-center sm:gap-4">
-              <span className="font-semibold text-slate-300">{label}</span>
-              <span className="arc-bar-track col-span-2 sm:col-span-1">
-                <span className="arc-bar-fill block" style={{ width: `${value}%` }} />
-              </span>
-              <span className="text-right font-extrabold tabular-nums text-white">{value}</span>
+      <div className="cal-grid">
+        {rows.map(([label, value, max], index) => {
+          const reading = Number.isFinite(value) ? Math.max(0, Math.min(max, Math.round(value))) : 0;
+          const barPct = Math.round((reading / max) * 100);
+          return (
+            <div key={label} className="cal-row">
+              <span className="cal-idx">{String(index + 1).padStart(2, "0")}</span>
+              <span className="cal-label">{label}</span>
+              <span className="cal-val">{String(reading).padStart(2, "0")}<small>pts</small></span>
+              <span className="cal-scale" aria-hidden="true"><i style={{ width: `${barPct}%` }} /></span>
             </div>
-            <p className="mt-2.5 text-xs leading-relaxed text-slate-500">{explanation ?? "Not enough indexed data yet."}</p>
-          </div>
-        ))}
+          );
+        })}
       </div>
     </section>
   );
@@ -503,7 +501,7 @@ function eventIconClass(event: ReputationEvent) {
   return "border-amber-200/25 bg-amber-200/10 text-amber-100 shadow-[0_0_26px_rgba(212,175,55,0.12)]";
 }
 
-const arcNativeRecalibrationReason = "ARC Score recalibrated from latest Arc ecosystem activity, verified attestations, trust graph strength, and supporting wallet intelligence context.";
+const arcNativeRecalibrationReason = "Identity Score recalibrated from latest Arc ecosystem activity, verified attestations, trust graph strength and supporting wallet intelligence context.";
 
 function normalizeHistoryReason(reason: string) {
   const lower = reason.toLowerCase();
@@ -662,7 +660,7 @@ function ReputationHistoryDrawer({ events }: { events: ReputationEvent[] }) {
             <div className="min-w-0">
               <p className="arc-section-label">REPUTATION HISTORY</p>
               <h3 className="mt-2.5 text-2xl font-extrabold text-white sm:text-3xl">Score and trust events</h3>
-              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300/85">Review ARC Score recalibrations, verified trust updates, and supporting wallet intelligence context.</p>
+              <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-300/85">Review Identity Score recalibrations, verified trust updates and supporting wallet intelligence context.</p>
             </div>
             <button
               onClick={() => setOpen(false)}
@@ -674,7 +672,7 @@ function ReputationHistoryDrawer({ events }: { events: ReputationEvent[] }) {
           </div>
         </div>
         <div className="arc-history-list">
-          {historyItems.length === 0 ? <p className="rounded-2xl border border-white/10 bg-white/[0.045] p-5 text-slate-400">No reputation history yet.</p> : (
+          {historyItems.length === 0 ? <p className="rounded-[2px] border border-white/10 bg-white/[0.045] p-5 text-slate-400">No reputation history yet.</p> : (
             <div className="grid gap-4">
               {historyItems.map((item) => {
                 if (item.kind === "group") {
@@ -772,10 +770,11 @@ export default function DashboardPage() {
   const refreshActiveWalletRef = useRef<string | null>(null);
   const displayedSnapshotRef = useRef<DisplayedDashboardSnapshot | null>(null);
   const lastPassiveRefreshAtRef = useRef<Record<string, number>>({});
+  const indexingPollRef = useRef<{ wallet: string; attempts: number; timer: number | null }>({ wallet: "", attempts: 0, timer: null });
   const [identity, setIdentity] = useState<IdentityRecord | null>(null);
   const [attestations, setAttestations] = useState<Attestation[]>([]);
   const [trustGraph, setTrustGraph] = useState<TrustGraph | null>(null);
-  const [message, setMessage] = useState("Loading ARC Identity...");
+  const [message, setMessage] = useState("Loading Arc Identity...");
   const [refreshMessage, setRefreshMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [scoreMeta, setScoreMeta] = useState<ScoreLookupResponse | null>(null);
@@ -834,6 +833,32 @@ export default function DashboardPage() {
 
   function markPassiveRefresh(wallet: string) {
     lastPassiveRefreshAtRef.current[wallet.toLowerCase()] = Date.now();
+  }
+
+  function clearIndexingPollTimer() {
+    if (indexingPollRef.current.timer !== null) {
+      window.clearTimeout(indexingPollRef.current.timer);
+      indexingPollRef.current.timer = null;
+    }
+  }
+
+  function resetIndexingPoll(wallet: string | null) {
+    clearIndexingPollTimer();
+    indexingPollRef.current = { wallet: wallet?.toLowerCase() ?? "", attempts: 0, timer: null };
+  }
+
+  function scheduleIndexingPoll(wallet: string) {
+    const normalized = wallet.toLowerCase();
+    if (indexingPollRef.current.wallet !== normalized) resetIndexingPoll(wallet);
+    clearIndexingPollTimer();
+    indexingPollRef.current.attempts += 1;
+    const attempt = indexingPollRef.current.attempts;
+    indexingPollRef.current.timer = window.setTimeout(() => {
+      indexingPollRef.current.timer = null;
+      if (!mountedRef.current || loadActiveWalletRef.current !== normalized) return;
+      console.log("[arc-identity] dashboard_indexing_poll", { wallet, attempt });
+      void load({ trigger: "indexing_poll" });
+    }, INDEXING_POLL_DELAY_MS);
   }
 
   function shouldApplyDashboardSnapshot(wallet: string, nextIdentity: IdentityRecord | null, nextScoreMeta: ScoreLookupResponse | null, source: string, cachedAt?: string | null) {
@@ -1021,19 +1046,22 @@ export default function DashboardPage() {
       loadRequestIdRef.current += 1;
       loadActiveWalletRef.current = null;
       displayedSnapshotRef.current = null;
+      resetIndexingPoll(null);
       setKnownUsername(null);
       setIdentity(null);
       setAttestations([]);
       setTrustGraph(null);
       setScoreMeta(null);
       setRefreshMessage("");
-      setMessage("Connect an EVM wallet to open your ARC Identity dashboard.");
+      setMessage("Connect an EVM wallet to open your Arc Identity dashboard.");
       setLoadState("new_wallet_no_data");
       return;
     }
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
     loadActiveWalletRef.current = wallet.toLowerCase();
+    // Any load supersedes a pending first-index poll; it is rescheduled below if still waiting.
+    clearIndexingPollTimer();
     const passiveRefresh = trigger === "focus" || trigger === "visibility" || (trigger === "session" && Boolean(identity || displayedSnapshotRef.current));
 
     const currentIdentityMatchesWallet = identity?.profile.walletAddress.toLowerCase() === wallet.toLowerCase();
@@ -1113,7 +1141,7 @@ export default function DashboardPage() {
         if (ensure?.usernameClaimed || ensuredUsername) {
           if (!ensuredUsername) {
             setLoadState("new_wallet_no_data");
-            setMessage("Complete your ARC Identity to unlock wallet intelligence.");
+            setMessage("Complete your Arc Identity to unlock wallet intelligence.");
             console.log("[arc-identity] dashboard_locked_reason", { wallet, reason: "claimed_without_username" });
             console.log("[arc-identity] dashboard_identity_locked_from_ensure", { wallet, reason: "claimed_without_username" });
             return;
@@ -1162,7 +1190,8 @@ export default function DashboardPage() {
               return;
             }
             const scoreWithResolvedUsername = score ? { ...score, username: ensuredUsername } : null;
-            if (isBaselineScore(scoreWithResolvedUsername) && !isConfirmedFreshScore(scoreWithResolvedUsername) && !hasIndexedActivity(normalizedProfile)) {
+            const waitingForFirstIndex = isBaselineScore(scoreWithResolvedUsername) && !isConfirmedFreshScore(scoreWithResolvedUsername) && !hasIndexedActivity(normalizedProfile);
+            if (waitingForFirstIndex && indexingPollRef.current.attempts < INDEXING_POLL_MAX_ATTEMPTS) {
               setIdentity(null);
               setAttestations([]);
               setTrustGraph(null);
@@ -1170,11 +1199,16 @@ export default function DashboardPage() {
               setMessage("Loading wallet intelligence...");
               if (!passiveRefresh) setRefreshMessage(scoreWithResolvedUsername?.refreshInProgress ? intelligenceStateCopy("indexing") : "Loading wallet intelligence...");
               setLoadState("loading_cached_profile");
-              console.log("[arc-identity] dashboard_score_ignored", { wallet, reason: "unconfirmed_baseline_waiting_for_indexing" });
+              scheduleIndexingPoll(wallet);
+              console.log("[arc-identity] dashboard_score_ignored", { wallet, reason: "unconfirmed_baseline_waiting_for_indexing", pollAttempt: indexingPollRef.current.attempts });
               return;
+            }
+            if (waitingForFirstIndex) {
+              console.log("[arc-identity] dashboard_indexing_poll_exhausted", { wallet, attempts: indexingPollRef.current.attempts });
             }
             const applied = applyDashboardState(wallet, normalizedProfile, normalizedProfile.attestations ?? [], normalizedProfile.trustGraph ?? trustData ?? null, scoreWithResolvedUsername);
             if (applied.stale) return;
+            resetIndexingPoll(wallet);
             setMessage("");
             const intelligenceState = deriveIntelligenceState({
               walletConnected: true,
@@ -1229,7 +1263,7 @@ export default function DashboardPage() {
           setTrustGraph(null);
           setScoreMeta(null);
           setLoadState("new_wallet_no_data");
-          setMessage("Complete your ARC Identity to unlock wallet intelligence.");
+          setMessage("Complete your Arc Identity to unlock wallet intelligence.");
           console.log("[arc-identity] dashboard_locked_reason", { wallet, reason: "unclaimed" });
           console.log("[arc-identity] dashboard_identity_locked_from_ensure", { wallet });
           return;
@@ -1417,6 +1451,7 @@ export default function DashboardPage() {
     document.addEventListener("visibilitychange", onVisibilityChange);
     return () => {
       cancelled = true;
+      clearIndexingPollTimer();
       window.removeEventListener("arc-identity-wallet-changed", onSessionChange);
       window.removeEventListener("storage", onSessionChange);
       window.removeEventListener("focus", onFocus);
@@ -1427,14 +1462,14 @@ export default function DashboardPage() {
   const sessionWallet = sessionState.wallet ?? arcIdentity.normalizedWallet;
   const sessionHasWallet = Boolean(sessionWallet);
   const sessionSignatureVerified = sessionState.signatureVerified || arcIdentity.status === "claimed";
-  const confirmedUnclaimed = sessionHasWallet && loadState === "new_wallet_no_data" && message.startsWith("Complete your ARC Identity");
+  const confirmedUnclaimed = sessionHasWallet && loadState === "new_wallet_no_data" && message.startsWith("Complete your Arc Identity");
   const shouldHoldConnectedPendingState = sessionHasWallet && !identity && !confirmedUnclaimed;
   const needsWalletConnection = !sessionHasWallet;
   const setupHeading = needsWalletConnection
-    ? "Connect your wallet to open your ARC Identity dashboard."
+    ? "Connect your wallet to open your Arc Identity dashboard."
     : shouldHoldConnectedPendingState
       ? dashboardPendingMessage(sessionSignatureVerified)
-      : message || "Complete your ARC Identity to unlock wallet intelligence.";
+      : message || "Complete your Arc Identity to unlock wallet intelligence.";
   const showSetupClaimCta = sessionHasWallet && !shouldHoldConnectedPendingState;
   const dashboardStatusMessage = refreshing
     ? "Refreshing wallet intelligence. Current data remains visible."
@@ -1450,30 +1485,71 @@ export default function DashboardPage() {
               ? `Loading wallet intelligence for ${knownUsername}.`
               : "";
 
+  function EvidenceChip({ children, tone = "green" }: { children: React.ReactNode; tone?: "green" | "amber" | "rose" }) {
+    return <span className={`chip ${tone}`}><span className="dot" />{children}</span>;
+  }
+
+  function verdictTone(score: number, risk: string) {
+    if (/high risk|anomaly/i.test(risk)) return "rose" as const;
+    if (/review|required|unproven/i.test(risk)) return "amber" as const;
+    return score > 75 ? "green" as const : "amber" as const;
+  }
+
+  function verdictLabel(score: number, risk: string) {
+    if (/protected review required/i.test(risk)) return "Review recommended";
+    return getBadge(score);
+  }
+
   return (
     <ArcShell>
-      <section className="fade-in py-10">
+      <section className="py-10">
         <div className="mb-10">
-          <p className="arc-section-label">Wallet intelligence console</p>
-          <h1 className="mt-3 text-4xl font-extrabold text-white">Dashboard</h1>
-          <div className="mt-5 flex flex-wrap items-center gap-3">
-            {sessionHasWallet ? <button onClick={refreshIntelligence} disabled={refreshing} className="arc-button-primary px-5 py-3 text-sm font-extrabold disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh intelligence"}</button> : null}
-            {scoreMeta?.lastIndexedAt ? <span className="rounded-lg border border-white/[0.07] bg-white/[0.03] px-3.5 py-2 text-xs text-slate-400">Last indexed {new Date(scoreMeta.lastIndexedAt).toLocaleString()}</span> : null}
-            {scoreMeta?.cacheStatus ? <span title="Score data is served from the latest saved wallet intelligence snapshot. Refresh can still update the timestamp and chain coverage." className="rounded-lg border border-cyan-300/15 bg-cyan-300/[0.06] px-3.5 py-2 text-xs font-bold uppercase tracking-[0.14em] text-cyan-200">{scoreMeta.cacheStatus === "cached" ? "Cached snapshot" : scoreMeta.cacheStatus.replace("_", " ")}</span> : null}
+          <p className="kicker">Overview / {identity && cleanUsername(identity.profile.username) ? "claimed identity" : "unclaimed record"}</p>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-6">
+            <div><h1 className="text-5xl font-semibold sm:text-7xl">{identity ? (cleanUsername(identity.profile.username) ?? "New wallet") : sessionWallet ? "New wallet" : "Dashboard"}</h1>
+              {identity ? <div className="mt-3 font-mono text-sm text-mutedc">{identity.profile.walletAddress}</div> : sessionWallet ? <p className="mt-3 font-mono text-sm text-mutedc">{sessionWallet} · connected just now</p> : null}</div>
+            {identity ? <div className="flex flex-wrap gap-2">
+              {cleanUsername(identity.profile.username) ? <><button onClick={copyProfileUrl} className="arc-button-secondary px-4 py-2.5 text-sm">Copy profile</button><ReputationHistoryDrawer events={identity.reputationEvents ?? []} /></> : <Link href="/create" className="arc-button-primary px-4 py-2.5 text-sm">Claim this wallet</Link>}
+              <button onClick={refreshIntelligence} disabled={refreshing} className="arc-button-primary px-4 py-2.5 text-sm disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh index"}</button>
+            </div> : needsWalletConnection ? null : <Link href="/create" className="arc-button-primary px-5 py-3 text-sm">Claim this wallet</Link>}
           </div>
           {dashboardStatusMessage ? <p className={dashboardStatusClass(dashboardStatusMessage)}>{dashboardStatusMessage}</p> : null}
         </div>
         {identity ? (
-          <div className="grid gap-10">
-            <IdentitySummary identity={identity} refreshing={refreshing} onCopyProfile={copyProfileUrl} historyAction={<ReputationHistoryDrawer events={identity.reputationEvents ?? []} />} />
-            {copiedProfile ? <p className="rounded-xl border border-emerald-300/15 bg-emerald-300/[0.06] p-3.5 text-sm text-emerald-100">Public profile URL copied.</p> : null}
-            <div className="grid gap-10 xl:grid-cols-[1.4fr_0.8fr] xl:items-start">
-              <div className="grid gap-10">
+          <div className="grid gap-8">
+            {copiedProfile ? <p className="rounded-[2px] border border-emerald-300/15 bg-emerald-300/[0.06] p-3.5 text-sm text-emerald-100">Public profile URL copied.</p> : null}
+            <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[0.9fr_1.3fr_0.9fr]">
+              <section className="credential-plate score-plate">
+                <p className="kicker" style={{ color: "#b8bdb2" }}>IDENTITY SCORE / {cleanUsername(identity.profile.username) ? "VERIFIED CREDENTIAL" : "BUILDING RECORD"}</p>
+                <div className="plate-num mt-8">{Math.round(identity.score.arcScore)}<small>/100</small></div>
+                <div className="plate-scale" aria-hidden="true"><i style={{ width: `${Math.min(Math.max(Math.round(identity.score.arcScore), 0), 100)}%` }} /></div>
+                <div className="plate-line mt-8"><EvidenceChip tone={cleanUsername(identity.profile.username) ? verdictTone(identity.score.arcScore, identity.score.riskLevel) : "amber"}>{cleanUsername(identity.profile.username) ? verdictLabel(identity.score.arcScore, identity.score.riskLevel) : "No verdict yet"}</EvidenceChip><span className="text-[#b8bdb2]">{cleanUsername(identity.profile.username) ? identity.score.riskLevel : "Record not yet built"} · confidence {trustGraph ? `${Math.round(trustGraph.metrics.trustConfidence)}%` : "pending"}</span></div>
+                <div className="plate-meta"><span>{`score model ${(identity.score.modelVersion ?? ARC_SCORE_MODEL_VERSION).replace(/^arc_score_/, "")}`}</span><span>{scoreMeta?.lastIndexedAt ? `refreshed ${new Date(scoreMeta.lastIndexedAt).toLocaleDateString()}` : "never refreshed"}</span></div>
+              </section>
+              <section className="r4-panel">
+                <div className="r4-panel-head"><span>Evidence ledger</span><span className="quiet mono">{(identity.profile.txCount ?? 0) + (identity.acceptedAttestations ?? 0)} indexed signals</span></div>
+                <div className="r4-panel-body">
+                  <div className="ledger-row"><span><b>Verified wallet</b><small>Signature and ownership confirmed</small></span><EvidenceChip>{sessionSignatureVerified ? "Verified" : "Pending"}</EvidenceChip></div>
+                  <div className="ledger-row"><span><b>Wallet age</b><small>{identity.profile.globalWalletAgeDays} days observed</small></span><EvidenceChip tone={identity.profile.globalWalletAgeDays ? "green" : "amber"}>{identity.profile.globalWalletAgeDays ? "Confirmed" : "Building"}</EvidenceChip></div>
+                  <div className="ledger-row"><span><b>Trust edges</b><small>{trustGraph?.metrics.trustedPeerCount ?? 0} verified relationships</small></span><EvidenceChip tone={trustGraph?.metrics.trustedPeerCount ? "green" : "amber"}>{trustGraph?.metrics.trustedPeerCount ? "Reciprocal" : "Pending"}</EvidenceChip></div>
+                  <div className="ledger-row"><span><b>Attestations</b><small>{identity.acceptedAttestations} transaction-backed records</small></span><EvidenceChip tone={identity.acceptedAttestations ? "green" : "amber"}>{identity.acceptedAttestations ? "Verified" : "None yet"}</EvidenceChip></div>
+                </div>
+              </section>
+              <section className="r4-panel">
+                <div className="r4-panel-head"><span>Record status</span><EvidenceChip tone={scoreMeta?.cacheStatus === "cached" ? "green" : "amber"}>{scoreMeta?.cacheStatus === "cached" ? "Current" : "Indexing"}</EvidenceChip></div>
+                <div className="r4-panel-body">
+                  {[["Verdict", verdictLabel(identity.score.arcScore, identity.score.riskLevel)], ["Risk level", identity.score.riskLevel], ["Cache status", scoreMeta?.cacheStatus === "cached" ? "Warm snapshot" : "Indexing required"], ["Last indexed", scoreMeta?.lastIndexedAt ? new Date(scoreMeta.lastIndexedAt).toLocaleString() : "Not indexed"]].map(([label, value]) => <div className="ledger-row" key={label}><span className="muted">{label}</span><span className="mono text-right">{value}</span></div>)}
+                </div>
+              </section>
+            </div>
+            <div className="grid gap-8 xl:grid-cols-[1.4fr_0.8fr] xl:items-start">
+              <div className="grid gap-8">
                 <TrustGraphCard graph={trustGraph} />
-                <section className="arc-surface rounded-2xl p-8">
+                <section className="r4-panel pt-6">
                   <p className="arc-section-label">Activity + Attestations</p>
                   <div className="mt-5">
                     <OnchainActivityCard
+                      embedded
                       onchain={identity.snapshot}
                       arcChain={identity.multiChain?.chains.find((chain) => chain.chain.toLowerCase().includes("arc")) ?? null}
                       liveArc={{
@@ -1487,27 +1563,17 @@ export default function DashboardPage() {
                       }}
                     />
                   </div>
-                  {attestations.length === 0 ? (
-                    <p className="mt-4 text-slate-400">No transaction-backed attestations yet.</p>
-                  ) : (
-                    <div className="mt-6 grid gap-3.5 md:grid-cols-2">
-                      {attestations.slice(0, 4).map((item) => (
-                        <div key={item.id} className="arc-card-hover rounded-xl border border-white/[0.07] bg-white/[0.025] p-4">
-                          <p className="font-bold text-white">{item.fromUsername ?? shortenAddress(item.fromWallet)} to {item.toUsername ?? shortenAddress(item.toWallet)}</p>
-                          <p className="mt-1.5 text-[0.8125rem] leading-relaxed text-slate-400">{item.type.replaceAll("_", " ")} - verified by transaction - value {item.txValue} - trust weight {item.weight}</p><TxLink txHash={item.txHash} />
-                        </div>
-                      ))}
-                    </div>
-                  )}
                 </section>
               </div>
-              <aside className="grid gap-10 xl:sticky xl:top-28">
-                <details className="arc-surface rounded-2xl p-7" open>
-                  <summary className="cursor-pointer arc-section-label font-extrabold">Score Intelligence</summary>
-                  <div className="mt-6 grid gap-6">
+              <aside className="grid gap-8 xl:sticky xl:top-28">
+                <details className="r4-panel" open>
+                  <summary className="intel-summary">
+                    <span>Score intelligence</span>
+                    <span className="intel-meta"><span className="quiet mono">07 signals</span><span className="intel-toggle" aria-hidden="true" /></span>
+                  </summary>
+                  <div className="grid gap-7">
                     <ScoreBreakdownChart identity={identity} />
                     <DecisionPanel score={identity.score} trustGraph={trustGraph} />
-                    <DataTransparency />
                   </div>
                 </details>
                 <ChainCoverageExplorer chains={identity.multiChain?.chains ?? []} />
@@ -1516,22 +1582,42 @@ export default function DashboardPage() {
             <ArcIntegrationCard />
           </div>
         ) : (
-          <div className="arc-surface rounded-2xl p-8 text-slate-300">
-            <p className="arc-section-label">ARC Identity setup</p>
-            <h2 className="mt-3 text-2xl font-extrabold text-white">{setupHeading}</h2>
-            <p className="mt-3 max-w-2xl text-sm leading-6 text-slate-400">
+          <div className="grid gap-8">
+            <div className="grid gap-x-12 gap-y-10 xl:grid-cols-[0.9fr_1.3fr_0.9fr]">
+              <section className="credential-plate score-plate">
+                <p className="kicker" style={{ color: "#b8bdb2" }}>IDENTITY SCORE</p>
+                <div className="plate-num mt-8">0<small>/100</small></div>
+                <div className="plate-scale" aria-hidden="true"><i style={{ width: "0%" }} /></div>
+                <div className="plate-line mt-8"><EvidenceChip tone="amber">No verdict yet</EvidenceChip><span className="text-[#b8bdb2]">Evidence required</span></div>
+                <div className="plate-meta"><span>model awaits first index</span><span>record not yet built</span></div>
+              </section>
+              <section className="r4-panel xl:col-span-2">
+                <div className="r4-panel-head"><span>Build your evidence ledger</span><span className="quiet mono">0 signals</span></div>
+                <div className="r4-panel-body">
+                  {[["Claim ownership", "Sign a message to establish this credential", "/create"], ["Index wallet history", "Scan supported chains for activity", null], ["Add an attestation", "Verify a real interaction with a counterparty", "/attestations"]].map(([label, detail, href]) => <div className="ledger-row" key={label}><span><b>{label}</b><small>{detail}</small></span>{href ? <Link href={href} className="arc-button-secondary px-3 py-2 text-xs">{label === "Claim ownership" ? "Claim" : "Start"}</Link> : <button onClick={refreshIntelligence} className="arc-button-secondary px-3 py-2 text-xs">Index</button>}</div>)}
+                </div>
+              </section>
+              <section className="r4-panel xl:col-span-3">
+                <div className="r4-panel-head"><span>What appears here</span></div>
+                <div className="r4-panel-body"><p className="max-w-3xl leading-7 text-mutedc">We assemble a readable credential from wallet age, counterparties, chain coverage and transaction-backed attestations. Nothing is scored until evidence is indexed.</p></div>
+              </section>
+            </div>
+            <section className="r4-panel pt-6 text-mutedc">
+              <p className="kicker">Arc Identity setup</p>
+              <h2 className="mt-3 font-heading text-2xl text-ink">{setupHeading}</h2>
+              <p className="mt-3 max-w-2xl text-sm leading-6">
               {loadState === "loading_cached_profile" || shouldHoldConnectedPendingState
                 ? knownUsername
-                ? "Loading your ARC Identity dashboard."
-                  : "Preparing your ARC Identity workspace."
+                ? "Loading your Arc Identity dashboard."
+                  : "Preparing your Arc Identity workspace."
                 : message.startsWith("ARC Identity created")
                 ? "Your public identity is ready. Refresh intelligence to load the latest wallet context."
                 : needsWalletConnection
-                ? "Connect your wallet to view your reputation, attestations, and wallet intelligence."
-                : "Claim a username to activate your public ARC Identity dashboard."}
-            </p>
+                ? "Connect your wallet to view your reputation, attestations and wallet intelligence."
+                : "Claim a username to activate your public Arc Identity dashboard."}
+              </p>
             {loadState === "loading_cached_profile" || shouldHoldConnectedPendingState ? <p className="mt-4 text-sm text-slate-500">{knownUsername ? "Loading wallet intelligence..." : "Checking identity..."}</p> : null}
-            <div className="mt-6 flex flex-wrap gap-3">
+              <div className="mt-6 flex flex-wrap gap-3">
               {needsWalletConnection ? (
                 <WalletConnectButton />
               ) : !showSetupClaimCta ? null : message.startsWith("ARC Identity created") && (knownUsername || scoreMeta?.username) ? (
@@ -1540,7 +1626,8 @@ export default function DashboardPage() {
                 <Link href="/create" className="inline-flex rounded bg-emerald-300 px-4 py-3 font-black text-slate-950">Claim username</Link>
               )}
               {message.startsWith("ARC Identity created") ? <button onClick={refreshIntelligence} disabled={refreshing} className="rounded border border-white/10 px-4 py-3 font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh intelligence"}</button> : null}
-            </div>
+              </div>
+            </section>
           </div>
         )}
       </section>

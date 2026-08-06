@@ -51,7 +51,7 @@ const revealSteps = [
   "Creating your ARC Identity...",
   "Verifying wallet signature...",
   "Scanning wallet footprints...",
-  "Preparing ARC Score..."
+  "Preparing Identity Score..."
 ];
 
 function readInitialRevealContext(): RevealContext {
@@ -185,7 +185,7 @@ export default function IdentityCreatedPage() {
   const chainsIndexed = indexedChainsFor(score);
   const freshWallet = txCount === 0 && chainsIndexed === 0;
   const publicProfileUrl = publicAppUrl(publicProfileHref);
-  const shareText = `I just claimed my ARC Identity: ${displayUsername}\n\nPayments are solved, trust isn't.\n\nARC Identity brings onchain reputation, wallet intelligence, and portable trust profiles to Arc users.\n\n${publicProfileUrl}\n\nBuilt by @vaibhav_0xq`;
+  const shareText = `I just claimed my ARC Identity: ${displayUsername}\n\nPayments are solved, trust isn't.\n\nARC Identity brings onchain reputation, wallet intelligence and portable trust profiles to Arc users.\n\n${publicProfileUrl}\n\nBuilt by @vaibhav_0xq`;
   const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
   const scoreLoading = state === "loading" && !score;
 
@@ -276,7 +276,7 @@ export default function IdentityCreatedPage() {
                 <div className="grid min-h-52 place-items-center">
                   {scoreLoading ? (
                     <div className="grid h-44 w-44 place-items-center rounded-full border border-emerald-300/20 bg-emerald-300/[0.055] text-center shadow-[0_0_60px_rgba(16,185,129,0.12)]">
-                      <span className="px-5 text-sm font-black leading-6 text-emerald-100">Preparing your ARC Reputation Score...</span>
+                      <span className="px-5 text-sm font-black leading-6 text-emerald-100">Preparing your Identity Score...</span>
                     </div>
                   ) : (
                     <ScoreRing score={arcScore} />
@@ -306,12 +306,12 @@ export default function IdentityCreatedPage() {
 
               <p className="mt-6 rounded-2xl border border-cyan-300/15 bg-cyan-300/[0.06] p-4 text-sm leading-6 text-cyan-50/80">
                 {scoreLoading
-                  ? "Preparing your ARC Reputation Score. Your identity is live, and wallet intelligence will appear as indexing completes."
+                  ? "Preparing your Identity Score. Your identity is live and wallet intelligence will appear as indexing completes."
                   : scoreLoadFailed
                     ? "Score will appear once wallet intelligence finishes indexing."
                     : freshWallet
                   ? "No wallet footprints found yet. ARC Intelligence will update as this wallet becomes active."
-                  : "Your ARC Score prioritizes Arc ecosystem activity, verified attestations, trusted counterparties, and trust graph strength. Global wallet history supports maturity confidence."}
+                  : "Your Identity Score prioritizes Arc ecosystem activity, verified attestations, trusted counterparties and trust graph strength. Global wallet history supports maturity confidence."}
               </p>
               {score?.refreshInProgress ? <p className="mt-3 text-xs font-semibold text-slate-500">Wallet intelligence is still indexing. You can continue using ARC Identity.</p> : null}
             </div>

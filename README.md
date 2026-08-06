@@ -1,171 +1,164 @@
+<div align="center">
+
 # Arc Identity
 
-Wallet intelligence and reputation infrastructure for apps built on Arc.
+**Wallet intelligence for the Arc economy. Trust, with a record behind it.**
 
-![License](https://img.shields.io/badge/license-MIT-f59e0b)
-![Next.js](https://img.shields.io/badge/Next.js-15-111827)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-2563eb)
+Arc Identity turns public wallet history into a verified financial credential readable by people, protocols and the systems moving value.
+
+[**arcidentity.in**](https://arcidentity.in) - [Identity model docs](https://arcidentity.in/docs) - [Developer API](https://arcidentity.in/developers)
+
+![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
+![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
 ![Arc Testnet](https://img.shields.io/badge/Arc-Testnet-d4af37)
-![Supabase](https://img.shields.io/badge/Supabase-Postgres-16a34a)
-![EVM Wallets](https://img.shields.io/badge/EVM-Wallets-8b5cf6)
-![Reputation Graph](https://img.shields.io/badge/Reputation-Graph-06b6d4)
+![Wallet Intelligence](https://img.shields.io/badge/Wallet-Intelligence-111827)
+![Reputation Graph](https://img.shields.io/badge/Reputation-Graph-2f6f5f)
+![Verified Attestations](https://img.shields.io/badge/Verified-Attestations-b8893a)
 
-Arc Identity turns wallet history, Arc activity, transaction-backed attestations, and trust graph evidence into a portable wallet reputation score.
+</div>
 
-[Live app](https://arcidentity.in)
+---
 
-Arc Identity is an independent builder project. It supports Arc Network infrastructure and is not an official Arc or Circle product.
+## What it does
 
-## Problem
+Most reputation tools rank wallets by volume. Arc Identity ranks them by evidence.
 
-Stablecoin apps still need a practical way to answer a simple question before payments, lending, escrow, or high-value interactions: does this wallet have credible history?
+The engine indexes public activity across supported networks, verifies transaction-backed attestations between wallets, maps counterparty relationships into a trust graph and compresses all of it into a deterministic Identity Score with every input disclosed. The result is a public credential page any person or protocol can inspect.
 
-Arc Identity gives wallets a public reputation surface based on indexed evidence instead of social claims or manually entered trust data.
+- **Evidence over volume.** Every point on a score traces back to indexed transactions, verified attestations or trust relationships.
+- **Deterministic scoring.** The same committed evidence always produces the same score under the same model version.
+- **Explainable by design.** Profiles expose the component breakdown, caps, penalties and data provenance behind the score.
+- **Built for the Arc economy.** Native to Arc testnet activity and designed around stablecoin settlement patterns, with multichain context from Ethereum, Base, Arbitrum, Polygon and BNB Chain.
 
-## Features
+## Product tour
 
-- EVM wallet connection and signature verification
-- Public `.arcid` identity profiles
-- Deterministic Arc Identity Score
-- Arc Testnet activity indexing
-- Multichain wallet history across supported EVM chains
-- Transaction-backed attestations
-- Trust graph relationships
-- Public identity directory
-- Developer API for wallet reputation checks
+### Landing page
 
-## Screenshots
+The public face of the credential. Start with the address. Leave with a record.
 
-### Homepage
+![Landing page](./public/screenshots/landing-page.png)
 
-![Homepage](./public/screenshots/homepage.png)
+### Landing page closing section
 
-### Dashboard
+The final product statement and public links.
 
-![Dashboard](./public/screenshots/dashboard.png)
+![Landing page closing section](./public/screenshots/landing-page-ending.png)
+
+### Identity workspace
+
+The signed-in overview. Score, evidence ledger and record status for a claimed identity, with signature-verified wallet ownership.
+
+![Identity workspace](./public/screenshots/identity-workspace.png)
+
+### Trust graph
+
+Counterparties are plotted around the wallet. Closer means stronger. Edges only exist where verified transactions exist.
+
+![Trust graph](./public/screenshots/trust-graph.png)
 
 ### Directory
 
-![Directory](./public/screenshots/directory.png)
+A searchable public registry of claimed identities, sortable by score with risk level, credential age and chain coverage at a glance.
 
-### Verified Attestations
+![Directory](./public/screenshots/directory-registry.png)
 
-![Verified Attestations](./public/screenshots/verified_attestations.png)
+### Verified attestations
 
-## Scoring Model
+Attestations are claims backed by real transactions. The verification flow checks the transaction on chain before anything is recorded.
 
-Current scoring model:
+![Verify attestation](./public/screenshots/verify-attestation.png)
+
+### Developer API
+
+Query any credential as JSON. Score, provenance, coverage and trust context ship together in one response.
+
+![Developer API](./public/screenshots/reputation-api.png)
+
+## Identity Score model
+
+The production model is versioned as `arc_score_v2_2026_07`. It is deterministic and evidence capped. A wallet with no indexed or verified evidence starts at 0. Profile creation alone is worth nothing.
+
+| Evidence category | Max points |
+| --- | --- |
+| Arc activity | 25 |
+| Global wallet age | 20 |
+| Indexed transaction activity | 15 |
+| Counterparty diversity | 15 |
+| Verified transaction attestations | 15 |
+| Active chain coverage | 5 |
+| Propagated trust | 5 |
+
+Anomaly evidence and excessive repeated-pair concentration can apply a disclosed penalty of up to 10 points.
+
+Transaction count is one bounded input, not the whole result. Two wallets with similar raw activity can rank differently when Arc footprint, counterparties, verified attestations or risk signals differ. The public profile and score API expose the exact component points behind every comparison.
+
+## Architecture
 
 ```txt
-arc_score_v2_2026_07
+app/            Pages and API routes (Next.js App Router)
+  api/          REST endpoints for score, profile, trust, attestations and onchain data
+  profile/      Public credential pages
+  dashboard/    Signed-in identity workspace
+  docs/         Identity model documentation
+components/     UI components including the trust graph and evidence panels
+lib/            Core engine
+  score.ts            Scoring pipeline
+  score-contract.ts   Versioned model contract and component caps
+  trust-graph.ts      Trust propagation and edge weighting
+  multichain.ts       Cross-chain indexing
+  onchain.ts          Live RPC readers
+  signature.ts        Wallet ownership verification
+data/           Static reference data
+scripts/        Score contract tests, audits and maintenance jobs
 ```
 
-The score is deterministic. If the committed evidence for a wallet has not changed, refreshes should not randomly move the score.
-
-The 100 available points are capped by evidence category:
-
-- Global wallet age: 20
-- Active chain coverage: 5
-- Indexed transaction activity: 15
-- Counterparty diversity: 15
-- Arc activity: 25
-- Verified transaction attestations: 15
-- Propagated trust: 5
-
-Risk and anomaly evidence can apply a disclosed penalty of up to 10 points. Profile creation has no score value, so a wallet with no indexed or verified evidence starts at 0.
-
-Transaction count is one bounded input, not the whole reputation result. Arc footprint, counterparties, verified attestations, trust graph evidence, provider coverage, and risk signals also affect the final score.
-
-## Verified Attestations
-
-Attestations are transaction-backed. A submitted transaction must be found, validated, and linked to the participating wallets before it can affect reputation or trust graph data.
-
-Attestation strength considers transaction verification, counterparty identity, relationship diversity, repeated-pair concentration, and trust graph context.
-
-## Trust Graph
-
-Accepted transaction-backed attestations create wallet-to-wallet trust edges. These edges power trusted peer counts, strongest connection, reciprocal relationship signals, network maturity labels, anomaly warnings, and propagated trust contribution.
-
-Social claims and usernames do not create trust edges by themselves.
-
-## Chain Intelligence
-
-Supported indexing targets:
-
-- Arc Testnet
-- Ethereum
-- Base
-- Arbitrum
-- Polygon
-- BNB Chain
-
-Provider availability is shown explicitly. Limited provider coverage is not treated as proof of no activity, and temporary provider failures do not erase previously committed score evidence.
+Production deployment configuration, private environment files and database operations are intentionally excluded from this public mirror.
 
 ## API
 
-```http
-GET /api/score/:wallet
+Base URL: `https://arcidentity.in`
+
+| Endpoint | Returns |
+| --- | --- |
+| `GET /api/score/:wallet` | Identity Score with component breakdown, risk level and chain intelligence |
+| `GET /api/profile/:username` | Full public credential including trust graph and attestation history |
+| `GET /api/onchain/:wallet` | Indexed transaction analytics and counterparty metrics |
+
+Example:
+
+```bash
+curl https://arcidentity.in/api/score/0xYourWalletAddress
 ```
 
-Returns wallet intelligence, score breakdown, risk level, chain coverage, evidence summaries, and trust graph context.
+Responses include the model version, cache status and last indexed timestamp so consumers can reason about freshness.
 
-```http
-GET /api/profile/:username
-```
+## Tech stack
 
-Returns a public identity profile for a claimed username.
+| Layer | Technology |
+| --- | --- |
+| Framework | Next.js 15 App Router with React and TypeScript |
+| Styling | Tailwind CSS with a custom editorial design system |
+| Wallet layer | viem for RPC reads and signature verification |
 
-```http
-GET /api/users
-```
+## Getting started
 
-Returns claimed public identities sorted by reputation data.
-
-## Project Structure
-
-```txt
-app/          Next.js app router pages and API routes
-components/   UI components and dashboard modules
-hooks/        Client-side wallet/session helpers
-lib/          Scoring, indexing, trust graph, Supabase, API contracts
-public/       Static assets and screenshots
-scripts/      Verification, audit, and maintenance scripts
-```
-
-Production database migrations and deployment operations are kept private.
-
-## Stack
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-- Supabase PostgreSQL
-- Arc Testnet RPC
-- EVM wallet signatures
-- Etherscan-compatible indexers
-- Blockscout fallback indexing
-- Vercel
-
-## Local Development
+Requires Node.js 20 or later.
 
 ```bash
 git clone https://github.com/vaibhav0xq/arc-identity-public.git
 cd arc-identity-public
 npm install
-npm run dev
 ```
 
-Create `.env.local` before running the app with real providers:
+Create `.env.local` in the project root:
 
 ```env
-NEXT_PUBLIC_APP_URL=http://localhost:3000
+NEXT_PUBLIC_APP_URL=
 NEXT_PUBLIC_ARC_RPC_URL=
 NEXT_PUBLIC_ARC_CHAIN_ID=
 NEXT_PUBLIC_ARC_EXPLORER_URL=
-NEXT_PUBLIC_SUPABASE_URL=
-NEXT_PUBLIC_SUPABASE_ANON_KEY=
-SUPABASE_SERVICE_ROLE_KEY=
+NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
 ETHERSCAN_API_KEY=
 BASESCAN_API_KEY=
 ARBISCAN_API_KEY=
@@ -173,25 +166,60 @@ POLYGONSCAN_API_KEY=
 BSCSCAN_API_KEY=
 ```
 
-## Validation
+Run the development server:
 
 ```bash
-npm run typecheck
-npm run build
+npm run dev
 ```
 
-Score contract and production audit scripts live in `scripts/`.
+The app is available at `http://localhost:3000`.
+
+## Scripts
+
+| Command | Purpose |
+| --- | --- |
+| `npm run dev` | Start the development server |
+| `npm run build` | Production build |
+| `npm run typecheck` | TypeScript checks without emitting |
+| `npm run test:score-contract` | Verify the score model against its contract |
+| `npm run test:score-api` | Integrity checks against the score API |
+
+## Roadmap
+
+**Now**
+
+- Deterministic reputation engine with disclosed caps and penalties
+- Public credential pages, directory and trust graph
+- Transaction-backed attestations with onchain verification
+- Developer API
+
+**Next**
+
+- Deeper trust propagation and reciprocal relationship weighting
+- Expanded chain coverage
+- Wallet clustering and stronger sybil resistance
+
+**Later**
+
+- Credit intelligence primitives
+- Protocol integrations, SDKs and developer tooling
 
 ## Security
 
-Do not commit secrets, private keys, production logs, database exports, or user private data.
+No legitimate Arc Identity surface will ever ask for private keys or seed phrases. Wallet ownership is proven by signature only.
 
-Security reports: `arcidentity.build@gmail.com`
+Found a vulnerability? See [SECURITY.md](./SECURITY.md) for how to report it responsibly.
 
-## License
+## Contributing
 
-MIT. See [LICENSE](./LICENSE).
+Issues and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, conventions and the review process before opening one.
+
+## Disclaimer
+
+Arc Identity is informational. It is not financial advice, not a credit bureau and it never takes custody of funds. It is an independent project built on the Arc network and is not affiliated with Circle or any network operator.
 
 ## Author
 
-Built by [Vaibhav](https://github.com/vaibhav0xq).
+Built by **Vaibhav** ([@vaibhav0xq](https://github.com/vaibhav0xq)) - [X](https://x.com/arcidentityhq) - [arcidentity.build@gmail.com](mailto:arcidentity.build@gmail.com)
+
+Web3 builder focused on wallet intelligence, trust systems and blockchain identity infrastructure.

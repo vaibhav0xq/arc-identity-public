@@ -39,16 +39,16 @@ const sample = {
     propagatedTrustScore: 7.4,
     trustConfidence: 78,
     anomalyScore: 0,
-    maturityReason: "Based on verified peers, reciprocal relationships, and trust confidence.",
+    maturityReason: "Based on verified peers, reciprocal relationships and trust confidence.",
     suspicious: false
   },
   explanations: {
     globalWalletAge: "Wallet maturity supports anti-sybil confidence from 420 indexed days.",
     crossChainActivity: "Global chain coverage provides supporting context from 3 active indexed chains.",
     counterpartyDiversity: "Verified and Arc-weighted counterparties support reputation depth.",
-    arcActivity: "Arc ecosystem activity is based on Arc transactions, Arc counterparties, and active days.",
+    arcActivity: "Arc ecosystem activity is based on Arc transactions, Arc counterparties and active days.",
     indexedChainDepth: "Chain explorer data is wallet intelligence context, not the primary reputation driver.",
-    verifiedAttestations: "Verified transaction-backed attestations are a primary ARC Score driver.",
+    verifiedAttestations: "Verified transaction-backed attestations are a primary Identity Score driver.",
     riskPenalty: "No risk penalty is currently applied."
   }
 };
@@ -57,30 +57,105 @@ export function DevelopersPageClient() {
   return (
     <WalletGate
       sectionLabel="Developer API"
-      title="Connect your wallet to view ARC Identity developer tools."
+      title="Connect your wallet to view Arc Identity developer tools."
       description="Connect your wallet to explore API examples and live credential demos."
     >
-      <section className="fade-in grid min-w-0 gap-6 py-8 lg:grid-cols-[0.9fr_1.1fr]">
-        <div className="arc-surface min-w-0 rounded p-5 sm:p-6">
-          <p className="text-sm uppercase tracking-[0.24em] text-emerald-200">Developer API</p>
-          <h1 className="mt-2 text-4xl font-black text-white">Arc-native reputation API</h1>
-          <p className="mt-4 text-lg leading-8 text-slate-300">
-            Query a wallet or username and receive a stable Arc-native reputation signal built from Arc ecosystem activity, transaction-backed attestations, verified counterparties, trust graph context, wallet signatures, and supporting global wallet intelligence.
-          </p>
-          <div className="mt-8 grid min-w-0 gap-3.5">
-            <code className="arc-card-hover block max-w-full overflow-x-auto whitespace-nowrap rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 font-mono text-xs text-emerald-100 sm:text-sm">GET /api/score/:wallet</code>
-            <code className="arc-card-hover block max-w-full overflow-x-auto whitespace-nowrap rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 font-mono text-xs text-emerald-100 sm:text-sm">GET /api/profile/:username</code>
-            <code className="arc-card-hover block max-w-full overflow-x-auto whitespace-nowrap rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 font-mono text-xs text-emerald-100 sm:text-sm">GET /api/trust/:wallet</code>
-            <code className="arc-card-hover block max-w-full overflow-x-auto whitespace-nowrap rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 font-mono text-xs text-emerald-100 sm:text-sm">GET /api/users?sort=score|activity|newest|risk</code>
-            <code className="arc-card-hover block max-w-full overflow-x-auto whitespace-nowrap rounded-xl border border-white/[0.06] bg-white/[0.03] p-4 font-mono text-xs text-emerald-100 sm:text-sm">POST /api/attestations/request JSON: fromWallet, toWallet, txHash, interactionType</code>
+      <div className="min-w-0 py-4 sm:py-6 lg:py-2">
+        <header className="border-b border-linec pb-7 pt-2 sm:pb-9">
+          <p className="kicker">Developer API / credential registry</p>
+          <div className="mt-4 flex flex-col justify-between gap-6 lg:flex-row lg:items-end">
+            <div className="max-w-4xl">
+              <h1 className="text-5xl font-semibold text-ink sm:text-6xl lg:text-[4.7rem]">
+                Arc-native reputation API
+              </h1>
+              <p className="mt-5 max-w-3xl text-base leading-7 text-mutedc sm:text-lg">
+                Query a wallet or username and receive a stable reputation signal built from Arc activity,
+                transaction-backed attestations, verified counterparties, trust graph context and wallet intelligence.
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              <span className="chip"><span className="dot" />Live registry</span>
+              <span className="chip">v2 · JSON</span>
+            </div>
           </div>
+        </header>
+
+        <div className="mt-8 min-w-0">
+          <section className="r4-panel min-w-0" aria-labelledby="endpoints-title">
+            <div className="r4-panel-head">
+              <div>
+                <p className="kicker">Surface map</p>
+                <h2 id="endpoints-title" className="mt-1 font-heading text-2xl font-semibold">Available endpoints</h2>
+              </div>
+              <span className="font-mono text-[0.65rem] text-quiet">05 routes</span>
+            </div>
+            <div className="r4-panel-body px-0 sm:px-0">
+              <div className="grid min-w-0 gap-x-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
+                {[
+                  ["GET", "/api/score/:wallet", "Identity score + evidence"],
+                  ["GET", "/api/profile/:username", "Public identity record"],
+                  ["GET", "/api/trust/:wallet", "Trust graph context"],
+                  ["GET", "/api/users?sort=score|activity|newest|risk", "Directory query"],
+                  ["POST", "/api/attestations/request", "Request a transaction-backed attestation"]
+                ].map(([method, route, description]) => (
+                  <div className="ledger-row" key={route}>
+                    <span className="min-w-0">
+                      <code className="block overflow-x-auto whitespace-nowrap font-mono text-xs text-ink">{route}</code>
+                      <small>{description}</small>
+                    </span>
+                    <span className="chip">{method}</span>
+                  </div>
+                ))}
+              </div>
+              <div className="verify-note mt-5">
+                Score responses are cache-aware. Use the returned source and indexed timestamp when presenting a credential.
+              </div>
+            </div>
+          </section>
+
+          <section className="credential-plate mt-10 min-w-0" aria-labelledby="response-title">
+            <div className="flex flex-wrap items-start justify-between gap-4">
+              <div>
+                <p className="kicker" style={{ color: "#b8bdb2" }}>Response specimen</p>
+                <h2 id="response-title" className="mt-2 font-heading text-3xl font-semibold text-bone">Credential payload</h2>
+              </div>
+              <span className="chip">200 · cached</span>
+            </div>
+            <p className="plate-line mt-5 text-sm">A complete response keeps score, provenance, coverage and trust context together.</p>
+            <pre className="mt-5 max-h-[32rem] max-w-full overflow-auto border border-line-dark bg-[#272a28] p-4 font-mono text-xs leading-relaxed text-bone sm:p-5 sm:text-sm">{JSON.stringify(sample, null, 2)}</pre>
+            <div className="plate-meta">
+              <span>application/json</span>
+              <span>read-only sample</span>
+            </div>
+          </section>
         </div>
-        <div className="arc-surface min-w-0 rounded-2xl p-5 sm:p-8">
-          <p className="mb-4 text-[0.6875rem] font-bold uppercase tracking-[0.2em] text-slate-400">Sample JSON response</p>
-          <pre className="max-w-full overflow-auto rounded-xl border border-white/[0.06] bg-[rgba(8,16,22,0.95)] p-4 font-mono text-xs leading-relaxed text-emerald-50/80 sm:p-5 sm:text-sm">{JSON.stringify(sample, null, 2)}</pre>
+
+        <div className="mt-10 min-w-0">
+          <DeveloperApiDemo />
+          <section className="r4-panel mt-10 min-w-0">
+            <div className="r4-panel-head">
+              <div>
+                <p className="kicker">Record contract</p>
+                <h2 className="mt-1 font-heading text-2xl font-semibold">What the API returns</h2>
+              </div>
+              <span className="chip">stable</span>
+            </div>
+            <div className="r4-panel-body px-0 sm:px-0">
+              {[
+                ["Identity", "Wallet, username, score and risk level"],
+                ["Coverage", "Indexed chains, transaction counts and issues"],
+                ["Trust graph", "Reciprocal peers, confidence and network health"],
+                ["Provenance", "Cache status, source and last indexed timestamp"]
+              ].map(([title, detail]) => (
+                <div className="ledger-row" key={title}>
+                  <span><b className="font-medium text-ink">{title}</b><small>{detail}</small></span>
+                  <span className="font-mono text-[0.65rem] text-quiet">JSON</span>
+                </div>
+              ))}
+            </div>
+          </section>
         </div>
-      </section>
-      <DeveloperApiDemo />
+      </div>
     </WalletGate>
   );
 }

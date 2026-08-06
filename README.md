@@ -8,6 +8,8 @@ Arc Identity turns public wallet history into a verified financial credential re
 
 [**arcidentity.in**](https://arcidentity.in) - [Identity model docs](https://arcidentity.in/docs) - [Developer API](https://arcidentity.in/developers)
 
+[Privacy](./PRIVACY.md) - [Terms](./TERMS.md) - [Security](./SECURITY.md)
+
 ![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
 ![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)

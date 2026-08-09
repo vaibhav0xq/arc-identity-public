@@ -1,6 +1,6 @@
 # Privacy Policy
 
-This Markdown copy is provided for repository transparency. The canonical version is available at https://arcidentity.in/privacy.
+This Markdown copy is provided for repository transparency. The canonical version is available at https://www.thekyro.co/privacy.
 
 Effective: August 6, 2026
 
@@ -13,11 +13,11 @@ Effective: August 6, 2026
 
 ## What we collect
 
-Arc Identity works with information that is already public on supported blockchains. This includes wallet addresses, transaction history, counterparty relationships and onchain attestations.
+Kyro works with information that is already public on supported blockchains. This includes wallet addresses, transaction history, counterparty relationships and onchain attestations.
 
 When you claim a profile we also store your chosen username, the wallet signature used to verify ownership and the score data computed for your wallet.
 
-We do not collect private keys, seed phrases, passwords or custody of any funds. We never ask for them and no legitimate Arc Identity surface will.
+We do not collect private keys, seed phrases, passwords or custody of any funds. We never ask for them and no legitimate Kyro surface will.
 
 ## How we use it
 
@@ -39,7 +39,7 @@ We use browser storage to keep your session and cached score data so the app loa
 
 ## Your choices
 
-Onchain data is public by nature and remains visible on the blockchain regardless of Arc Identity. If you want your claimed username or cached profile data removed from our systems, contact us and we will process the request.
+Onchain data is public by nature and remains visible on the blockchain regardless of Kyro. If you want your claimed username or cached profile data removed from our systems, contact us and we will process the request.
 
 ## Changes
 

@@ -18,8 +18,8 @@ const gatedRoutes = [
   { path: "/directory", forbidden: "Registered Arc identities", expected: "Checking wallet connection" },
   { path: "/developers", forbidden: "Multi-chain wallet credential API", expected: "Checking wallet connection" },
   { path: "/profile/me", forbidden: "Resolving your connected wallet", expected: "Checking wallet connection" },
-  { path: "/identity-created", forbidden: "Your ARC Identity is live", expected: "Checking wallet connection" },
-  { path: "/attestations", forbidden: "Verification Workflow", expected: "Checking ARC Identity" }
+  { path: "/identity-created", forbidden: "Your Kyro is live", expected: "Checking wallet connection" },
+  { path: "/attestations", forbidden: "Verification Workflow", expected: "Checking Kyro" }
 ];
 
 for (const route of gatedRoutes) {

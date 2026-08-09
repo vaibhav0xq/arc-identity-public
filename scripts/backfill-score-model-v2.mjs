@@ -7,7 +7,7 @@ if (!confirmed) {
   process.exit(1);
 }
 if (!/^https?:\/\//.test(baseUrl)) {
-  console.error("Set BASE_URL to the deployed ARC Identity origin.");
+  console.error("Set BASE_URL to the deployed Kyro origin.");
   process.exit(1);
 }
 

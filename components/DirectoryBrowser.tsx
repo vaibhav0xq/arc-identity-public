@@ -249,7 +249,7 @@ export function DirectoryBrowser({ users, currentSort, initialLimit = DEFAULT_DI
         {loading ? (
           <p className="shimmer p-5 font-mono text-sm text-mutedc">Loading registered identities...</p>
         ) : hasLoaded && serverUsers.length === 0 ? (
-          <p className="p-8 font-mono text-sm text-mutedc">No Arc Identity profiles registered yet.</p>
+          <p className="p-8 font-mono text-sm text-mutedc">No Kyro profiles registered yet.</p>
         ) : filteredUsers.length === 0 ? (
           <p className="p-8 font-mono text-sm text-mutedc">No matching identities found.</p>
         ) : filteredUsers.map((item) => {

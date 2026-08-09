@@ -3,18 +3,18 @@ import Link from "next/link";
 import { ARC_SUPPORT_EMAIL } from "@/lib/links";
 
 export const metadata: Metadata = {
-  title: "Terms of use · Arc Identity",
-  description: "The terms that govern use of Arc Identity."
+  title: "Terms of use · Kyro",
+  description: "The terms that govern use of Kyro."
 };
 
 const serif = { fontFamily: "var(--font-newsreader), serif" };
 
 const clauses = [
   {
-    title: "What Arc Identity is",
+    title: "What Kyro is",
     body: [
-      "Arc Identity is a wallet intelligence service. It indexes public blockchain activity, verifies transactions and presents an Identity Score, trust graph and attestation history for wallets on supported networks.",
-      "Arc Identity is informational. It is not financial advice, not a credit bureau, not a payment service and it never takes custody of funds. Decisions you make based on a score or credential are your own."
+      "Kyro is a wallet intelligence service. It indexes public blockchain activity, verifies transactions and presents an Identity Score, trust graph and attestation history for wallets on supported networks.",
+      "Kyro is informational. It is not financial advice, not a credit bureau, not a payment service and it never takes custody of funds. Decisions you make based on a score or credential are your own."
     ]
   },
   {
@@ -40,13 +40,13 @@ const clauses = [
   {
     title: "Third-party networks",
     body: [
-      "The service reads from public blockchains and third-party infrastructure we do not control. Arc Identity is an independent project built on the Arc network and is not affiliated with, endorsed by or sponsored by Circle or any network operator."
+      "The service reads from public blockchains and third-party infrastructure we do not control. Kyro is an independent project built on the Arc network and is not affiliated with, endorsed by or sponsored by Circle or any network operator."
     ]
   },
   {
     title: "Limitation of liability",
     body: [
-      "The service is provided as is, without warranties of any kind. To the maximum extent permitted by law, Arc Identity and its contributors are not liable for losses arising from use of the service, including losses tied to decisions made in reliance on scores or credentials."
+      "The service is provided as is, without warranties of any kind. To the maximum extent permitted by law, Kyro and its contributors are not liable for losses arising from use of the service, including losses tied to decisions made in reliance on scores or credentials."
     ]
   },
   {
@@ -61,7 +61,7 @@ export default function TermsPage() {
   return (
     <main className="min-h-screen w-full pb-24">
       <div className="flex items-center justify-between border-b border-[color:var(--line,#d6d1c4)] px-6 py-5 md:px-14">
-        <Link href="/" className="landing-text-link">Arc Identity <span>→</span></Link>
+        <Link href="/" className="landing-text-link">Kyro <span>→</span></Link>
         <p className="hidden font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500 md:block">Instrument · Terms of use</p>
       </div>
 
@@ -73,7 +73,7 @@ export default function TermsPage() {
           </div>
           <div className="max-w-[420px]">
             <p className="text-[0.88rem] leading-relaxed text-slate-600">
-              By using Arc Identity you agree to these terms. If you do not agree, do not use the service.
+              By using Kyro you agree to these terms. If you do not agree, do not use the service.
             </p>
             <div className="mt-5 flex items-center gap-6 border-t border-[color:var(--line,#d6d1c4)] pt-4">
               <p className="font-mono text-[0.64rem] uppercase tracking-[0.16em] text-slate-500">Effective Aug 6, 2026</p>
@@ -112,7 +112,7 @@ export default function TermsPage() {
         </section>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t-2 border-[color:var(--ink)] pt-5">
-          <p className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500">Arc Identity · Independent project · Not affiliated with Circle</p>
+          <p className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500">Kyro · Independent project · Not affiliated with Circle</p>
           <Link href="/privacy" className="landing-text-link">Privacy policy <span>→</span></Link>
         </div>
       </div>

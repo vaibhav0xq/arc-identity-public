@@ -72,7 +72,7 @@ export function ExplainableReputationCard({ wallet, arcId, initialReputation }: 
            <p className="kicker">Explainable wallet reputation</p>
            <h2 className="mt-2 font-heading text-2xl font-semibold text-ink sm:text-3xl">Reputation drivers</h2>
            <p className="mt-3 max-w-2xl text-sm leading-6 text-mutedc">
-            Key signals behind this wallet&apos;s ARC Identity reputation.
+            Key signals behind this wallet&apos;s Kyro reputation.
           </p>
           <div className="mt-4 flex flex-wrap gap-2 text-xs font-bold uppercase tracking-[0.14em]">
               <span className="chip green">{arcId ?? "Unclaimed ARC ID"}</span>

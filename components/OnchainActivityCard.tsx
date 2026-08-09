@@ -84,7 +84,7 @@ export function OnchainActivityCard({ onchain, arcChain, liveArc, embedded = fal
           </h2>
           <p className="mt-2 max-w-2xl text-[0.8125rem] leading-relaxed text-mutedc">
             {providerUnavailable
-              ? "ARC Identity is keeping the latest safe wallet intelligence visible while live Arc data is unavailable."
+              ? "Kyro is keeping the latest safe wallet intelligence visible while live Arc data is unavailable."
               : confirmedNoActivity || baselineFresh
                 ? "ARC Intelligence will update as activity appears. Empty metrics are shown as a safe initial state until indexed activity is confirmed."
                 : "Derived from Arc explorer/indexer history when available, with Arc RPC verification and recent block scan support."}

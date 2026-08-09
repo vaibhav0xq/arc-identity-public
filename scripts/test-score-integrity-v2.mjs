@@ -26,7 +26,7 @@ for (const user of users.slice(0, sampleLimit)) {
 
   const first = await getJson(`/api/score/${wallet}?refresh=false`);
   const second = await getJson(`/api/score/${wallet}?refresh=false`);
-  assert.equal(first.scoreModelVersion, "arc_score_v2_2026_07", `${wallet} is not on score V2`);
+  assert.equal(first.scoreModelVersion, "identity_score_v1", `${wallet} is not on score V2`);
   assert.equal(first.arcIdentityScore, second.arcIdentityScore, `${wallet} changed score between read-only GET requests`);
   assert.equal(first.lastIndexedAt, second.lastIndexedAt, `${wallet} changed freshness between read-only GET requests`);
 

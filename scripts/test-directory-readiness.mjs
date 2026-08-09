@@ -165,7 +165,7 @@ if (api.durationMs > idealLimitMs) {
 if (api.json.users.length > 250) fail("Directory default response should be paginated/limited", { count: api.json.users.length });
 const hiddenDefaultUsers = api.json.users
   .map(usernameFromDirectoryItem)
-  .filter((username) => hiddenDirectoryPrefixes.some((prefix) => username.replace(/\.arcid$/i, "").startsWith(prefix)));
+  .filter((username) => hiddenDirectoryPrefixes.some((prefix) => username.replace(/\.(?:kyro|arcid)$/i, "").startsWith(prefix)));
 if (hiddenDefaultUsers.length > 0) fail("Directory default response should hide generated QA usernames", { hiddenDefaultUsers });
 const firstUser = api.json.users[0];
 if (firstUser && !firstUser.profileUrl?.startsWith("/profile/")) fail("Directory users should include direct public profileUrl", firstUser);
@@ -176,13 +176,13 @@ for (const prefix of hiddenDirectoryPrefixes) {
   if (!hiddenSearch.response.ok) fail("Directory hidden-prefix search API must return successfully", { prefix, response: hiddenSearch.json ?? hiddenSearch.text });
   const leakedUsers = (hiddenSearch.json?.users ?? [])
     .map(usernameFromDirectoryItem)
-    .filter((username) => username.replace(/\.arcid$/i, "").startsWith(prefix));
+    .filter((username) => username.replace(/\.(?:kyro|arcid)$/i, "").startsWith(prefix));
   if (leakedUsers.length > 0) fail("Directory search should hide generated QA username prefixes", { prefix, leakedUsers });
 }
 
 const search = await request(`/api/users?q=${encodeURIComponent(activeUsername)}&limit=10`);
 if (!search.response.ok) fail("Directory users search API must return successfully", search.json ?? search.text);
-const expected = activeUsername.toLowerCase().endsWith(".arcid") ? activeUsername.toLowerCase() : `${activeUsername.toLowerCase()}.arcid`;
+const expected = activeUsername.toLowerCase().endsWith(".kyro") || normalized.endsWith(".arcid") ? activeUsername.toLowerCase() : `${activeUsername.toLowerCase()}.arcid`;
 let searchedUsername = expected;
 let match = (search.json?.users ?? []).find((item) => item.profile?.username?.toLowerCase() === expected);
 if (!match) {

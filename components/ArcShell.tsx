@@ -31,14 +31,14 @@ function Wordmark({ dark = false }: { dark?: boolean }) {
     <Link href="/" className="flex min-w-0 items-center gap-3 transition-opacity duration-200 hover:opacity-80">
       <Image
         src="/brand/arc-identity-icon.png"
-        alt="Arc Identity icon"
+        alt="Kyro icon"
         width={40}
         height={40}
         priority
         className={`h-8 w-8 shrink-0 rounded-full border object-contain ${dark ? "border-[#555a52]" : "border-linec"}`}
       />
       <span className={`block whitespace-nowrap text-[0.85rem] font-semibold tracking-tight ${dark ? "text-bone" : "text-ink"}`}>
-        Arc Identity
+        Kyro
       </span>
     </Link>
   );

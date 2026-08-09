@@ -127,7 +127,7 @@ export default async function PublicProfilePage({ params }: PublicProfilePagePro
         </section>
         <div className="flex flex-col justify-between gap-2 border-y border-linec py-3 font-mono text-[0.65rem] text-mutedc sm:flex-row">
           <span>Score model {identity.score.modelVersion.replace(/^arc_score_/, "")} · refreshed {new Date(identity.score.lastSyncedAt).toLocaleString()}</span>
-          <span>Issued by Arc Identity</span>
+          <span>Issued by Kyro</span>
         </div>
 
         <div className="grid min-w-0 gap-7">

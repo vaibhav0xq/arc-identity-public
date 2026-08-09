@@ -41,7 +41,7 @@ export async function GET(request: Request) {
       {
         users: [],
         error: setupRequired
-          ? "ARC Identity records are not available yet. Please retry shortly."
+          ? "Kyro records are not available yet. Please retry shortly."
           : "Could not load registered identities. Please retry.",
         message: setupRequired
           ? "Registered identities are not available yet. Please retry shortly."

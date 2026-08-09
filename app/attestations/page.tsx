@@ -95,8 +95,8 @@ function friendlyError(error: unknown, fallback: string) {
 function normalizeIdentitySearch(value: string) {
   const normalized = value.trim().toLowerCase();
   return {
-    full: normalized.endsWith(".arcid") ? normalized : `${normalized}.arcid`,
-    base: normalized.replace(/\.arcid$/i, ""),
+    full: normalized.endsWith(".kyro") || normalized.endsWith(".arcid") ? normalized : `${normalized}.kyro`,
+    base: normalized.replace(/\.(?:kyro|arcid)$/i, ""),
     raw: normalized
   };
 }
@@ -192,7 +192,7 @@ function CounterpartyPicker({
     if (!canSearch) return false;
     const wallet = item.profile.walletAddress.toLowerCase();
     const usernameFull = (item.profile.username ?? "").trim().toLowerCase();
-    const usernameBase = usernameFull.replace(/\.arcid$/i, "");
+    const usernameBase = usernameFull.replace(/\.(?:kyro|arcid)$/i, "");
     return [
       usernameFull,
       usernameBase,
@@ -262,7 +262,7 @@ function CounterpartyPicker({
             onBlur={() => setOpen(false)}
             onKeyDown={handleKeyDown}
             className="arc-input min-w-0 w-full border-linec px-4 py-3 font-mono text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20"
-            placeholder={loading ? "Loading registered identities..." : "Search username, username.arcid or wallet address"}
+            placeholder={loading ? "Loading registered identities..." : "Search username, username.kyro or wallet address"}
             aria-label="Search registered counterparty"
           />
           {/* Dropdown only appears once there is something to search — the caption
@@ -272,7 +272,7 @@ function CounterpartyPicker({
               {loading ? (
                 <p className="p-4 text-sm text-mutedc">Loading registered counterparties...</p>
               ) : filtered.length === 0 ? (
-                <p className="p-4 text-sm text-mutedc">No registered Arc Identity found.</p>
+                <p className="p-4 text-sm text-mutedc">No registered Kyro found.</p>
               ) : (
                 <>
                   {filtered.map((item, index) => {
@@ -317,7 +317,7 @@ function CounterpartyPicker({
           </div>
         </div>
       ) : null}
-       <span className="text-xs leading-5 text-mutedc">{selectedCounterparty ? "Arc Identity will verify this identity against the submitted transaction." : "Search by username, username.arcid or wallet address. Your own identity is excluded."}</span>
+       <span className="text-xs leading-5 text-mutedc">{selectedCounterparty ? "Kyro will verify this identity against the submitted transaction." : "Search by username, username.kyro or wallet address. Your own identity is excluded."}</span>
     </div>
   );
 }
@@ -375,7 +375,7 @@ export default function AttestationsPage() {
     setWallet(current);
     if (identity.status === "checking") {
       setIdentityStatus("checking");
-      setMessage("Checking Arc Identity...");
+      setMessage("Checking Kyro...");
       setUsersLoading(false);
       console.log("[arc-identity] attestations_final_decision", { requestId, state: "checking" });
       return;
@@ -391,7 +391,7 @@ export default function AttestationsPage() {
     }
     if (identity.status === "unclaimed") {
       setIdentityStatus("unregistered");
-      setMessage("Claim your Arc Identity before creating attestations.");
+      setMessage("Claim your Kyro before creating attestations.");
       setUsersLoading(false);
       setHistoryLoaded(false);
       registeredWalletRef.current = "";
@@ -405,7 +405,7 @@ export default function AttestationsPage() {
         console.log("[arc-identity] attestations_final_decision", { requestId, state: "registered", reason: "previous_success_preserved" });
       } else {
         setIdentityStatus("failed");
-        setMessage("Could not verify your Arc Identity. Retry the identity check.");
+        setMessage("Could not verify your Kyro. Retry the identity check.");
         console.log("[arc-identity] attestations_final_decision", { requestId, state: "failed" });
       }
       setUsersLoading(false);
@@ -460,7 +460,7 @@ export default function AttestationsPage() {
     const validationMessage = attestationFormError();
     if (!wallet || validationMessage) {
       setSubmitSuccess("");
-      setSubmitError(validationMessage || "Connect a verified Arc Identity wallet before submitting an attestation.");
+      setSubmitError(validationMessage || "Connect a verified Kyro wallet before submitting an attestation.");
       return;
     }
     setSubmitting(true);
@@ -556,7 +556,7 @@ export default function AttestationsPage() {
 
   function attestationFormError() {
     if (submitting) return "";
-    if (!selectedCounterparty) return "Select a registered Arc Identity counterparty.";
+    if (!selectedCounterparty) return "Select a registered Kyro counterparty.";
     if (wallet && normalizeWallet(wallet) === normalizeWallet(selectedCounterparty.profile.walletAddress)) return "You cannot submit an attestation with your own wallet as the counterparty.";
     if (!isInteractionType(interactionType)) return "Choose a supported interaction type.";
     if (!txHash.trim()) return "Paste the Arc transaction hash involving both wallets.";
@@ -589,22 +589,22 @@ export default function AttestationsPage() {
                <p className="kicker">{identityStatus === "checking" ? "Checking identity" : identityStatus === "failed" ? "Retry available" : "Identity required"}</p>
                <h2 className="mt-3 text-2xl">
                 {identityStatus === "checking"
-                  ? "Checking Arc Identity..."
+                  ? "Checking Kyro..."
                   : identityStatus === "failed"
-                    ? "Could not verify your Arc Identity."
+                    ? "Could not verify your Kyro."
                     : identityStatus === "disconnected"
                       ? "Connect your wallet to continue."
-                      : "Claim your Arc Identity before creating attestations."}
+                      : "Claim your Kyro before creating attestations."}
               </h2>
                <p className="mt-3 max-w-2xl text-sm leading-6 text-mutedc">
                 {identityStatus === "checking"
-                  ? "Looking up the connected wallet directly against the Arc Identity registry."
+                  ? "Looking up the connected wallet directly against the Kyro registry."
                   : identityStatus === "failed"
                     ? "The registry lookup did not complete. Retry the check without leaving this page."
-                    : "Claim your Arc Identity to create verified attestations."}
+                    : "Claim your Kyro to create verified attestations."}
               </p>
               <div className="mt-5 flex flex-wrap gap-3">
-                {identityStatus === "unregistered" || identityStatus === "disconnected" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim Arc Identity</a> : null}
+                {identityStatus === "unregistered" || identityStatus === "disconnected" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim Kyro</a> : null}
                 {identityStatus !== "checking" ? <button type="button" onClick={() => void refreshIdentity(identity.normalizedWallet)} className="arc-button-secondary px-5 py-3 text-sm font-bold">Retry check</button> : null}
               </div>
             </div>
@@ -613,7 +613,7 @@ export default function AttestationsPage() {
                   <p className="kicker">How it works</p>
                  <div className="mt-4 grid gap-3 text-sm leading-6 text-mutedc">
                    <p><span className="font-bold text-gold">1.</span> Connect and verify your wallet.</p>
-                   <p><span className="font-bold text-gold">2.</span> Claim your Arc Identity username.</p>
+                   <p><span className="font-bold text-gold">2.</span> Claim your Kyro username.</p>
                    <p><span className="font-bold text-gold">3.</span> Return here to verify real Arc transactions.</p>
                 </div>
               </div>
@@ -648,7 +648,7 @@ export default function AttestationsPage() {
                <label className="grid min-w-0 gap-2 md:col-span-2">
                   <span className="kicker">03 / Arc transaction hash</span>
                   <input value={txHash} onChange={(event) => setTxHash(event.target.value.trim())} className="arc-input min-w-0 w-full border-linec px-4 py-3 font-mono text-sm outline-none focus:border-gold focus:ring-2 focus:ring-gold/20" placeholder="0x..." />
-                 <span className="text-xs leading-5 text-mutedc">{toWallet ? "Use the transaction hash from the Arc transfer involving both wallets." : "Select a counterparty first so Arc Identity knows which wallets to verify."}</span>
+                 <span className="text-xs leading-5 text-mutedc">{toWallet ? "Use the transaction hash from the Arc transfer involving both wallets." : "Select a counterparty first so Kyro knows which wallets to verify."}</span>
               </label>
                {!formReady && formDisabledReason ? <p className="rounded-[2px] border border-linec bg-paper-deep px-3 py-2 text-xs leading-5 text-mutedc md:col-span-2">{formDisabledReason}</p> : null}
                <button onClick={sendRequest} disabled={!formReady || submitting} className="arc-button-primary w-full px-5 py-3 font-black disabled:cursor-not-allowed disabled:opacity-60 disabled:text-mutedc md:col-span-2">{verifyButtonLabel}</button>
@@ -673,7 +673,7 @@ export default function AttestationsPage() {
                  <p><span className="font-bold text-gold">1.</span> Select a registered counterparty.</p>
                  <p><span className="font-bold text-gold">2.</span> Choose the interaction type.</p>
                  <p><span className="font-bold text-gold">3.</span> Paste the Arc transaction hash involving both wallets.</p>
-                 <p><span className="font-bold text-gold">4.</span> Arc Identity verifies the transaction before trust is created.</p>
+                 <p><span className="font-bold text-gold">4.</span> Kyro verifies the transaction before trust is created.</p>
               </div>
             </div>
               <div className="r4-panel border-limited bg-limited-bg p-6 sm:p-7">

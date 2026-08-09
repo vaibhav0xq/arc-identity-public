@@ -63,9 +63,9 @@ export function deriveIntelligenceState(input: {
 export function intelligenceStateCopy(state: IntelligenceState) {
   switch (state) {
     case "unconnected":
-      return "Connect a wallet to open ARC Identity.";
+      return "Connect a wallet to open Kyro.";
     case "unclaimed":
-      return "Claim your ARC Identity to unlock wallet intelligence.";
+      return "Claim your Kyro to unlock wallet intelligence.";
     case "indexing":
       return "Updating wallet intelligence...";
     case "indexed":

@@ -1273,7 +1273,7 @@ function isZeroSignalBreakdown(breakdown: ScoreBreakdown) {
 }
 
 export function isGeneratedDirectoryUsername(username: string | null | undefined) {
-  const base = String(username ?? "").trim().toLowerCase().replace(/\.arcid$/i, "");
+  const base = String(username ?? "").trim().toLowerCase().replace(/\.(?:kyro|arcid)$/i, "");
   return DIRECTORY_HIDDEN_USERNAME_PREFIXES.some((prefix) => base.startsWith(prefix));
 }
 
@@ -1786,7 +1786,7 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
   const normalizedSort = normalizeDirectorySort(sort);
   const normalizedLimit = normalizeDirectoryLimit(limit);
   const normalizedSearch = search.trim().toLowerCase();
-  const searchBase = normalizedSearch.replace(/\.arcid$/i, "");
+  const searchBase = normalizedSearch.replace(/\.(?:kyro|arcid)$/i, "");
   const searchTerm = normalizedSearch.replace(/[%,]/g, "");
   const searchBaseTerm = searchBase.replace(/[%,]/g, "");
   console.log("[arc-identity] directory_fetch_started", { claimedOnly: true, sort: normalizedSort, limit: normalizedLimit, hasSearch: Boolean(normalizedSearch) });
@@ -1816,7 +1816,7 @@ export async function listUsers(sort: UserSort = DIRECTORY_DEFAULT_SORT, limit =
     if (isGeneratedDirectoryUsername(row.username)) return false;
     if (!normalizedSearch) return true;
     const username = row.username.toLowerCase();
-    const usernameBase = username.replace(/\.arcid$/i, "");
+    const usernameBase = username.replace(/\.(?:kyro|arcid)$/i, "");
     const wallet = String(row.wallet_address ?? "").toLowerCase();
     return username.includes(normalizedSearch) || username.includes(searchBase) || usernameBase.includes(searchBase) || wallet.includes(normalizedSearch);
   });
@@ -2126,7 +2126,7 @@ export async function createAttestation(fromWallet: string, toWallet: string, tx
     .eq("tx_hash", verifiedTx.txHash)
     .limit(1);
   if (duplicateError) throwPersistenceError("checking_duplicate_attestation", "attestations", { txHash: verifiedTx.txHash }, duplicateError);
-  if ((duplicate ?? []).length > 0) throw new Error("Duplicate attestation: this transaction has already been used for ARC Identity reputation");
+  if ((duplicate ?? []).length > 0) throw new Error("Duplicate attestation: this transaction has already been used for Kyro reputation");
 
   const since = new Date(Date.now() - rateLimitMs).toISOString();
   const { data: recent, error: recentError } = await supabase

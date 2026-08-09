@@ -29,12 +29,12 @@ export async function GET(_request: Request, { params }: { params: Promise<{ wal
 
     const profileRow = rows?.[0] ?? null;
     if (!profileRow?.username) {
-      return publicApiError("Profile not found", "No claimed ARC Identity profile was found for this wallet.", 404, { walletAddress: wallet, usernameClaimed: false });
+      return publicApiError("Profile not found", "No claimed Kyro profile was found for this wallet.", 404, { walletAddress: wallet, usernameClaimed: false });
     }
 
     const identity = await getIdentityByWallet(profileRow.wallet_address, false);
     if (!identity?.profile.username) {
-      return publicApiError("Profile not found", "No claimed ARC Identity profile was found for this wallet.", 404, { walletAddress: wallet, usernameClaimed: false });
+      return publicApiError("Profile not found", "No claimed Kyro profile was found for this wallet.", 404, { walletAddress: wallet, usernameClaimed: false });
     }
 
     const trustGraph = await withTimeout(getTrustGraph(identity.profile.walletAddress), 900, "profile trust graph summary").catch(() => null);

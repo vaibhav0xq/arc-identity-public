@@ -2,7 +2,7 @@ export function normalizeUsernameInput(input?: string | null) {
   return (input ?? "")
     .trim()
     .toLowerCase()
-    .replace(/\.arcid$/i, "");
+    .replace(/\.(?:kyro|arcid)$/i, "");
 }
 
 export function toArcUsername(input?: string | null) {
@@ -11,7 +11,7 @@ export function toArcUsername(input?: string | null) {
   if (!/^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9]$/.test(base)) {
     throw new Error("Use 3-30 lowercase letters, numbers, underscores or hyphens");
   }
-  return `${base}.arcid`;
+  return `${base}.kyro`;
 }
 
 export function maybeArcUsername(input?: string | null) {

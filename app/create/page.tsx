@@ -312,7 +312,7 @@ export default function CreateProfilePage() {
 
     setLoading(true);
     setError("");
-    setSuccess("Creating your ARC Identity...");
+    setSuccess("Creating your Kyro...");
     console.log("[arc-identity] username_claim_started", { wallet, username: usernameValue });
 
     try {
@@ -327,7 +327,7 @@ export default function CreateProfilePage() {
       const claimedWallet = cleanText(data.wallet_address ?? data.profile?.walletAddress ?? data.profile?.wallet_address);
       const verifiedWallet = Boolean(data.verified_wallet ?? data.profile?.verifiedWallet ?? data.profile?.verified_wallet);
       if (!data.success || !claimedUsername || !claimedWallet || !verifiedWallet || !data.usernameClaimed) {
-        throw new Error("ARC Identity did not return a completed profile. Please retry claim.");
+        throw new Error("Kyro did not return a completed profile. Please retry claim.");
       }
 
       localStorage.setItem("arcIdentityWallet", claimedWallet);
@@ -391,7 +391,7 @@ export default function CreateProfilePage() {
       <section className="mx-auto grid w-full max-w-4xl flex-1 content-start py-6 sm:content-center sm:py-14">
         <div className="rounded border border-white/10 bg-slate-950/70 p-5 shadow-panel sm:p-8">
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-200">Create profile</p>
-          <h1 className="mt-3 text-4xl font-black text-white">{existingUsername ? "Identity already claimed" : claimFormReady() ? "Create your ARC Identity" : "Claim your ARC Identity"}</h1>
+          <h1 className="mt-3 text-4xl font-black text-white">{existingUsername ? "Identity already claimed" : claimFormReady() ? "Create your Kyro" : "Claim your Kyro"}</h1>
           <form onSubmit={createProfile} className="mt-6 grid gap-4 sm:mt-8 sm:gap-5">
             <div className="rounded border border-emerald-300/30 bg-emerald-300/10 px-4 py-4 text-left">
               <span className="block font-bold text-emerald-100">Wallet identity</span>
@@ -405,7 +405,7 @@ export default function CreateProfilePage() {
             </div>
             {confirmedClaimed() || likelyClaimed() ? (
               <div className="rounded border border-emerald-300/20 bg-emerald-300/10 p-5">
-                <p className="text-sm text-emerald-100/70">{identityState === "claimed" ? "This wallet already has a public ARC Identity." : "Local profile state indicates this identity is already claimed. Verification can be retried."}</p>
+                <p className="text-sm text-emerald-100/70">{identityState === "claimed" ? "This wallet already has a public Kyro." : "Local profile state indicates this identity is already claimed. Verification can be retried."}</p>
                 <p className="mt-2 text-2xl font-black text-white">{existingUsername}</p>
                 <div className="mt-4 flex flex-wrap gap-3">
                     <button type="button" onClick={() => router.push("/dashboard")} className="rounded bg-emerald-300 px-4 py-3 font-black text-slate-950 transition hover:bg-emerald-200">View Dashboard</button>
@@ -415,7 +415,7 @@ export default function CreateProfilePage() {
               </div>
             ) : checkingProfile || identityState === "checking" ? (
               <div className="rounded border border-cyan-300/20 bg-cyan-300/[0.08] p-5">
-                <p className="text-sm font-bold text-cyan-100">Checking ARC Identity profile...</p>
+                <p className="text-sm font-bold text-cyan-100">Checking Kyro profile...</p>
                 <p className="mt-2 text-sm leading-6 text-slate-400">We are confirming whether this wallet already has a username before opening the claim form.</p>
               </div>
             ) : claimFormReady() ? (
@@ -459,7 +459,7 @@ export default function CreateProfilePage() {
                       </p>
                     ) : null}
                     {usernameValidation.valid && availability === "error" ? <p className="text-mutedc">Availability check unavailable. You can still try claiming.</p> : null}
-                    {checkingProfile ? <p className="text-slate-500">New wallet? Claim a username to complete your ARC Identity.</p> : null}
+                    {checkingProfile ? <p className="text-slate-500">New wallet? Claim a username to complete your Kyro.</p> : null}
                   </div>
                 </label>
               </div>

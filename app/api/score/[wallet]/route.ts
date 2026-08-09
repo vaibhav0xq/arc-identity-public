@@ -332,10 +332,10 @@ export async function POST(_request: Request, { params }: { params: Promise<{ wa
       return publicApiError("Invalid wallet", "Provide a valid EVM wallet address.", 400, { walletAddress: wallet });
     }
     const existing = await getIdentityByWallet(wallet, false);
-    if (!existing?.profile.username) return publicApiError("Profile required", "Claim an ARC Identity before refreshing wallet intelligence.", 403, { walletAddress: wallet });
+    if (!existing?.profile.username) return publicApiError("Profile required", "Claim an Kyro before refreshing wallet intelligence.", 403, { walletAddress: wallet });
     await runWalletRefresh(wallet);
     const identity = await getIdentityByWallet(wallet, false);
-    if (!identity) return publicApiError("Profile not found", "No claimed ARC Identity profile was found for this wallet.", 404, { walletAddress: wallet });
+    if (!identity) return publicApiError("Profile not found", "No claimed Kyro profile was found for this wallet.", 404, { walletAddress: wallet });
     const lastIndexedAt = latestIndexedAt(identity as IdentityRecord);
     return NextResponse.json(await scoreResponse(identity as IdentityRecord, "cached", lastIndexedAt, false, false), { headers: publicNoStoreHeaders });
   } catch (error) {

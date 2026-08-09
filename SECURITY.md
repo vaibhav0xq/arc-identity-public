@@ -1,6 +1,6 @@
 # Security Policy
 
-Arc Identity handles public blockchain data and signature based wallet verification. It never holds funds, private keys or seed phrases. Even so, security reports are taken seriously and handled with priority.
+Kyro handles public blockchain data and signature based wallet verification. It never holds funds, private keys or seed phrases. Even so, security reports are taken seriously and handled with priority.
 
 ## Reporting a vulnerability
 
@@ -15,7 +15,7 @@ You can expect an acknowledgement within 72 hours and a status update once the r
 
 ## Scope
 
-Reports are welcome for anything in this repository and the deployment at arcidentity.in, including:
+Reports are welcome for anything in this repository and the deployment at www.thekyro.co, including:
 
 - Score manipulation or attestation forgery
 - Signature verification bypass
@@ -38,6 +38,6 @@ Out of scope:
 
 ## Hard rules for users
 
-- No legitimate Arc Identity surface will ever ask for a private key or seed phrase.
+- No legitimate Kyro surface will ever ask for a private key or seed phrase.
 - Wallet ownership is proven by message signature only. Signing a verification message costs nothing and moves no funds.
-- If any page or message claiming to be Arc Identity asks for keys, treat it as a phishing attempt and report it.
+- If any page or message claiming to be Kyro asks for keys, treat it as a phishing attempt and report it.

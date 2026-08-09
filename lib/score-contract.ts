@@ -1,6 +1,6 @@
 import type { IdentityRecord, MultiChainWalletProfile, WalletActivitySnapshot } from "@/lib/types";
 
-export const ARC_SCORE_MODEL_VERSION = "arc_score_v2_2026_07";
+export const ARC_SCORE_MODEL_VERSION = "identity_score_v1";
 
 export type ScoreComponentKey =
   | "walletAge"

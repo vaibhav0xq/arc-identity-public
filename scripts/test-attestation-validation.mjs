@@ -21,10 +21,10 @@ function appearsBefore(source, first, second) {
 }
 
 expect(files.page.includes("looksLikeTxHash") && files.page.includes("^0x[a-fA-F0-9]{64}$"), "client should validate EVM transaction hash format");
-expect(files.page.includes("selectedCounterparty") && files.page.includes("Select a registered ARC Identity counterparty."), "client should require a selected registered counterparty");
-expect(files.page.includes("{!selectedCounterparty ? (") && files.page.includes("Search username, username.arcid, or wallet address"), "counterparty search input should render before selection");
+expect(files.page.includes("selectedCounterparty") && files.page.includes("Select a registered Kyro counterparty."), "client should require a selected registered counterparty");
+expect(files.page.includes("{!selectedCounterparty ? (") && files.page.includes("Search username, username.kyro, or wallet address"), "counterparty search input should render before selection");
 expect(files.page.includes("{!selectedCounterparty && open ? ("), "counterparty search results should hide after a counterparty is selected");
-expect(files.page.includes("Selected identity") && files.page.includes("ARC Identity will verify this identity against the submitted transaction."), "selected counterparty state should render an intentional selected identity card");
+expect(files.page.includes("Selected identity") && files.page.includes("Kyro will verify this identity against the submitted transaction."), "selected counterparty state should render an intentional selected identity card");
 expect(files.page.includes("onSelect(\"\")") && files.page.includes("setSearchQuery(\"\")") && files.page.includes("inputRef.current?.focus()"), "Change should clear stale counterparty/search state and restore search focus");
 expect(files.page.includes("You cannot submit an attestation with your own wallet as the counterparty."), "client should block self-attestation");
 expect(files.page.includes("isInteractionType(interactionType)"), "client should require a supported interaction type");

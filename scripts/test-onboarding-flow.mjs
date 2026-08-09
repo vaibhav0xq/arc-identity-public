@@ -24,7 +24,7 @@ async function assertCreateRedirectContract() {
     assert(navSource.includes("profile_nav_final_url"), "ProfileNavButton should emit final URL debug logs");
     assert(!navSource.includes("<Link href={href}"), "ProfileNavButton should not navigate through a stale href");
     assert(navSource.includes("identity.profileUrl || \"/profile/me\""), "ProfileNavButton should use canonical profile URL with /profile/me fallback");
-    assert(resolverSource.includes("Opening your ARC Identity"), "wallet profile resolver should show opening state");
+    assert(resolverSource.includes("Opening your Kyro"), "wallet profile resolver should show opening state");
     assert(resolverSource.includes("useArcIdentity"), "wallet profile resolver should use shared identity state");
     assert(resolverSource.includes("window.location.replace(identity.profileUrl)"), "wallet profile resolver should redirect to canonical public profile");
     const dashboardUsesResolverFallback = dashboardSource.includes('const profileHref = username ? "/profile/me" : "/create"');
@@ -143,14 +143,14 @@ async function runCase(index) {
     const profileRoute = await request(route, { headers: { Accept: "text/html" } });
     assert(profileRoute.response.ok, "public profile route should return ok", { route, status: profileRoute.response.status });
     assert(profileRoute.text.includes(canonicalUsername), "public profile route should render claimed username", { route });
-    assert(!profileRoute.text.includes("ARC Identity initializing"), "public profile route should not render initializing fallback for claimed username", { route });
+    assert(!profileRoute.text.includes("Kyro initializing"), "public profile route should not render initializing fallback for claimed username", { route });
   }
 
   const revealRoute = await request(`/identity-created?username=${encodeURIComponent(canonicalUsername)}&wallet=${encodeURIComponent(wallet)}`, { headers: { Accept: "text/html" } });
   assert(revealRoute.response.ok, "identity reveal route should return ok", { status: revealRoute.response.status });
   assert(
-    revealRoute.text.includes("ARC Identity created")
-      || revealRoute.text.includes("Your ARC Identity is live")
+    revealRoute.text.includes("Kyro created")
+      || revealRoute.text.includes("Your Kyro is live")
       || revealRoute.text.includes("/_next/static/chunks/app/identity-created/page"),
     "identity reveal route should serve the branded reveal experience",
     { status: revealRoute.response.status }

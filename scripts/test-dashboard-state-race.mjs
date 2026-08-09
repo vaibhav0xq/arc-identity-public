@@ -15,7 +15,7 @@ if (!source.includes("{!showSetupClaimCta ? null :")) {
   failures.push("Claim username CTA must be guarded by connected-session pending state");
 }
 
-if (!source.includes("Wallet connection is active. ARC Identity is checking your signature and profile before showing setup actions.")) {
+if (!source.includes("Wallet connection is active. Kyro is checking your signature and profile before showing setup actions.")) {
   failures.push("connected pending state should not use disconnected setup copy");
 }
 

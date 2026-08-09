@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const DEMO_REQUEST_TIMEOUT_MS = 15_000;
 const walletPattern = /^0x[a-fA-F0-9]{40}$/;
-const usernamePattern = /^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9](?:\.arcid)?$/;
+const usernamePattern = /^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9](?:\.(?:kyro|arcid))?$/;
 
 function normalizeLookupInput(value: string) {
   return value.trim();
@@ -21,7 +21,7 @@ function normalizeWalletLookup(value: string) {
 function normalizeUsernameLookup(value: string) {
   const normalized = normalizeLookupInput(value).toLowerCase();
   if (!usernamePattern.test(normalized)) return null;
-  return normalized.endsWith(".arcid") ? normalized : `${normalized}.arcid`;
+  return normalized.endsWith(".kyro") || normalized.endsWith(".arcid") ? normalized : `${normalized}.kyro`;
 }
 
 function timeoutResult() {
@@ -47,7 +47,7 @@ export function DeveloperApiDemo() {
   async function fetchScore() {
     const input = normalizeLookupInput(lookupValue);
     if (!input) {
-      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or Arc Identity username."));
+      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or Kyro username."));
       return;
     }
 
@@ -59,7 +59,7 @@ export function DeveloperApiDemo() {
         })();
 
     if (!endpoint) {
-      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or Arc Identity username."));
+      setResult(safeErrorResult("Invalid input", "Enter a valid EVM wallet address or Kyro username."));
       return;
     }
 
@@ -110,7 +110,7 @@ export function DeveloperApiDemo() {
             value={lookupValue}
             onChange={(event) => setLookupValue(event.target.value)}
             className="arc-input min-w-0 flex-1 px-4 py-3.5 font-mono text-sm outline-none"
-            placeholder="Wallet address or username.arcid"
+            placeholder="Wallet address or username.kyro"
           />
           <button
             onClick={fetchScore}
@@ -125,7 +125,7 @@ export function DeveloperApiDemo() {
           <span className={loading ? "chip amber" : "chip"}><span className="dot" />{loading ? "request active" : result ? "response received" : "ready"}</span>
         </div>
         <pre className="arc-code-block mt-3 min-h-52 max-w-full overflow-auto p-4 text-xs leading-relaxed text-bone sm:p-5 sm:text-sm">
-          {JSON.stringify(result ?? { ready: "Enter a wallet or Arc Identity username and fetch Identity Score" }, null, 2)}
+          {JSON.stringify(result ?? { ready: "Enter a wallet or Kyro username and fetch Identity Score" }, null, 2)}
         </pre>
       </div>
     </section>

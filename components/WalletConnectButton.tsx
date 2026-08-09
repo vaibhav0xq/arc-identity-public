@@ -376,8 +376,8 @@ export function WalletConnectButton({
       const issuedAt = new Date().toISOString();
       const nonce = crypto.randomUUID();
       const message = [
-        "ARC Identity",
-        "Domain: arcidentity.in",
+        "Kyro",
+        "Domain: www.thekyro.co",
         "Purpose: Verify wallet ownership",
         `Wallet address: ${connected}`,
         "Username: Not claimed yet",
@@ -400,7 +400,7 @@ export function WalletConnectButton({
       setVerified(true);
       onConnect?.(connected);
       shouldClosePicker = true;
-      setStatus("Signature verified. Syncing ARC Identity profile...");
+      setStatus("Signature verified. Syncing Kyro profile...");
       setStage("sync");
 
       try {
@@ -430,7 +430,7 @@ export function WalletConnectButton({
           } else {
             clearCurrentUsername();
             localStorage.removeItem(lookupWarningKey);
-            setStatus("Create your ARC Identity.");
+            setStatus("Create your Kyro.");
             logIdentityLookup("wallet_identity_route_decision", { wallet: connected, route: "/create", source: "unclaimed" });
             routeAfterWalletLookup("/create", connected, "unclaimed");
           }
@@ -535,7 +535,7 @@ export function WalletConnectButton({
               </button>
             </div>
             <div className="wcm-notice mt-5 bg-[#ece8dc] p-4 text-sm leading-6 text-mutedc">
-              <p className="font-bold text-ink">ARC Identity only asks for a wallet signature to verify ownership.</p>
+              <p className="font-bold text-ink">Kyro only asks for a wallet signature to verify ownership.</p>
               <p className="mt-1">This does not send a transaction. This does not grant token access.</p>
             </div>
             {stage === "pick" ? (

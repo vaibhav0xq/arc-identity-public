@@ -55,7 +55,7 @@ function normalizeUsername(username) {
 }
 
 function usernameBase(username) {
-  return normalizeUsername(username).replace(/\.arcid$/i, "");
+  return normalizeUsername(username).replace(/\.(?:kyro|arcid)$/i, "");
 }
 
 function isProtectedUsername(username) {

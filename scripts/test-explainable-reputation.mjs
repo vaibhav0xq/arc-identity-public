@@ -52,7 +52,7 @@ expect(!card.includes("fetch(`/api/score/"), "profile explainability card does n
 expect(card.includes("Last updated") && card.includes("seconds ago"), "profile card shows relative last-updated text");
 expect(card.includes("key={item.id}"), "attestation impact rows use stable unique keys");
 expect(card.includes("Score breakdown") && card.includes("Insights") && card.includes("Attestation impact"), "profile card shows required explanation sections");
-expect(card.includes("Key signals behind this wallet&apos;s ARC Identity reputation."), "profile card uses polished product copy");
+expect(card.includes("Key signals behind this wallet&apos;s Kyro reputation."), "profile card uses polished product copy");
 expect(card.includes("The main signals shaping this profile."), "profile breakdown copy is concise");
 expect(card.includes("shortReason(key)"), "profile card uses short readable row reasons");
 expect(!card.includes("canonical score") && !card.includes("Matches ARC Score") && !card.includes("breakdownTotal"), "profile card avoids defensive proof-style wording");

@@ -1,6 +1,6 @@
-# Contributing to Arc Identity
+# Contributing to Kyro
 
-Thanks for your interest in improving Arc Identity. This document covers how to get a working setup, what conventions the codebase follows and how changes get reviewed.
+Thanks for your interest in improving Kyro. This document covers how to get a working setup, what conventions the codebase follows and how changes get reviewed.
 
 ## Getting set up
 
@@ -34,7 +34,7 @@ npm run test:score-api
 
 ### Scoring model
 
-The score model is a versioned contract. `arc_score_v2_2026_07` and the caps in `lib/score-contract.ts` are load bearing across the API, the database and the docs.
+The score model is a versioned contract. `identity_score_v1` and the caps in `lib/score-contract.ts` are load bearing across the API, the database and the docs.
 
 - Never change component caps, weights or penalties without bumping the model version.
 - Never rename the model version string in one place only. It must stay consistent everywhere it appears.

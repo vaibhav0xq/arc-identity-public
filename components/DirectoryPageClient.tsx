@@ -9,7 +9,7 @@ export function DirectoryPageClient({ sort, limit }: { sort: UserSort; limit: nu
     <WalletGate
       requireClaimed
       sectionLabel="Directory"
-      title="Connect your wallet to view the Arc Identity Directory."
+      title="Connect your wallet to view the Kyro Directory."
       description="Connect your wallet to browse registered Arc identities."
     >
       <section className="fade-in grid gap-7 py-8 lg:gap-8 lg:py-12">

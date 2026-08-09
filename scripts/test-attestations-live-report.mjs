@@ -91,11 +91,11 @@ if (!searchUsers.response?.ok) {
   warnings.push({ stage: "users_search", details: searchUsers.json ?? searchUsers.text ?? searchUsers.error });
 } else {
   let usernameForSearch = activeUsername;
-  let expectedFull = usernameForSearch.trim().toLowerCase().endsWith(".arcid") ? usernameForSearch.trim().toLowerCase() : `${usernameForSearch.trim().toLowerCase()}.arcid`;
-  let expectedBase = expectedFull.replace(/\.arcid$/i, "");
+  let expectedFull = usernameForSearch.trim().toLowerCase().endsWith(".kyro") || normalized.endsWith(".arcid") ? usernameForSearch.trim().toLowerCase() : `${usernameForSearch.trim().toLowerCase()}.arcid`;
+  let expectedBase = expectedFull.replace(/\.(?:kyro|arcid)$/i, "");
   let found = (searchUsers.json?.users ?? []).find((item) => {
     const usernameFull = item.profile?.username?.toLowerCase() ?? "";
-    const usernameBase = usernameFull.replace(/\.arcid$/i, "");
+    const usernameBase = usernameFull.replace(/\.(?:kyro|arcid)$/i, "");
     return usernameFull === expectedFull || usernameBase === expectedBase;
   });
   if (!found) {
@@ -105,11 +105,11 @@ if (!searchUsers.response?.ok) {
       usernameForSearch = fallback;
       const fallbackSearch = await timedRequest(`/api/users?q=${encodeURIComponent(fallback)}&limit=10&t=${Date.now()}`);
       timings.push({ path: fallbackSearch.path, durationMs: fallbackSearch.durationMs, status: fallbackSearch.response?.status ?? "network_error" });
-      expectedFull = fallback.trim().toLowerCase().endsWith(".arcid") ? fallback.trim().toLowerCase() : `${fallback.trim().toLowerCase()}.arcid`;
-      expectedBase = expectedFull.replace(/\.arcid$/i, "");
+      expectedFull = fallback.trim().toLowerCase().endsWith(".kyro") || normalized.endsWith(".arcid") ? fallback.trim().toLowerCase() : `${fallback.trim().toLowerCase()}.arcid`;
+      expectedBase = expectedFull.replace(/\.(?:kyro|arcid)$/i, "");
       found = (fallbackSearch.json?.users ?? []).find((item) => {
         const usernameFull = item.profile?.username?.toLowerCase() ?? "";
-        const usernameBase = usernameFull.replace(/\.arcid$/i, "");
+        const usernameBase = usernameFull.replace(/\.(?:kyro|arcid)$/i, "");
         return usernameFull === expectedFull || usernameBase === expectedBase;
       });
     }
@@ -120,10 +120,10 @@ if (!searchUsers.response?.ok) {
   const normalizedInputs = [expectedBase, expectedFull, expectedFull.replace(/[a-z]/g, (char, index) => index % 2 ? char.toUpperCase() : char)];
   const normalizedMatches = normalizedInputs.every((input) => {
     const raw = input.trim().toLowerCase();
-    const base = raw.replace(/\.arcid$/i, "");
-    const full = raw.endsWith(".arcid") ? raw : `${raw}.arcid`;
+    const base = raw.replace(/\.(?:kyro|arcid)$/i, "");
+    const full = raw.endsWith(".kyro") || normalized.endsWith(".arcid") ? raw : `${raw}.arcid`;
     const usernameFull = found?.profile?.username?.trim().toLowerCase() ?? "";
-    const usernameBase = usernameFull.replace(/\.arcid$/i, "");
+    const usernameBase = usernameFull.replace(/\.(?:kyro|arcid)$/i, "");
     return [usernameFull, usernameBase].some((entry) => entry.includes(raw) || entry.includes(base) || entry.includes(full));
   });
   if (!normalizedMatches) failures.push({ stage: "counterparty_username_normalization", details: { activeUsername: usernameForSearch, normalizedInputs, found: found?.profile?.username } });
@@ -151,9 +151,9 @@ try {
   for (const requiredCopy of [
     "Complete all fields",
     "looksLikeTxHash",
-    "Search username, username.arcid, or wallet address",
+    "Search username, username.kyro, or wallet address",
     "Type at least 2 characters to search registered identities.",
-    "No registered ARC Identity found.",
+    "No registered Kyro found.",
     "Loading verified attestations...",
     "No verified attestations yet.",
     "Couldn't load attestation history. Retry."

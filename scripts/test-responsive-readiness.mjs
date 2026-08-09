@@ -39,7 +39,7 @@ expect(!shell.includes("overflow-x-hidden"), "ArcShell should not create an over
 expect(shell.includes("max-w-[calc(100vw-1rem)]"), "shell ambient glow should not create mobile viewport overflow");
 expect(shell.includes("lg:grid-cols-5"), "header nav should use a five-column controlled layout at 1024px");
 expect(shell.includes("xl:grid-cols-[210px_minmax(0,1fr)_minmax(280px,auto)]"), "header should reserve one-row desktop layout for wider screens");
-expect(shell.includes("next/image") && shell.includes("/brand/arc-identity-icon.png"), "header should use the ARC Identity brand icon asset");
+expect(shell.includes("next/image") && shell.includes("/brand/arc-identity-icon.png"), "header should use the Kyro brand icon asset");
 expect(!shell.includes(">ARC</span>"), "header should not render the old ARC text placeholder logo");
 
 expect(developers.includes("overflow-x-auto whitespace-nowrap"), "Developer API endpoint chips should own horizontal overflow");
@@ -47,7 +47,7 @@ expect(developers.includes("max-w-full overflow-auto"), "Developer API sample re
 expect(demo.includes("max-w-full overflow-auto"), "live API demo response should scroll inside its card");
 expect(docs.includes("max-w-6xl") && docs.includes("lg:grid-cols-2"), "Docs page should use constrained responsive article grids");
 expect(docs.includes("sm:grid-cols-2") && docs.includes("lg:grid-cols-4"), "Docs CTA cards should wrap responsively");
-expect(docs.includes("Introducing ARC Identity"), "Docs page should include the launch article title");
+expect(docs.includes("Introducing Kyro"), "Docs page should include the launch article title");
 expect(docsNav.includes("On this page") && docs.includes("#arc-reputation-score") && docs.includes("#get-started"), "Docs page should include mobile-safe table of contents anchors");
 expect(docs.includes("Common questions") && docs.includes("Is ARC Score based only on transaction count?"), "Docs page should include launch FAQ content");
 expect(docs.includes("<DocsOnThisPage items={tocItems} />"), "Docs page should use the dedicated docs sidebar component");

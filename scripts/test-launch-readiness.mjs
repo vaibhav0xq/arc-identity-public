@@ -127,7 +127,7 @@ await check("fresh generated wallet", async () => {
 
   const profileMe = await request("/profile/me", { headers: { Accept: "text/html" } });
   expect(profileMe.response.ok, "/profile/me route should render", { status: profileMe.response.status });
-  expect(!profileMe.text.includes("No ARC Identity found"), "/profile/me shell should not contain raw missing identity copy", null);
+  expect(!profileMe.text.includes("No Kyro found"), "/profile/me shell should not contain raw missing identity copy", null);
 });
 
 await check("claimed wallet reconnect", async () => {

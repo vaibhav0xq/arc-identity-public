@@ -25,7 +25,7 @@ expect(files.create.includes("router.replace(revealUrl)") && !files.create.inclu
 expect(!files.create.includes("window.dispatchEvent(new Event(\"arc-identity-wallet-changed\"))"), "claim flow should not broadcast identity changes before the reveal route owns the session");
 expect(!files.create.includes("source: \"trusted_cache_create_page\""), "create page should not use stale local cache to skip server-confirmed profile lookup");
 expect(files.create.includes("identityState === \"unclaimed\" && !checkingProfile"), "create page should show claim form only after lookup confirms no profile");
-expect(files.create.includes("Checking ARC Identity profile..."), "create page should show a checking state while profile lookup is pending");
+expect(files.create.includes("Checking Kyro profile..."), "create page should show a checking state while profile lookup is pending");
 
 expect(files.reveal.includes("type RevealAccessState = \"checking\" | \"allowed\" | \"blocked\""), "identity-created should own a stable reveal access state");
 expect(files.reveal.includes("getPostClaimRevealContext()") && files.reveal.includes("readInitialRevealContext()"), "identity-created should read shared deterministic query/session reveal context");

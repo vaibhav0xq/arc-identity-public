@@ -15,9 +15,9 @@ expect(source.includes("walletPattern = /^0x[a-fA-F0-9]{40}$/"), "demo should de
 expect(source.includes("normalizeWalletLookup(input)") && source.includes(".toLowerCase()"), "wallet input should be normalized before API lookup");
 expect(source.includes("/api/score/${encodeURIComponent(normalizeWalletLookup(input))}"), "valid wallet input should call /api/score/:wallet");
 expect(source.includes("normalizeUsernameLookup(input)") && source.includes("/api/profile/${encodeURIComponent(username)}"), "username input should call /api/profile/:username");
-expect(source.includes("username.endsWith(\".arcid\")") || source.includes("normalized.endsWith(\".arcid\")"), "username lookup should support username and username.arcid inputs");
+expect(source.includes("username.endsWith(\".arcid\")") || source.includes("normalized.endsWith(\".arcid\")"), "username lookup should support username and username.kyro inputs");
 expect(source.includes("encodeURIComponent"), "demo API paths should encode user input safely");
-expect(source.includes("Invalid input") && source.includes("valid EVM wallet address or ARC Identity username"), "invalid input should get a clean validation error");
+expect(source.includes("Invalid input") && source.includes("valid EVM wallet address or Kyro username"), "invalid input should get a clean validation error");
 expect(source.includes("Request timeout") && source.includes("The API request took longer than expected. Please retry."), "timeout should be distinct from profile-not-found");
 expect(source.includes("typeof data?.error === \"string\"") && source.includes("typeof data?.message === \"string\""), "demo should preserve structured public API errors");
 expect(!source.includes("This profile could not be found, or the request took longer than expected."), "demo should not use misleading combined profile/timeout error");

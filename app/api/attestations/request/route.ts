@@ -46,7 +46,7 @@ function validateRequestBody(body: any) {
     return { error: attestationError("Connect a valid EVM wallet before submitting an attestation.", 400, "Invalid wallet") };
   }
   if (!validWalletPattern.test(toWallet)) {
-    return { error: attestationError("Select a registered ARC Identity counterparty.", 400, "Invalid counterparty") };
+    return { error: attestationError("Select a registered Kyro counterparty.", 400, "Invalid counterparty") };
   }
   if (fromWallet === toWallet) {
     return { error: attestationError("You cannot submit an attestation with your own wallet as the counterparty.", 400, "Self-attestation rejected") };
@@ -110,7 +110,7 @@ function publicAttestationError(message: string) {
   if (/not found/i.test(message)) return "Transaction hash not found on Arc.";
   if (/involve|wallet|participant/i.test(message)) return "Transaction does not involve both selected wallets.";
   if (/wrong chain/i.test(message)) return "This transaction was not found on the supported Arc network.";
-  if (/minimum|at least|within the last|timestamp|finalized|succeed/i.test(message)) return "This transaction is not eligible for ARC Identity reputation.";
+  if (/minimum|at least|within the last|timestamp|finalized|succeed/i.test(message)) return "This transaction is not eligible for Kyro reputation.";
   if (/temporar|timeout|rpc|network|unavailable/i.test(message)) return "Transaction could not be verified right now. Try again later.";
   return "Transaction could not be verified right now. Try again later.";
 }

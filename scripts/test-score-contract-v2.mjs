@@ -45,7 +45,7 @@ function assertIntegrity(result) {
   }
 }
 
-assert.equal(ARC_SCORE_MODEL_VERSION, "arc_score_v2_2026_07");
+assert.equal(ARC_SCORE_MODEL_VERSION, "identity_score_v1");
 assert.equal(score().score, 0, "a wallet with no verified evidence must score zero");
 assert.equal(score({ providerLimited: true }).score, 0, "provider unavailability must not create points or penalties");
 assert.equal(score({ arcWalletAgeDays: 365, arcBalance: 100, arcCounterparties: 20, arcActiveDays: 30 }).components.arcActivity.points, 0, "Arc activity requires a verified Arc transaction");

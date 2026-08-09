@@ -23,7 +23,7 @@ export async function verifyWalletSignature({
   if (!validWalletPattern.test(wallet)) throw new Error("Invalid wallet address");
   if (!signatureValue || !validSignaturePattern.test(signatureValue)) throw new Error("Signature required to verify wallet ownership");
   if (!signedMessage) throw new Error("Signed message required to verify wallet ownership");
-  if (!signedMessage.includes("ARC Identity")) throw new Error("Signature message is not an ARC Identity verification message");
+  if (!signedMessage.includes("Kyro")) throw new Error("Signature message is not an Kyro verification message");
   if (!signedMessage.toLowerCase().includes(wallet)) throw new Error("Signature message wallet mismatch");
 
   const verified = await verifyMessage({

@@ -65,7 +65,7 @@ if (canonicalUsername) {
   const publicProfile = await request(`/profile/${encodeURIComponent(canonicalUsername)}`, { headers: { Accept: "text/html" } });
   timings.push({ path: "/profile/:username", status: publicProfile.response.status, durationMs: publicProfile.durationMs });
   failIf(!publicProfile.response.ok, failures, "public profile route must return 200", publicProfile.text.slice(0, 400));
-  failIf(publicProfile.text.includes("No ARC Identity found"), failures, "public profile route must not render not-found for claimed identity", publicProfile.text.slice(0, 600));
+  failIf(publicProfile.text.includes("No Kyro found"), failures, "public profile route must not render not-found for claimed identity", publicProfile.text.slice(0, 600));
 }
 
 const refresh = await request(`/api/score/${wallet}/refresh`, { method: "POST" });

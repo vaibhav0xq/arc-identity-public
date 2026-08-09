@@ -4,8 +4,8 @@ import { ArcShell } from "@/components/ArcShell";
 import { DocsOnThisPage } from "@/components/DocsOnThisPage";
 
 export const metadata: Metadata = {
-  title: "Arc Identity Docs",
-  description: "How Arc Identity turns wallet history, verified attestations and trust graph evidence into one explainable reputation score."
+  title: "Kyro Docs",
+  description: "How Kyro turns wallet history, verified attestations and trust graph evidence into one explainable reputation score."
 };
 
 const tocItems: { label: string; href: `#${string}` }[] = [
@@ -22,7 +22,7 @@ const tocItems: { label: string; href: `#${string}` }[] = [
 const primitives = [
   {
     title: "Wallet identity",
-    body: "Connect an injected EVM wallet, sign an ownership message and claim a public .arcid username. The signature proves control before anything is written."
+    body: "Connect an injected EVM wallet, sign an ownership message and claim a public .kyro username. The signature proves control before anything is written."
   },
   {
     title: "Identity Score",
@@ -88,7 +88,7 @@ const endpoints: [string, string, string][] = [
 
 const faqItems = [
   {
-    question: "Is Arc Identity a manual reputation form?",
+    question: "Is Kyro a manual reputation form?",
     answer: "No. Profiles are wallet-owned. Reputation comes from indexed wallet activity, verified transaction-backed attestations and trust graph context. Claiming a username adds zero points."
   },
   {
@@ -105,7 +105,7 @@ const faqItems = [
   },
   {
     question: "Is the system final?",
-    answer: "No. Arc Identity is in an active launch phase. Score explanations, provider coverage, trust safeguards and developer responses keep improving as usage grows."
+    answer: "No. Kyro is in an active launch phase. Score explanations, provider coverage, trust safeguards and developer responses keep improving as usage grows."
   }
 ];
 
@@ -137,7 +137,7 @@ export default function DocsPage() {
           <p className="font-mono text-[0.62rem] uppercase tracking-[0.2em] text-mutedc">Docs / Identity model</p>
           <h1 className="mt-3 font-heading text-5xl font-semibold tracking-tight text-ink sm:text-6xl">Identity model</h1>
           <p className="mt-5 max-w-2xl text-base leading-7 text-mutedc">
-            Arc Identity indexes wallet activity, verifies Arc transactions and turns trust relationships into one portable reputation credential for stablecoin apps. This page documents how every point of that credential is earned.
+            Kyro indexes wallet activity, verifies Arc transactions and turns trust relationships into one portable reputation credential for stablecoin apps. This page documents how every point of that credential is earned.
           </p>
           <div className="mt-6 flex flex-wrap gap-2">
             {["Wallet-owned identity", "Transaction-verified trust", "Cached API intelligence"].map((item) => (
@@ -152,10 +152,10 @@ export default function DocsPage() {
           </aside>
 
           <article className="docs-article grid min-w-0 gap-12">
-            <DocSection id="overview" label="Overview" title="What Arc Identity does">
+            <DocSection id="overview" label="Overview" title="What Kyro does">
               <div className="grid gap-4">
                 <p>
-                  Arc Identity is a wallet credential layer for Arc and stablecoin applications. A user connects an EVM wallet, signs a verification message, claims a public <span className="font-bold text-ink">.arcid</span> profile and receives an Identity Score based on real indexed activity and verified transaction evidence.
+                  Kyro is a wallet credential layer for Arc and stablecoin applications. A user connects an EVM wallet, signs a verification message, claims a public <span className="font-bold text-ink">.kyro</span> profile and receives an Identity Score based on real indexed activity and verified transaction evidence.
                 </p>
                 <p>
                   The product is built for checks that happen before payments, lending, escrow, protected deals, merchant flows and higher-value stablecoin interactions.
@@ -164,7 +164,7 @@ export default function DocsPage() {
               <div className="mt-6 border-t border-linec pt-4">
                 <p className="kicker">Launch phase</p>
                 <p className="mt-2.5 leading-7">
-                  Arc Identity runs on wallet signatures, Supabase persistence, Arc transaction verification, external chain indexers, cached score snapshots and verified trust graph records. Some external providers can be rate limited or plan restricted. The UI reports those cases as Limited coverage so the product stays understandable while Arc-native data and cached intelligence remain visible.
+                  Kyro runs on wallet signatures, Supabase persistence, Arc transaction verification, external chain indexers, cached score snapshots and verified trust graph records. Some external providers can be rate limited or plan restricted. The UI reports those cases as Limited coverage so the product stays understandable while Arc-native data and cached intelligence remain visible.
                 </p>
               </div>
             </DocSection>
@@ -183,13 +183,13 @@ export default function DocsPage() {
             <DocSection id="score-model" label="Score model" title="One score, explainable components">
               <div className="grid gap-4">
                 <p>
-                  Arc Identity exposes one primary score. Supporting components explain why the score moved but they are not separate competing scores.
+                  Kyro exposes one primary score. Supporting components explain why the score moved but they are not separate competing scores.
                 </p>
                 <p>
                   Score model <span className="font-mono text-[0.85rem] font-bold text-ink">v2_2026_07</span> combines global wallet maturity, Arc-specific activity, verified transaction attestations, capped trust propagation and evidence-based risk controls. Component points sum to the score after any risk penalty, then clamp from 0 to 100.
                 </p>
                 <p>
-                  Claiming a username grants no points. A fresh wallet with no indexed activity, no Arc footprint, no verified attestations and no trust graph evidence starts at the real component total: 0. The score rises only when Arc Identity can verify meaningful wallet behavior.
+                  Claiming a username grants no points. A fresh wallet with no indexed activity, no Arc footprint, no verified attestations and no trust graph evidence starts at the real component total: 0. The score rises only when Kyro can verify meaningful wallet behavior.
                 </p>
               </div>
               <div className="mt-6 grid">
@@ -276,7 +276,7 @@ export default function DocsPage() {
 
             <DocSection id="developer-api" label="Developer API" title="Reputation data for builders">
               <p>
-                Any Arc app can query Arc Identity before payments, lending, escrow, protected deals, merchant flows or high-value stablecoin interactions. Full request and response documentation lives on the <Link href="/developers" className="font-bold text-ink underline decoration-gold decoration-2 underline-offset-4 transition hover:text-gold">Developer API page</Link>.
+                Any Arc app can query Kyro before payments, lending, escrow, protected deals, merchant flows or high-value stablecoin interactions. Full request and response documentation lives on the <Link href="/developers" className="font-bold text-ink underline decoration-gold decoration-2 underline-offset-4 transition hover:text-gold">Developer API page</Link>.
               </p>
               <div className="mt-5 grid">
                 {endpoints.map(([method, path, description]) => (
@@ -295,9 +295,9 @@ export default function DocsPage() {
                 <pre className="mt-4 overflow-x-auto font-mono text-xs leading-6" style={{ color: "#e6e2d4" }}>
                   <code>{`{
   "walletAddress": "0x...",
-  "username": "example.arcid",
+  "username": "example.kyro",
   "arcIdentityScore": 72,
-  "scoreModelVersion": "arc_score_v2_2026_07",
+  "scoreModelVersion": "identity_score_v1",
   "riskLevel": "Reliable",
   "cacheStatus": "cached",
   "refreshStatus": "committed",
@@ -338,7 +338,7 @@ export default function DocsPage() {
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
                 <Link href="/dashboard" className="border-2 border-ink bg-ink px-4 py-3.5 text-center text-sm font-bold text-bone transition hover:bg-[#3a3e3a]">
-                  Launch Arc Identity
+                  Launch Kyro
                 </Link>
                 {[
                   ["View directory", "/directory"],

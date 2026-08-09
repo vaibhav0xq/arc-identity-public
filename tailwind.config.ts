@@ -1,7 +1,7 @@
 import type { Config } from "tailwindcss";
 
 /**
- * Arc Identity — engraved-credential material system.
+ * Kyro — engraved-credential material system.
  * Warm paper ground, graphite plates, bone panels, muted gold, verified green, limited amber.
  *
  * NOTE ON REMAPPED SCALES: this app was originally a dark theme, so legacy markup

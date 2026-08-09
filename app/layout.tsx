@@ -24,7 +24,7 @@ const dmMono = DM_Mono({
   display: "swap"
 });
 
-const metadataDescription = "Payments are solved, trust isn't. ARC Identity is an onchain reputation and wallet intelligence platform for Arc stablecoin users - transaction-verified trust scoring, multichain analytics and portable identity.";
+const metadataDescription = "Payments are solved, trust isn't. Kyro is an onchain reputation and wallet intelligence platform for Arc stablecoin users - transaction-verified trust scoring, multichain analytics and portable identity.";
 const brandIcon = "/brand/arc-identity-icon.png";
 const brandIcon32 = "/brand/arc-identity-icon-32.png";
 const brandIcon192 = "/brand/arc-identity-icon-192.png";
@@ -33,7 +33,7 @@ const brandWordmark = "/brand/arc-identity-wordmark.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(ARC_PUBLIC_APP_URL),
-  title: "ARC Identity",
+  title: "Kyro",
   description: metadataDescription,
   alternates: {
     canonical: "/"
@@ -49,7 +49,7 @@ export const metadata: Metadata = {
     apple: [{ url: brandIcon192, sizes: "192x192", type: "image/png" }]
   },
   openGraph: {
-    title: "ARC Identity",
+    title: "Kyro",
     description: metadataDescription,
     type: "website",
     url: ARC_PUBLIC_APP_URL,
@@ -58,13 +58,13 @@ export const metadata: Metadata = {
         url: brandWordmark,
         width: 2376,
         height: 621,
-        alt: "ARC Identity wordmark"
+        alt: "Kyro wordmark"
       }
     ]
   },
   twitter: {
     card: "summary_large_image",
-    title: "ARC Identity",
+    title: "Kyro",
     description: metadataDescription,
     images: [brandWordmark]
   }

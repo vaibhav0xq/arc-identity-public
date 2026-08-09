@@ -3,8 +3,8 @@ import Link from "next/link";
 import { ARC_SUPPORT_EMAIL } from "@/lib/links";
 
 export const metadata: Metadata = {
-  title: "Privacy policy · Arc Identity",
-  description: "How Arc Identity collects, uses and protects data."
+  title: "Privacy policy · Kyro",
+  description: "How Kyro collects, uses and protects data."
 };
 
 const serif = { fontFamily: "var(--font-newsreader), serif" };
@@ -20,9 +20,9 @@ const sections = [
   {
     title: "What we collect",
     body: [
-      "Arc Identity works with information that is already public on supported blockchains. This includes wallet addresses, transaction history, counterparty relationships and on-chain attestations.",
+      "Kyro works with information that is already public on supported blockchains. This includes wallet addresses, transaction history, counterparty relationships and on-chain attestations.",
       "When you claim a profile we also store your chosen username, the wallet signature used to verify ownership and the score data computed for your wallet.",
-      "We do not collect private keys, seed phrases, passwords or custody of any funds. We never ask for them and no legitimate Arc Identity surface will."
+      "We do not collect private keys, seed phrases, passwords or custody of any funds. We never ask for them and no legitimate Kyro surface will."
     ]
   },
   {
@@ -53,7 +53,7 @@ const sections = [
   {
     title: "Your choices",
     body: [
-      "On-chain data is public by nature and remains visible on the blockchain regardless of Arc Identity. If you want your claimed username or cached profile data removed from our systems, contact us and we will process the request."
+      "On-chain data is public by nature and remains visible on the blockchain regardless of Kyro. If you want your claimed username or cached profile data removed from our systems, contact us and we will process the request."
     ]
   },
   {
@@ -69,13 +69,13 @@ export default function PrivacyPage() {
     <main className="min-h-screen w-full md:grid md:grid-cols-[minmax(300px,380px)_1fr]">
       <aside className="bg-[#252827] px-6 py-10 text-[#e9e5db] md:sticky md:top-0 md:flex md:h-screen md:flex-col md:px-10 md:py-12">
         <Link href="/" className="font-mono text-[0.66rem] uppercase tracking-[0.18em] text-[#e9e5db]/70 hover:text-[#e9e5db]">
-          ← Arc Identity
+          ← Kyro
         </Link>
         <div className="mt-12 md:mt-16">
           <p className="font-mono text-[0.62rem] font-bold uppercase tracking-[0.18em] text-[color:var(--gold)]">Legal / Privacy</p>
           <h1 className="mt-4 text-5xl leading-none text-[#e9e5db] md:text-6xl" style={serif}>Privacy<br />policy</h1>
           <p className="mt-6 max-w-[300px] text-[0.84rem] leading-relaxed text-[#e9e5db]/60">
-            Most of what powers Arc Identity is data that is already public on-chain. This page covers what we hold beyond that and the choices you have.
+            Most of what powers Kyro is data that is already public on-chain. This page covers what we hold beyond that and the choices you have.
           </p>
         </div>
         <div className="mt-10 border-t border-[#e9e5db]/15 pt-6 md:mt-auto">
@@ -122,7 +122,7 @@ export default function PrivacyPage() {
         </section>
 
         <div className="flex flex-wrap items-center justify-between gap-4 border-t-2 border-[color:var(--ink)] pt-5">
-          <p className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500">Arc Identity · Independent project · Not affiliated with Circle</p>
+          <p className="font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500">Kyro · Independent project · Not affiliated with Circle</p>
           <Link href="/terms" className="landing-text-link">Terms of use <span>→</span></Link>
         </div>
       </div>

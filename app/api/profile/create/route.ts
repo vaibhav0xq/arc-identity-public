@@ -10,11 +10,11 @@ function errorMessage(error: unknown) {
 }
 
 function publicClaimError(message: string) {
-  if (/already taken/i.test(message)) return { error: "Username unavailable", message: "This ARC Identity username is already claimed.", status: 409 };
+  if (/already taken/i.test(message)) return { error: "Username unavailable", message: "This Kyro username is already claimed.", status: 409 };
   if (/signature/i.test(message)) return { error: "Signature verification failed", message: "Could not verify wallet ownership. Please sign again.", status: 400 };
   if (/wallet/i.test(message)) return { error: "Invalid wallet", message: "Provide a valid EVM wallet address.", status: 400 };
   if (/username|required|lowercase|letters|numbers|underscore|hyphen/i.test(message)) return { error: "Invalid username", message, status: 400 };
-  return { error: "Claim failed", message: "Could not claim this ARC Identity. Please retry.", status: 400 };
+  return { error: "Claim failed", message: "Could not claim this Kyro. Please retry.", status: 400 };
 }
 
 function profileResponse(profile: Awaited<ReturnType<typeof claimUsername>>) {

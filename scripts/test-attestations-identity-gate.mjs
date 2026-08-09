@@ -37,7 +37,7 @@ async function assertSourceContract() {
   assert(source.includes("attestations_final_decision"), "attestations gate should log final gate state", null);
   assert(source.includes("Promise.allSettled"), "secondary attestation data loading must not downgrade identity gate", null);
   assert(source.includes("attestations_ignored_stale_response"), "stale attestation gate responses must be ignored", null);
-  assert(source.includes("Checking ARC Identity..."), "attestations page should have a checking state", null);
+  assert(source.includes("Checking Kyro..."), "attestations page should have a checking state", null);
   assert(source.includes("xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]"), "attestations page should use the shared responsive workflow grid", null);
 }
 
@@ -74,7 +74,7 @@ assert(unclaimedDebug.json.finalIdentityGateDecision === "identity_required", "a
 
 const page = await request("/attestations", { headers: { Accept: "text/html" } });
 assert(page.response.ok, "attestations route should render", { status: page.response.status });
-assert(page.text.includes("Checking ARC Identity"), "initial attestations HTML should render checking state, not a false identity-required flash", null);
+assert(page.text.includes("Checking Kyro"), "initial attestations HTML should render checking state, not a false identity-required flash", null);
 
 console.log(JSON.stringify({
   ok: true,

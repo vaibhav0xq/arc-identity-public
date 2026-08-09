@@ -19,7 +19,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ use
     console.log("[arc-identity] profile_lookup_result", { username: normalizedUsername, found: Boolean(identity), wallet: identity?.profile.walletAddress ?? null });
     if (!identity) {
       console.warn("[arc-identity] profile_route_not_found_reason", { username: usernameParam, normalizedUsername, reason: normalizedUsername ? "no_profile_row" : "invalid_username" });
-      return publicApiError("Profile not found", "This ARC Identity profile could not be found.", 404, { username: normalizedUsername });
+      return publicApiError("Profile not found", "This Kyro profile could not be found.", 404, { username: normalizedUsername });
     }
     const [attestations, reputationEvents, trustConnections, trustGraph] = await Promise.all([
       listAttestations(identity.profile.walletAddress),

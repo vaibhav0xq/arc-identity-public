@@ -23,7 +23,7 @@ expect(files.contract.includes("publicApiError"), "shared public API error helpe
 expect(files.contract.includes("sanitizeCanonicalSnapshot"), "canonical score/profile payloads should be sanitized before public responses");
 expect(files.contract.includes("sanitizeCoverageIssues"), "coverage issues should have a public-safe shape");
 expect(files.score.includes("isValidWalletAddress(wallet)") && files.refresh.includes("isValidWalletAddress(wallet)") && files.byWallet.includes("isValidWalletAddress(wallet)"), "wallet routes should return clean invalid-wallet errors");
-expect(files.profile.includes("Profile not found") && files.profile.includes("This ARC Identity profile could not be found."), "profile not-found response should use stable error/message fields");
+expect(files.profile.includes("Profile not found") && files.profile.includes("This Kyro profile could not be found."), "profile not-found response should use stable error/message fields");
 expect(files.score.includes("components") && files.score.includes("explanations"), "score response should include components and explanations");
 expect(files.score.includes("coverageIssues") && files.refresh.includes("coverageIssues"), "score responses should expose calm coverage issues");
 expect(files.developers.includes('"score"') || files.developers.includes("score:"), "Developer API sample should include top-level score");

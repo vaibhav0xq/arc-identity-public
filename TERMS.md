@@ -1,14 +1,14 @@
 # Terms of Use
 
-This Markdown copy is provided for repository transparency. The canonical version is available at https://arcidentity.in/terms.
+This Markdown copy is provided for repository transparency. The canonical version is available at https://www.thekyro.co/terms.
 
 Effective: August 6, 2026
 
-## What Arc Identity is
+## What Kyro is
 
-Arc Identity is a wallet intelligence service. It indexes public blockchain activity, verifies transactions and presents an Identity Score, trust graph and attestation history for wallets on supported networks.
+Kyro is a wallet intelligence service. It indexes public blockchain activity, verifies transactions and presents an Identity Score, trust graph and attestation history for wallets on supported networks.
 
-Arc Identity is informational. It is not financial advice, not a credit bureau, not a payment service and it never takes custody of funds. Decisions you make based on a score or credential are your own.
+Kyro is informational. It is not financial advice, not a credit bureau, not a payment service and it never takes custody of funds. Decisions you make based on a score or credential are your own.
 
 ## Your wallet, your responsibility
 
@@ -28,11 +28,11 @@ Identity Scores are computed from available evidence and are estimates, not guar
 
 ## Third-party networks
 
-The service reads from public blockchains and third-party infrastructure we do not control. Arc Identity is an independent project built on the Arc network and is not affiliated with, endorsed by or sponsored by Circle or any network operator.
+The service reads from public blockchains and third-party infrastructure we do not control. Kyro is an independent project built on the Arc network and is not affiliated with, endorsed by or sponsored by Circle or any network operator.
 
 ## Limitation of liability
 
-The service is provided as is, without warranties of any kind. To the maximum extent permitted by law, Arc Identity and its contributors are not liable for losses arising from use of the service, including losses tied to decisions made in reliance on scores or credentials.
+The service is provided as is, without warranties of any kind. To the maximum extent permitted by law, Kyro and its contributors are not liable for losses arising from use of the service, including losses tied to decisions made in reliance on scores or credentials.
 
 ## Changes and termination
 

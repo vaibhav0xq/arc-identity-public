@@ -41,6 +41,7 @@ tmp
 temp
 debug
 public/arc-identity/
+public/kyro/
 coverage
 playwright-report
 test-results

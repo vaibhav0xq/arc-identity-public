@@ -5,7 +5,7 @@ import { WalletGate } from "@/components/WalletGate";
 
 const sample = {
   walletAddress: "0x...",
-  username: "yourname.arcid",
+  username: "yourname.kyro",
   score: 68,
   arcIdentityScore: 68,
   riskLevel: "Reliable",
@@ -57,7 +57,7 @@ export function DevelopersPageClient() {
   return (
     <WalletGate
       sectionLabel="Developer API"
-      title="Connect your wallet to view Arc Identity developer tools."
+      title="Connect your wallet to view Kyro developer tools."
       description="Connect your wallet to explore API examples and live credential demos."
     >
       <div className="min-w-0 py-4 sm:py-6 lg:py-2">

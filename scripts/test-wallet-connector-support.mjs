@@ -23,7 +23,7 @@ const requiredSignals = [
   "arcIdentityWalletProvider",
   "No compatible EVM wallet found.",
   "Install or enable MetaMask, Rabby, OKX Wallet, or Coinbase Wallet to continue.",
-  "Domain: arcidentity.in",
+  "Domain: www.thekyro.co",
   "Purpose: Verify wallet ownership",
   "Nonce:",
   "This signature does not send a transaction.",
@@ -56,5 +56,5 @@ console.log(JSON.stringify({
   ok: true,
   checked: "components/WalletConnectButton.tsx",
   connectors: ["MetaMask", "Rabby", "OKX Wallet", "Coinbase Wallet", "generic injected EIP-1193", "EIP-6963"],
-  note: "Phantom is intentionally hidden for the EVM-only launch flow. MetaMask domain blocklist warnings are external and must be appealed separately; ARC Identity does not request transactions or token approvals."
+  note: "Phantom is intentionally hidden for the EVM-only launch flow. MetaMask domain blocklist warnings are external and must be appealed separately; Kyro does not request transactions or token approvals."
 }, null, 2));

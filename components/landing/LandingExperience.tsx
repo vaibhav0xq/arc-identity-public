@@ -230,7 +230,7 @@ export function LandingExperience() {
           <div className="landing-eyebrow" data-cascade><span className="landing-eyebrow-line" /> Wallet intelligence / Built on Arc</div>
           <h1 data-cascade>Trust, with a <em>record</em> behind it.</h1>
           <p className="landing-hero-lede" data-cascade>
-            Arc Identity turns wallet history into a verified financial credential readable by people, protocols and the systems moving value.
+            Kyro turns wallet history into a verified financial credential readable by people, protocols and the systems moving value.
           </p>
           <div className="landing-hero-actions" data-cascade>
             <Link href="/dashboard" className="landing-button landing-button-dark">Launch Identity <span>↗</span></Link>
@@ -318,7 +318,7 @@ export function LandingExperience() {
       <footer className="landing-footer">
         <div className="landing-footer-grid">
           <div className="landing-footer-brand">
-            <p className="landing-footer-name">Arc Identity</p>
+            <p className="landing-footer-name">Kyro</p>
             <p className="landing-footer-tag">Wallet intelligence for the Arc economy. Trust, with a record behind it.</p>
             <a className="landing-footer-mail" href={`mailto:${ARC_SUPPORT_EMAIL}`}>{ARC_SUPPORT_EMAIL}</a>
           </div>
@@ -344,8 +344,8 @@ export function LandingExperience() {
           </nav>
         </div>
         <div className="landing-footer-base">
-          <span>Arc Identity &#183; arcidentity.in &#183; 2026</span>
-          <span>Built on Arc. Arc Identity is an independent project and is not affiliated with Circle.</span>
+          <span>Kyro &#183; www.thekyro.co &#183; 2026</span>
+          <span>Built on Arc. Kyro is an independent project and is not affiliated with Circle.</span>
         </div>
       </footer>
     </div>

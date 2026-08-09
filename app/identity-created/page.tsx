@@ -48,7 +48,7 @@ type RevealContext = {
 };
 
 const revealSteps = [
-  "Creating your ARC Identity...",
+  "Creating your Kyro...",
   "Verifying wallet signature...",
   "Scanning wallet footprints...",
   "Preparing Identity Score..."
@@ -176,7 +176,7 @@ export default function IdentityCreatedPage() {
   const publicProfileHref = resolvedProfileUrl ?? (resolvedUsername ? `/profile/${resolvedUsername}` : "/profile/me");
   const profileHref = resolvedWallet ? publicProfileHref : "/create";
   const dashboardHref = "/dashboard";
-  const displayUsername = resolvedUsername ?? "your ARC Identity";
+  const displayUsername = resolvedUsername ?? "your Kyro";
   const displayWallet = resolvedWallet ? shortenAddress(resolvedWallet) : "Verified wallet";
   const arcScore = scoreFor(score);
   const riskLevel = score?.riskLevel ?? "High Risk";
@@ -185,7 +185,7 @@ export default function IdentityCreatedPage() {
   const chainsIndexed = indexedChainsFor(score);
   const freshWallet = txCount === 0 && chainsIndexed === 0;
   const publicProfileUrl = publicAppUrl(publicProfileHref);
-  const shareText = `I just claimed my ARC Identity: ${displayUsername}\n\nPayments are solved, trust isn't.\n\nARC Identity brings onchain reputation, wallet intelligence and portable trust profiles to Arc users.\n\n${publicProfileUrl}\n\nBuilt by @vaibhav_0xq`;
+  const shareText = `I just claimed my Kyro: ${displayUsername}\n\nPayments are solved, trust isn't.\n\nKyro brings onchain reputation, wallet intelligence and portable trust profiles to Arc users.\n\n${publicProfileUrl}\n\nBuilt by @vaibhav_0xq`;
   const shareUrl = `https://twitter.com/intent/tweet?text=${encodeURIComponent(shareText)}`;
   const scoreLoading = state === "loading" && !score;
 
@@ -203,7 +203,7 @@ export default function IdentityCreatedPage() {
           <div className="arc-surface w-full rounded-3xl p-7 text-center shadow-panel sm:p-10">
             <p className="arc-section-label">{checking ? "Preparing reveal" : "Identity reveal unavailable"}</p>
             <h1 className="mt-4 text-3xl font-black text-white sm:text-4xl">
-              {checking ? "Preparing your ARC Identity reveal..." : "Connect your wallet to view the ARC Identity reveal."}
+              {checking ? "Preparing your Kyro reveal..." : "Connect your wallet to view the Kyro reveal."}
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400">
               {checking
@@ -230,9 +230,9 @@ export default function IdentityCreatedPage() {
           <div className="pointer-events-none absolute -right-24 bottom-0 h-72 w-72 rounded-full bg-cyan-300/10 blur-3xl" />
           <div className="relative grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
             <div>
-              <p className="arc-section-label">ARC Identity created</p>
+              <p className="arc-section-label">Kyro created</p>
               <h1 className="mt-4 text-4xl font-black tracking-tight text-white sm:text-5xl">
-                {state === "loading" ? revealSteps[stepIndex].replace("...", "") : "Your ARC Identity is live"}
+                {state === "loading" ? revealSteps[stepIndex].replace("...", "") : "Your Kyro is live"}
               </h1>
               <p className="mt-5 max-w-xl text-base leading-7 text-slate-300">
                 {state === "loading"
@@ -313,7 +313,7 @@ export default function IdentityCreatedPage() {
                   ? "No wallet footprints found yet. ARC Intelligence will update as this wallet becomes active."
                   : "Your Identity Score prioritizes Arc ecosystem activity, verified attestations, trusted counterparties and trust graph strength. Global wallet history supports maturity confidence."}
               </p>
-              {score?.refreshInProgress ? <p className="mt-3 text-xs font-semibold text-slate-500">Wallet intelligence is still indexing. You can continue using ARC Identity.</p> : null}
+              {score?.refreshInProgress ? <p className="mt-3 text-xs font-semibold text-slate-500">Wallet intelligence is still indexing. You can continue using Kyro.</p> : null}
             </div>
           </div>
         </div>

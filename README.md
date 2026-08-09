@@ -1,12 +1,12 @@
 <div align="center">
 
-# Arc Identity
+# Kyro
 
 **Built on Arc. Wallet intelligence for the Arc economy. Trust, with a record behind it.**
 
-Arc Identity turns public wallet history into a verified financial credential readable by people, protocols and the systems moving value.
+Kyro turns public wallet history into a verified financial credential readable by people, protocols and the systems moving value.
 
-[**arcidentity.in**](https://arcidentity.in) - [Identity model docs](https://arcidentity.in/docs) - [Developer API](https://arcidentity.in/developers)
+[**thekyro.co**](https://www.thekyro.co) - [Identity model docs](https://www.thekyro.co/docs) - [Developer API](https://www.thekyro.co/developers)
 
 [Privacy](./PRIVACY.md) - [Terms](./TERMS.md) - [Security](./SECURITY.md)
 
@@ -22,7 +22,7 @@ Arc Identity turns public wallet history into a verified financial credential re
 
 ---
 
-Arc Identity is built on Arc and designed around Arc testnet activity. It is an independent project and is not affiliated with Circle or any network operator.
+Kyro is built on Arc and designed around Arc testnet activity. It is an independent project and is not affiliated with Circle or any network operator.
 
 ## Repository docs
 
@@ -35,7 +35,7 @@ Arc Identity is built on Arc and designed around Arc testnet activity. It is an 
 
 ## What it does
 
-Most reputation tools rank wallets by volume. Arc Identity ranks them by evidence.
+Most reputation tools rank wallets by volume. Kyro ranks them by evidence.
 
 The engine indexes public activity across supported networks, verifies transaction-backed attestations between wallets, maps counterparty relationships into a trust graph and compresses all of it into a deterministic Identity Score with every input disclosed. The result is a public credential page any person or protocol can inspect.
 
@@ -95,7 +95,7 @@ The engine indexes public activity across supported networks, verifies transacti
 
 ## Identity Score model
 
-The production model is versioned as `arc_score_v2_2026_07`. It is deterministic and evidence capped. A wallet with no indexed or verified evidence starts at 0. Profile creation alone is worth nothing.
+The production model is versioned as `identity_score_v1`. It is deterministic and evidence capped. A wallet with no indexed or verified evidence starts at 0. Profile creation alone is worth nothing.
 
 | Evidence category | Max points |
 | --- | --- |
@@ -135,7 +135,7 @@ Production deployment configuration, private environment files and database oper
 
 ## API
 
-Base URL: `https://arcidentity.in`
+Base URL: `https://www.thekyro.co`
 
 | Endpoint | Returns |
 | --- | --- |
@@ -146,7 +146,7 @@ Base URL: `https://arcidentity.in`
 Example:
 
 ```bash
-curl https://arcidentity.in/api/score/0xYourWalletAddress
+curl https://www.thekyro.co/api/score/0xYourWalletAddress
 ```
 
 Responses include the model version, cache status and last indexed timestamp so consumers can reason about freshness.
@@ -164,8 +164,8 @@ Responses include the model version, cache status and last indexed timestamp so 
 Requires Node.js 20 or later.
 
 ```bash
-git clone https://github.com/vaibhav0xq/arc-identity-public.git
-cd arc-identity-public
+git clone https://github.com/vaibhav0xq/kyro-public.git
+cd kyro-public
 npm install
 ```
 
@@ -190,7 +190,7 @@ Run the development server:
 npm run dev
 ```
 
-The app is available at `http://localhost:3000`.
+The app runs locally on the port shown by the development server.
 
 ## Scripts
 
@@ -224,7 +224,7 @@ The app is available at `http://localhost:3000`.
 
 ## Security
 
-No legitimate Arc Identity surface will ever ask for private keys or seed phrases. Wallet ownership is proven by signature only.
+No legitimate Kyro surface will ever ask for private keys or seed phrases. Wallet ownership is proven by signature only.
 
 Found a vulnerability? See [SECURITY.md](./SECURITY.md) for how to report it responsibly. Repository copies of the public policy pages are available in [PRIVACY.md](./PRIVACY.md) and [TERMS.md](./TERMS.md).
 
@@ -234,10 +234,10 @@ Issues and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) 
 
 ## Disclaimer
 
-Arc Identity is informational. It is not financial advice, not a credit bureau and it never takes custody of funds. It is an independent project built on the Arc network and is not affiliated with Circle or any network operator.
+Kyro is informational. It is not financial advice, not a credit bureau and it never takes custody of funds. It is an independent project built on the Arc network and is not affiliated with Circle or any network operator.
 
 ## Author
 
-Built by **Vaibhav** ([@vaibhav0xq](https://github.com/vaibhav0xq)) - [X](https://x.com/arcidentityhq) - [arcidentity.build@gmail.com](mailto:arcidentity.build@gmail.com)
+Built by **Vaibhav** ([@vaibhav0xq](https://github.com/vaibhav0xq)) - [X](https://x.com/KyroIdentity) - [arcidentity.build@gmail.com](mailto:arcidentity.build@gmail.com)
 
 Web3 builder focused on wallet intelligence, trust systems and blockchain identity infrastructure.

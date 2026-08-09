@@ -76,7 +76,7 @@ if (!refresh.response.ok && refresh.response.status !== 403) {
 }
 if (refresh.response.status === 403) {
   console.warn(JSON.stringify({
-    warning: "refresh requires a claimed ARC Identity; continuing provider diagnostics without refresh",
+    warning: "refresh requires a claimed Kyro; continuing provider diagnostics without refresh",
     wallet,
     response: refresh.json
   }, null, 2));

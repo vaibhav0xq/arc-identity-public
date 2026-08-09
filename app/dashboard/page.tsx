@@ -304,7 +304,7 @@ function isConfirmedFreshScore(score: ScoreLookupResponse | null | undefined) {
 }
 
 function dashboardPendingMessage(hasSignature: boolean) {
-  return hasSignature ? "Checking Arc Identity..." : "Verifying wallet session...";
+  return hasSignature ? "Checking Kyro..." : "Verifying wallet session...";
 }
 
 function timestampMs(value?: string | null) {
@@ -395,7 +395,7 @@ function IdentitySummary({ identity, onCopyProfile, historyAction, refreshing = 
       </div>
       <div>
         <p className="arc-section-label">Identity Summary</p>
-        <h2 className="mt-3 break-words text-2xl font-extrabold text-bone sm:text-3xl">{username ?? "Claim your Arc Identity"}</h2>
+        <h2 className="mt-3 break-words text-2xl font-extrabold text-bone sm:text-3xl">{username ?? "Claim your Kyro"}</h2>
         <p className="mt-3 break-all font-mono text-sm text-[#b6b9ae] sm:break-normal">{shortenAddress(identity.profile.walletAddress)}</p>
         <p className="mt-5 text-xl font-bold text-gold">{getBadge(identity.score.arcScore)}</p>
         <div className="mt-9 grid gap-x-5 sm:grid-cols-3 sm:divide-x sm:divide-[#555a52]">
@@ -774,7 +774,7 @@ export default function DashboardPage() {
   const [identity, setIdentity] = useState<IdentityRecord | null>(null);
   const [attestations, setAttestations] = useState<Attestation[]>([]);
   const [trustGraph, setTrustGraph] = useState<TrustGraph | null>(null);
-  const [message, setMessage] = useState("Loading Arc Identity...");
+  const [message, setMessage] = useState("Loading Kyro...");
   const [refreshMessage, setRefreshMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false);
   const [scoreMeta, setScoreMeta] = useState<ScoreLookupResponse | null>(null);
@@ -1053,7 +1053,7 @@ export default function DashboardPage() {
       setTrustGraph(null);
       setScoreMeta(null);
       setRefreshMessage("");
-      setMessage("Connect an EVM wallet to open your Arc Identity dashboard.");
+      setMessage("Connect an EVM wallet to open your Kyro dashboard.");
       setLoadState("new_wallet_no_data");
       return;
     }
@@ -1141,7 +1141,7 @@ export default function DashboardPage() {
         if (ensure?.usernameClaimed || ensuredUsername) {
           if (!ensuredUsername) {
             setLoadState("new_wallet_no_data");
-            setMessage("Complete your Arc Identity to unlock wallet intelligence.");
+            setMessage("Complete your Kyro to unlock wallet intelligence.");
             console.log("[arc-identity] dashboard_locked_reason", { wallet, reason: "claimed_without_username" });
             console.log("[arc-identity] dashboard_identity_locked_from_ensure", { wallet, reason: "claimed_without_username" });
             return;
@@ -1263,7 +1263,7 @@ export default function DashboardPage() {
           setTrustGraph(null);
           setScoreMeta(null);
           setLoadState("new_wallet_no_data");
-          setMessage("Complete your Arc Identity to unlock wallet intelligence.");
+          setMessage("Complete your Kyro to unlock wallet intelligence.");
           console.log("[arc-identity] dashboard_locked_reason", { wallet, reason: "unclaimed" });
           console.log("[arc-identity] dashboard_identity_locked_from_ensure", { wallet });
           return;
@@ -1462,14 +1462,14 @@ export default function DashboardPage() {
   const sessionWallet = sessionState.wallet ?? arcIdentity.normalizedWallet;
   const sessionHasWallet = Boolean(sessionWallet);
   const sessionSignatureVerified = sessionState.signatureVerified || arcIdentity.status === "claimed";
-  const confirmedUnclaimed = sessionHasWallet && loadState === "new_wallet_no_data" && message.startsWith("Complete your Arc Identity");
+  const confirmedUnclaimed = sessionHasWallet && loadState === "new_wallet_no_data" && message.startsWith("Complete your Kyro");
   const shouldHoldConnectedPendingState = sessionHasWallet && !identity && !confirmedUnclaimed;
   const needsWalletConnection = !sessionHasWallet;
   const setupHeading = needsWalletConnection
-    ? "Connect your wallet to open your Arc Identity dashboard."
+    ? "Connect your wallet to open your Kyro dashboard."
     : shouldHoldConnectedPendingState
       ? dashboardPendingMessage(sessionSignatureVerified)
-      : message || "Complete your Arc Identity to unlock wallet intelligence.";
+      : message || "Complete your Kyro to unlock wallet intelligence.";
   const showSetupClaimCta = sessionHasWallet && !shouldHoldConnectedPendingState;
   const dashboardStatusMessage = refreshing
     ? "Refreshing wallet intelligence. Current data remains visible."
@@ -1603,29 +1603,29 @@ export default function DashboardPage() {
               </section>
             </div>
             <section className="r4-panel pt-6 text-mutedc">
-              <p className="kicker">Arc Identity setup</p>
+              <p className="kicker">Kyro setup</p>
               <h2 className="mt-3 font-heading text-2xl text-ink">{setupHeading}</h2>
               <p className="mt-3 max-w-2xl text-sm leading-6">
               {loadState === "loading_cached_profile" || shouldHoldConnectedPendingState
                 ? knownUsername
-                ? "Loading your Arc Identity dashboard."
-                  : "Preparing your Arc Identity workspace."
-                : message.startsWith("ARC Identity created")
+                ? "Loading your Kyro dashboard."
+                  : "Preparing your Kyro workspace."
+                : message.startsWith("Kyro created")
                 ? "Your public identity is ready. Refresh intelligence to load the latest wallet context."
                 : needsWalletConnection
                 ? "Connect your wallet to view your reputation, attestations and wallet intelligence."
-                : "Claim a username to activate your public Arc Identity dashboard."}
+                : "Claim a username to activate your public Kyro dashboard."}
               </p>
             {loadState === "loading_cached_profile" || shouldHoldConnectedPendingState ? <p className="mt-4 text-sm text-slate-500">{knownUsername ? "Loading wallet intelligence..." : "Checking identity..."}</p> : null}
               <div className="mt-6 flex flex-wrap gap-3">
               {needsWalletConnection ? (
                 <WalletConnectButton />
-              ) : !showSetupClaimCta ? null : message.startsWith("ARC Identity created") && (knownUsername || scoreMeta?.username) ? (
+              ) : !showSetupClaimCta ? null : message.startsWith("Kyro created") && (knownUsername || scoreMeta?.username) ? (
                 <Link href="/profile/me" className="inline-flex rounded bg-emerald-300 px-4 py-3 font-black text-slate-950">View public profile</Link>
               ) : (
                 <Link href="/create" className="inline-flex rounded bg-emerald-300 px-4 py-3 font-black text-slate-950">Claim username</Link>
               )}
-              {message.startsWith("ARC Identity created") ? <button onClick={refreshIntelligence} disabled={refreshing} className="rounded border border-white/10 px-4 py-3 font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh intelligence"}</button> : null}
+              {message.startsWith("Kyro created") ? <button onClick={refreshIntelligence} disabled={refreshing} className="rounded border border-white/10 px-4 py-3 font-bold text-white transition hover:bg-white/10 disabled:cursor-not-allowed disabled:opacity-60">{refreshing ? "Refreshing..." : "Refresh intelligence"}</button> : null}
               </div>
             </section>
           </div>

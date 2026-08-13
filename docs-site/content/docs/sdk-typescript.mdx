@@ -1,0 +1,146 @@
+---
+title: TypeScript SDK
+description: First-party TypeScript client for the Kyro API. Typed methods for all 8 operations, a shared error model and rate limit metadata.
+---
+
+The TypeScript SDK wraps the v1 API so you can integrate counterparty decisions without hand-writing fetch calls. It has zero runtime dependencies, runs in Node 18.17+ and modern browsers and ships both ESM and CJS builds. Types are generated from the published OpenAPI spec, so the SDK surface matches the API contract exactly.
+
+**Status: not published to npm yet.** The package lives in the Kyro repository while the publish pipeline is settled. Once it ships, installing will look like this:
+
+```bash
+npm install @kyro/sdk
+```
+
+Everything below already works today against the source build.
+
+## Create a client
+
+```ts
+import { Kyro } from "@kyro/sdk";
+
+const kyro = new Kyro({
+  apiKey: process.env.KYRO_API_KEY, // optional
+});
+```
+
+Every endpoint works anonymously: omit `apiKey` and you get the anonymous rate budget (20 units per minute). A key raises the budget to its plan. Keys are server-side only; a key shipped to a browser is handed to every visitor.
+
+The constructor also accepts `baseUrl`, `timeoutMs` (default 30000), a custom `fetch` implementation and an `onRateLimit` hook.
+
+## Check a counterparty
+
+```ts
+const decision = await kyro.decisions.check(
+  "0x1234567890abcdef1234567890abcdef12345678",
+  { useCase: "payment" },
+);
+
+if (decision.decision === "block") {
+  // stop the flow and show the reasons
+}
+```
+
+A valid wallet Kyro has not scored answers with a conservative baseline instead of an error. The check never throws `NOT_FOUND` for a valid wallet.
+
+## All methods
+
+| Method | Endpoint |
+| --- | --- |
+| `kyro.score.get(wallet)` | `GET /api/v1/score/{wallet}` |
+| `kyro.profile.get(username)` | `GET /api/v1/profile/{username}` |
+| `kyro.trust.get(wallet)` | `GET /api/v1/trust/{wallet}` |
+| `kyro.decisions.check(wallet, { useCase })` | `GET /api/v1/decision/{wallet}` |
+| `kyro.decisions.batch(inputs, { useCase })` | `POST /api/v1/decision/batch` |
+| `kyro.receipts.create({ wallet or username, useCase })` | `POST /api/v1/decision-receipts` |
+| `kyro.receipts.get(id)` | `GET /api/v1/decision-receipts/{id}` |
+| `kyro.intake.start(wallet)` | `POST /api/v1/intake/{wallet}` |
+
+Each method returns the unwrapped `data` payload and takes an optional trailing `{ signal, timeoutMs }`. The [response envelope](/docs/response-envelope) is handled for you: `ok: false` becomes a thrown error.
+
+## Screen a list
+
+```ts
+const batch = await kyro.decisions.batch(
+  ["0x1234567890abcdef1234567890abcdef12345678", "amara.kyro"],
+  { useCase: "payment" },
+);
+
+console.log(batch.summary); // { total, allow, caution, block, noScore, invalid, error }
+for (const row of batch.results) {
+  // discriminate on row.status; rows include no_score and invalid outcomes
+}
+```
+
+Unique rows are capped by plan: 10 anonymous, 50 developer, 250 pro, 500 partner by default. A batch of N unique rows costs N rate units; size-rejected batches cost nothing. See [batch checks](/docs/batch-checks).
+
+## Wallets Kyro has not seen yet
+
+```ts
+const intake = await kyro.intake.start(wallet);
+
+if (intake.status !== "already_indexed") {
+  // poll until the snapshot commits, then decide
+  let score = await kyro.score.get(wallet);
+  while (score.cacheStatus !== "cached") {
+    await new Promise((resolve) => setTimeout(resolve, 5000));
+    score = await kyro.score.get(wallet);
+  }
+}
+const decision = await kyro.decisions.check(wallet, { useCase: "payment" });
+```
+
+`intake.start` is idempotent by state: `already_indexed` answers with no work done, `indexing` joins an in-flight scan for free and `started` begins a new scan for 20 rate units anonymously or 5 with an API key. See [intake](/docs/intake).
+
+## Handle errors
+
+```ts
+import { KyroApiError, KyroError, KyroRequestError } from "@kyro/sdk";
+
+try {
+  await kyro.decisions.check(wallet);
+} catch (error) {
+  if (error instanceof KyroApiError) {
+    // the API answered with an error envelope
+    error.code;              // "RATE_LIMITED", "INVALID_WALLET", ...
+    error.status;            // HTTP status
+    error.retryAfterSeconds; // set on 429 responses
+    error.rateLimit;         // { limit, remaining } when headers were present
+    error.envelope;          // the raw parsed body
+  } else if (error instanceof KyroRequestError) {
+    // the request failed in transit
+    error.code; // "TIMEOUT" | "NETWORK" | "BAD_RESPONSE"
+  }
+}
+```
+
+Both classes extend `KyroError`, so one `instanceof KyroError` catches everything the SDK throws. Error code lists can grow additively; treat unknown codes as informational.
+
+The SDK never retries on its own. Rate units are real spend, so retry policy stays with you; `retryAfterSeconds` says exactly how long to wait after a 429. Timeouts abort the underlying request, so retrying a timed-out call is safe.
+
+## Watch your rate budget
+
+```ts
+const kyro = new Kyro({
+  apiKey: process.env.KYRO_API_KEY,
+  onRateLimit: ({ limit, remaining, path }) => {
+    if (remaining !== undefined && remaining < 10) {
+      console.warn(`Kyro budget low: ${remaining}/${limit} after ${path}`);
+    }
+  },
+});
+```
+
+The hook fires whenever a response carries `X-RateLimit-*` headers. For per-call access to status, headers and rate limit values, use the low-level escape hatch:
+
+```ts
+const { data, status, headers, rateLimit } = await kyro.request(
+  "GET",
+  "/api/v1/score/0x1234567890abcdef1234567890abcdef12345678",
+);
+```
+
+## Requirements
+
+- Node 18.17 or newer and any modern browser runtime with `fetch`
+- Zero runtime dependencies; ESM and CJS builds with bundled types
+- API keys belong on the server; anonymous browser use is fine

@@ -1,0 +1,67 @@
+---
+title: Quickstart
+description: Make your first decision call. No SDK and no API key needed.
+---
+
+Every endpoint works anonymously over plain HTTP and JSON. The base URL is `https://www.thekyro.co`.
+
+## 1. Check a counterparty
+
+```bash
+curl "https://www.thekyro.co/api/v1/decision/0x1234567890abcdef1234567890abcdef12345678?useCase=payment"
+```
+
+The response is a versioned envelope. Check `ok` before reading `data`:
+
+```json
+{
+  "ok": true,
+  "version": "v1",
+  "data": {
+    "wallet": "0x1234567890abcdef1234567890abcdef12345678",
+    "decision": "caution",
+    "score": 79,
+    "recommendedLimit": { "amountUsdc": 50, "currency": "USDC" }
+  }
+}
+```
+
+## 2. Act on the verdict
+
+```ts
+const base = "https://www.thekyro.co";
+const headers = apiKey ? { Authorization: "Bearer " + apiKey } : undefined;
+
+const res = await fetch(base + "/api/v1/decision/" + wallet + "?useCase=payment", { headers });
+const body = await res.json();
+if (!body.ok) throw new Error(body.error.code + ": " + body.error.message);
+
+const { decision, recommendedLimit, reasons, warnings } = body.data;
+if (decision === "block") return reject(reasons);
+if (decision === "caution") return review(recommendedLimit.amountUsdc, reasons);
+return proceed(); // decision === "allow"
+```
+
+Treat `caution` as proceed-with-controls: lower limits, delays or review. Reserve hard stops for `block`, which only fires on strong negative evidence.
+
+## 3. Handle wallets Kyro has not seen
+
+A valid wallet without a committed snapshot still answers 200 with a conservative baseline, never a 404. To get a real verdict, index it first:
+
+```ts
+await fetch(base + "/api/v1/intake/" + wallet, { method: "POST" }); // 202, costs 20 units anonymously (5 with a key)
+
+for (let i = 0; i < 24; i++) {           // ~2 minutes at 5s intervals
+  await new Promise((r) => setTimeout(r, 5000));
+  const score = await fetch(base + "/api/v1/score/" + wallet).then((r) => r.json());
+  if (score.ok && score.data.cacheStatus === "cached") break;
+}
+
+const check = await fetch(base + "/api/v1/decision/" + wallet).then((r) => r.json());
+```
+
+## Next
+
+- [Authentication](./authentication.mdx) if you need a higher rate budget.
+- [Decision API](./decision-api.mdx) for verdict semantics and the full response shape.
+- [Batch checks](./batch-checks.mdx) to screen many counterparties in one call.

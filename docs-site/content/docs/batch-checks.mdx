@@ -1,0 +1,28 @@
+---
+title: Batch checks
+description: Screen many counterparties in one POST. Rows fail individually, never the whole batch.
+---
+
+`POST /api/v1/decision/batch` screens a list in one call. The body takes `inputs` (wallet addresses and Kyro usernames mixed in one list) and an optional `useCase`. Entries are trimmed and deduped case-insensitively. Row caps scale with your plan. After dedupe: at most 10 unique rows anonymously, 50 on a developer key, 250 on pro, 500 on partner by default. Raw entries before dedupe are capped at 4x the row cap with a floor of 200. Larger requests answer `400 INVALID_REQUEST` and nothing is charged. Plan budgets live on the [rate limits](./rate-limits.mdx) page.
+
+```json
+{
+  "inputs": ["0x1234567890abcdef1234567890abcdef12345678", "amara.kyro"],
+  "useCase": "payment"
+}
+```
+
+Problems with a row never fail the batch. Each row reports its own status and the response includes a verdict tally. Batch reads committed snapshots only and never mints receipts. Cost is N units where N is the number of unique rows.
+
+## Row statuses
+
+| Row status | Meaning |
+| --- | --- |
+| `ok` | Committed snapshot found. The row carries a full verdict. |
+| `no_score` | No committed snapshot. Kyro does not fabricate a verdict from missing evidence. Run intake, then re-check. |
+| `invalid` | Malformed wallet address or unknown username. |
+| `error` | Transient failure on this row only. Retry later. |
+
+## API vs web UI
+
+CSV upload and the results table are features of the Kyro web UI. The API itself takes and returns JSON only. The UI also offers per-row and bulk indexing for `no_score` rows; over the API you get the same effect by calling [intake](./intake.mdx) yourself.

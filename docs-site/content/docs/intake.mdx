@@ -1,0 +1,28 @@
+---
+title: Intake unknown wallets
+description: Start indexing a wallet Kyro has not seen yet. No signature from the wallet owner is needed.
+---
+
+Use `POST /api/v1/intake/:wallet` when a wallet has no committed Kyro score yet. It starts on-demand indexing in the background. No signature or action from the wallet owner is needed.
+
+Responses are idempotent by state: `200 already_indexed` when a committed snapshot exists, `202 started` or `indexing` for new or in-flight work. One attempt per wallet per 10 minutes: during the cooldown you get 429 with `Retry-After`. Starting a scan costs 20 units anonymously or 5 units with any API key. The `already_indexed` and `indexing` answers cost nothing. A request that hits the cooldown has already spent its units, which keeps hammering a failing wallet expensive.
+
+Starts are also capped per UTC day: 25 per IP for anonymous callers, 200 per key on developer, 1000 on pro and 2000 on partner. Only scans that actually start count against the cap. Reaching it answers `429 RATE_LIMITED` with `Retry-After` pointing at the next UTC midnight, before any units are spent.
+
+## Poll, then re-check
+
+Indexing usually completes in under a minute. Poll `GET /api/v1/score/:wallet` until `cacheStatus` is `cached` (the Kyro UI polls every 5 seconds for up to 2 minutes), then re-run the decision.
+
+```ts
+await fetch(base + "/api/v1/intake/" + wallet, { method: "POST" }); // 202 started costs 20 units anonymously, 5 with a key; free if already indexed or in flight
+
+for (let i = 0; i < 24; i++) {           // ~2 minutes at 5s intervals
+  await new Promise((r) => setTimeout(r, 5000));
+  const score = await fetch(base + "/api/v1/score/" + wallet).then((r) => r.json());
+  if (score.ok && score.data.cacheStatus === "cached") break;
+}
+
+const check = await fetch(base + "/api/v1/decision/" + wallet).then((r) => r.json());
+```
+
+Wallets indexed through intake stay out of the public directory and username lookups until the owner claims them. Intake creates score evidence, not a public profile.

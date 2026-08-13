@@ -1,0 +1,48 @@
+---
+title: Response envelope
+description: Every response, success or error, is JSON in the same versioned envelope.
+---
+
+Every response, success or error, is JSON in the same versioned envelope. Check `ok` before reading `data`.
+
+Success:
+
+```json
+{
+  "ok": true,
+  "version": "v1",
+  "data": {
+    "wallet": "0x1234567890abcdef1234567890abcdef12345678",
+    "score": 79,
+    "cacheStatus": "cached"
+  }
+}
+```
+
+Error:
+
+```json
+{
+  "ok": false,
+  "version": "v1",
+  "error": {
+    "code": "RATE_LIMITED",
+    "message": "Rate limit exceeded (20 requests per minute). Retry in 17s."
+  }
+}
+```
+
+## Error codes
+
+| Code | HTTP | Meaning |
+| --- | --- | --- |
+| `INVALID_WALLET` | 400 | Malformed wallet address. Expected 0x + 40 hex characters. |
+| `INVALID_USERNAME` | 400 | Malformed profile username. |
+| `INVALID_REQUEST` | 400 | Bad body or size limits exceeded. Nothing is charged for size-rejected batches. |
+| `INVALID_KEY` | 401 | Malformed, unknown or revoked API key. |
+| `NOT_FOUND` | 404 | Profile or receipt does not exist. |
+| `RATE_LIMITED` | 429 | Rate budget or creation cap exhausted. Retry-After tells you when to retry. |
+| `SCHEMA_MISSING` | 5XX | Backing store unavailable. |
+| `INTERNAL` | 5XX | Unexpected server error. |
+
+Error `code` values are stable and machine-readable. `message` text is human-readable and can change. Any operation can also answer 5XX in the same envelope.

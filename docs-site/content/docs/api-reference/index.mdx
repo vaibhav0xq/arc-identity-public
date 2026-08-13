@@ -1,0 +1,17 @@
+---
+title: API Reference
+description: Every endpoint, generated from the OpenAPI 3.1.0 spec. It cannot drift from the contract.
+---
+
+All paths are relative to `https://www.thekyro.co`. Every endpoint works anonymously; an API key raises the rate budget. Pages in this section are generated from [kyro-openapi.yaml](https://www.thekyro.co/kyro-openapi.yaml).
+
+| Method | Path | Cost | Purpose |
+| --- | --- | --- | --- |
+| GET | [/api/v1/decision/:wallet](./getDecision.mdx) | 1 unit | Allow / caution / block decision with a recommended USDC limit, reasons, warnings, evidence and coverage. |
+| POST | [/api/v1/decision/batch](./batchDecisions.mdx) | N units | Screen many counterparties in one call. Wallets and usernames mixed in one list. |
+| POST | [/api/v1/intake/:wallet](./intakeWallet.mdx) | 5 units | Start indexing a wallet Kyro has not seen yet. |
+| GET | [/api/v1/score/:wallet](./getScore.mdx) | 1 unit | Committed reputation score: 0-100 score, risk level, components, chains and freshness. |
+| GET | [/api/v1/profile/:username](./getProfile.mdx) | 1 unit | Public summary of a registered Kyro identity. |
+| GET | [/api/v1/trust/:wallet](./getTrustGraph.mdx) | 1 unit | Verified trust graph: transaction-backed edges, metrics and anomaly flags. |
+| POST | [/api/v1/decision-receipts](./createDecisionReceipt.mdx) | 2 units | Mint an immutable receipt of a decision. |
+| GET | [/api/v1/decision-receipts/:id](./getDecisionReceipt.mdx) | 1 unit | Fetch a receipt exactly as minted. |

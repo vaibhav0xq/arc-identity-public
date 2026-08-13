@@ -1,0 +1,41 @@
+---
+title: Wallet intelligence
+description: The evidence layer that turns indexed wallet history into scored, explainable intelligence.
+---
+
+Wallet intelligence is the evidence layer underneath every Kyro verdict. It is the indexed, verified picture of what a wallet has actually done: its age, activity, counterparties, chain coverage and Arc network footprint. Decision endpoints consume this evidence. They never guess beyond it.
+
+## What Kyro indexes
+
+| Signal | What it covers |
+| --- | --- |
+| Global wallet profile | Wallet age, transaction count, chain coverage, counterparties and contract interactions across supported networks. |
+| Arc network footprint | Arc-specific activity read live from Arc RPC and indexing, backed by verified Arc transaction attestations when explorer coverage is limited. |
+| Verified attestations | Transaction-backed trust evidence. An attestation only exists after the submitted Arc transaction is verified against both wallets. |
+| Trust graph | Verified wallet-to-wallet edges with reciprocal relationships, network maturity, anomaly hints and tightly capped trust propagation. |
+
+## How identities register
+
+A user connects an EVM wallet, signs a verification message, claims a public `.kyro` profile and receives an Identity Score based on real indexed activity and verified transaction evidence. The signature proves control before anything is written. Claiming a username adds zero points.
+
+Integrators do not need the wallet owner to register. Any wallet can be checked anonymously and [intake](/docs/intake) starts indexing for wallets Kyro has not seen yet.
+
+## Provider states
+
+Wallet intelligence depends on external chain indexers plus Arc RPC. Each chain reports one of five states:
+
+| State | Meaning |
+| --- | --- |
+| Indexed | Provider returned usable activity and the chain contributes real indexed data. |
+| No activity | Provider responded successfully but found no transactions for the wallet. |
+| Limited | External provider access is unavailable, rate limited, paywalled or temporarily restricted. |
+| Not configured | Required API key or provider configuration is missing. |
+| Pending | The wallet has not been checked yet or a refresh is still running. |
+
+Limited means provider coverage is constrained, not that the wallet is risky. The API reports constrained evidence through coverage metadata and the `DATA_LIMITED` reason code. See [Data coverage](/docs/data-coverage).
+
+## Fast reads, careful refreshes
+
+Score reads are cached-first. `GET /api/v1/score/{wallet}` returns the best available committed profile quickly, including cache status, refresh status, last indexed time, chain coverage and attestation counts.
+
+Full indexing runs through the refresh pipeline. The pipeline uses lifecycle states so incomplete or failed provider checks never overwrite the last good cached score. A refresh commits atomically only after indexing finishes. Temporary provider failures preserve the last verified evidence instead of treating unavailable chains as zero, so repeating a refresh cannot walk a score up or down.

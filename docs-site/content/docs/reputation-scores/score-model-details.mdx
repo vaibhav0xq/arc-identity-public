@@ -1,0 +1,107 @@
+---
+title: Score model details
+description: How identity_score_v1 turns observed evidence into points, bucket by bucket.
+---
+
+Kyro exposes one primary reputation score per wallet, from 0 to 100, computed by score model `identity_score_v1`. Seven evidence buckets earn points independently, a capped risk penalty is subtracted and the result is clamped to the 0 to 100 range. Every bucket has a fixed maximum weight, so no single signal can dominate the score.
+
+Kyro starts from zero. A fresh wallet with no indexed history, no Arc footprint, no verified attestations and no trust graph evidence scores exactly 0. Claiming a username grants no points. Points come only from observed evidence that Kyro can index or verify, never from signup, self-description or manual entry.
+
+The score is decision support for your own checks before funds move. Kyro is not AML or sanctions screening and it does not provide legal, regulatory or compliance determinations.
+
+## Point buckets and maximum weights
+
+| Bucket | Max points | What it measures |
+| --- | --- | --- |
+| Global wallet age | 20 | Maturity from the earliest real indexed transaction across supported chains. |
+| Chain coverage | 5 | Supporting context from active chains with successfully indexed activity. |
+| Indexed transactions | 15 | Maturity context from real indexed transactions. |
+| Counterparty diversity | 15 | Unique global counterparties plus higher-signal Arc and verified relationships. |
+| Arc activity | 25 | Arc transactions, counterparties, active days, wallet age and balance. |
+| Verified attestations | 15 | Transaction-backed attestations with unique tx hashes and registered counterparties. |
+| Trust propagation | 5 | A tightly capped signal from verified trust edges. |
+| Risk penalty | up to -10 | Subtracted only on supported anomaly evidence or heavy repeated-pair concentration. |
+
+The seven positive buckets sum to a maximum of 100. Related evidence can inform more than one bucket. Arc counterparties strengthen both Counterparty diversity and Arc activity, while counterparties from verified attestations strengthen both diversity and Verified attestations. Each bucket applies its own cap, so overlapping evidence cannot push any bucket past its maximum.
+
+## How each bucket earns points
+
+### Global wallet age (max 20)
+
+Wallet age comes from the wallet intelligence layer: the earliest real indexed transaction across supported chains. Points grow in steps as indexed age increases and wallets with more than a year of verifiable history reach the cap. Age is anti-sybil context, not proof of good behavior. See [Wallet intelligence](/docs/wallet-intelligence).
+
+### Chain coverage (max 5)
+
+One point per chain with successfully indexed activity, up to five. Chain coverage is supporting context and is deliberately one of the smallest buckets.
+
+### Indexed transactions (max 15)
+
+Points grow in steps with the number of real indexed transactions across supported chains. The steps flatten quickly, so raw volume alone cannot dominate the score. Reaching the cap takes hundreds of indexed transactions.
+
+### Counterparty diversity (max 15)
+
+Diversity counts unique global counterparties and Arc counterparties, with counterparties from verified attestations weighted double. A wallet that recycles the same few relationships stays low in this bucket regardless of transaction volume.
+
+### Arc activity (max 25)
+
+The largest bucket. It stays at zero until the wallet has at least one Arc transaction. After that, five sub-signals accrue with their own caps:
+
+| Sub-signal | Max |
+| --- | --- |
+| Arc transactions | 10 |
+| Distinct Arc counterparties | 6 |
+| Active days on Arc | 5 |
+| Arc wallet age | 3 |
+| Positive Arc balance | 1 |
+
+The sub-signals sum to at most 25.
+
+### Verified attestations (max 15)
+
+This bucket stays at zero until the wallet has at least one verified transaction-backed attestation. The first verified attestation carries most of the bucket with a base of 8 points. Additional distinct verified counterparties add up to 3 more, additional attestations add up to 2 more and accumulated attestation quality adds up to 2 more, capped at 15 in total.
+
+An attestation only counts after verification:
+
+- It references a real Arc transaction hash.
+- The transaction exists and succeeded on Arc.
+- Both the submitting wallet and the selected counterparty participated in it.
+- Duplicate transaction hashes are rejected.
+- Self-attestations and unsupported interaction types are rejected.
+
+### Trust propagation (max 5)
+
+Trust propagated through verified trust graph edges is scaled down and hard capped at 5 points. Network influence can support a score but can never outweigh the wallet's own behavior. Only accepted, transaction-backed attestations create trust edges. See [Trust graph](/docs/trust-graph).
+
+### Risk penalty (up to -10)
+
+The only negative bucket, applied solely on supported evidence. Anomaly signals on the trust graph subtract up to 6 points depending on severity. Heavy concentration of verified activity in a single counterparty pair subtracts 4 more. The combined penalty is capped at 10 points.
+
+## Risk levels
+
+The final score maps to the `riskLevel` field returned by [getScore](/docs/api-reference/getScore):
+
+| Score | Level |
+| --- | --- |
+| 0 to 30 | High Risk |
+| 31 to 55 | New / Unproven |
+| 56 to 75 | Reliable |
+| 76 to 100 | Trusted |
+
+Levels describe the depth of verified evidence behind a wallet. A wallet with little or no verifiable history lands in the lower bands even without negative evidence, so treat a low band as absence of proof rather than proof of misconduct.
+
+## Coverage limits
+
+External chain indexers can be rate limited, plan restricted or temporarily unavailable. When provider coverage is limited, Kyro reports the gap instead of guessing: missing evidence earns no points and the response marks the affected coverage as limited rather than claiming a confirmed zero. A temporary provider failure preserves the last committed evidence instead of overwriting it with partial results. See [Data coverage](/docs/data-coverage).
+
+## Determinism
+
+The same persisted evidence always produces the same score. A refresh commits atomically only after indexing finishes, so an incomplete run never overwrites the last good committed score and repeating a refresh cannot walk a score up or down.
+
+## What the score is and is not
+
+The score is one input to your own decision process. The [Decision API](/docs/decision-api) consumes the same evidence and adds verdict semantics, conservative baselines for unknown wallets and machine-readable reason codes on top.
+
+- It is decision support, not a compliance determination. Kyro is not AML or sanctions screening.
+- A high score reflects verified history. It does not guarantee future behavior.
+- A low score reflects missing or thin evidence more often than confirmed risk.
+- Scores are advisory signals. Responsibility for the final decision stays with you.

@@ -1,0 +1,35 @@
+---
+title: Reputation scores
+description: How identity_score_v1 turns verified evidence into one explainable score from 0 to 100.
+---
+
+Kyro exposes one primary reputation score per wallet, from 0 to 100. Supporting components explain why the score moved but they are not separate competing scores.
+
+Score model `identity_score_v1` combines global wallet maturity, Arc-specific activity, verified transaction attestations, capped trust propagation and evidence-based risk controls. Component points sum to the score after any risk penalty, then clamp from 0 to 100.
+
+Claiming a username grants no points. A fresh wallet with no indexed activity, no Arc footprint, no verified attestations and no trust graph evidence starts at the real component total: 0. The score rises only when Kyro can verify meaningful wallet behavior.
+
+## Score components
+
+| Component | Points | What it measures |
+| --- | --- | --- |
+| Global wallet age | 20 | Maturity from the earliest real indexed transaction across supported chains. |
+| Chain coverage | 5 | Supporting context from active chains with successfully indexed activity. |
+| Indexed transactions | 15 | Maturity context from real indexed transactions. Raw volume alone cannot dominate the score. |
+| Counterparty diversity | 15 | Unique global counterparties plus higher-signal Arc and verified transaction relationships. |
+| Arc activity | 25 | Arc transactions, Arc counterparties, active days, Arc age and the current balance signal. |
+| Verified attestations | 15 | Only transaction-backed attestations with unique tx hashes and registered counterparties. |
+| Trust propagation | 5 | A tightly capped signal from verified trust edges. Network influence cannot outweigh wallet behavior. |
+| Risk penalty | up to -10 | Applied only from supported anomaly evidence or excessive repeated-pair concentration. |
+
+For the bucket-by-bucket breakdown of how points accrue, including sub-signals, verification rules and the risk penalty, see [Score model details](/docs/reputation-scores/score-model-details).
+
+## Score stability
+
+The same persisted evidence always produces the same score. A refresh commits atomically only after indexing finishes. Temporary provider failures preserve the last verified evidence instead of treating unavailable chains as zero, so repeating a refresh cannot walk a score up or down.
+
+## Reading scores over the API
+
+`GET /api/v1/score/{wallet}` returns the committed score with its component breakdown, chain coverage and freshness metadata. See [getScore](/docs/api-reference/getScore) in the API reference.
+
+The [Decision API](/docs/decision-api) consumes the same evidence and adds verdict semantics on top. Wallets Kyro has not indexed yet get a conservative baseline verdict instead of a guessed score.

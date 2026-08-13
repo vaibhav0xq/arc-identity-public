@@ -1,0 +1,46 @@
+---
+title: Rate limits
+description: Unit budgets per fixed 60-second window and how to retry after a 429.
+---
+
+Budgets are measured in units per fixed 60-second window. Keyed budgets depend on the key's plan.
+
+| Access | Budget | Unique batch rows |
+| --- | --- | --- |
+| anonymous | 20 units per minute per IP | 10 |
+| developer key | 120 units per minute per key | 50 |
+| pro key | 300 units per minute per key | 250 |
+| partner key | 600 units per minute per key by default | 500 by default |
+
+Every new key starts on the developer plan. Plans are server-side state set by the Kyro team: nothing in a request can choose or change one. Partner budgets and batch caps can be set per key by agreement. To move past developer limits, reach out through the [developers page](https://www.thekyro.co/developers).
+
+## Unit costs
+
+| Request | Unit cost |
+| --- | --- |
+| most requests | 1 |
+| batch | N (N = unique rows) |
+| intake | 20 anonymously or 5 with any API key to start a scan. Probes answering `already_indexed` or `indexing` cost 0. |
+| receipt creation | 2, since it runs a real decision read. Extra cap of 5 creations per minute. |
+| score read background rescan | 5, drawn from the caller's anonymous per-IP budget when a stale known wallet triggers one (also on keyed requests). With that budget empty the rescan is skipped and cached data is served. |
+
+## Daily intake caps
+
+Starting scans is additionally capped per UTC day. The per-minute budget bounds how fast you can spend; this bounds the total.
+
+| Access | Intake starts per UTC day |
+| --- | --- |
+| anonymous | 25 per IP |
+| developer key | 200 per key |
+| pro key | 1000 per key |
+| partner key | 2000 per key |
+
+Only scans that actually start count: free probes, cooldown 429s and rate-limited requests never consume the cap. Reaching the cap answers `429 RATE_LIMITED` with `Retry-After` pointing at the next UTC midnight, before any units are spent.
+
+## Headers and retries
+
+Responses that pass validation carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`; early validation errors (400) can omit them; free intake probes (`already_indexed`, `indexing`) omit them because nothing was spent. A 429 adds `Retry-After` in seconds: wait that long, then retry.
+
+Budgets use a fixed 60-second window, so bursts right after a 429 will fail again. Read `Retry-After`, wait, then retry once. Nothing is charged for size-rejected batch requests.
+
+If the counter store behind the limiter is briefly unreachable, Kyro switches to a conservative in-memory limit of half the normal budget until it recovers. `X-RateLimit-Limit` always shows the budget in force.

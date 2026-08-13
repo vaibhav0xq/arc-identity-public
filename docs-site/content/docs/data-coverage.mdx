@@ -1,0 +1,25 @@
+---
+title: Data coverage and DATA_LIMITED
+description: What limited coverage means, how gaps surface and why missing evidence is not guilt.
+---
+
+> **Read this before judging a wallet.** `DATA_LIMITED` means Kyro has limited data coverage or confidence for this wallet. It does not mean the wallet is bad. The decision response separates what happened per chain in `coverage.chains` so you can see exactly where the gaps are.
+
+## Coverage states
+
+| Coverage state | What it means |
+| --- | --- |
+| Provider transient | A provider failed temporarily during the last refresh. Affected chains count as missing evidence, never as healthy. Usually clears on the next refresh. |
+| Provider unsupported | A standing provider gap for that chain. Not related to wallet behavior. |
+| History capped | The provider truncates old history, so age-related evidence may be understated. |
+| Not indexed | The wallet has not been indexed yet. Run intake. |
+
+Coverage notes surface as **warnings**, which are advisory: they never add reasons and never change the verdict. Show them to your users so limited coverage is visible instead of silent.
+
+Chain coverage scoring does not require activity on every supported chain. Wallets earn coverage points only where real indexed activity exists and inactivity on a chain is never a penalty. Adding more supported chains in the future does not lower existing scores.
+
+## Unknown wallets and no_score
+
+Kyro reports nothing instead of guessing. A valid wallet without a committed snapshot still answers HTTP 200 everywhere: the score read returns a conservative baseline payload, the single decision read returns a conservative baseline verdict with freshness `indexing_required` and batch rows report `no_score` instead of a fabricated verdict.
+
+If you rely on verdicts for real decisions, index unknown wallets first: [intake](./intake.mdx), poll the score until `cacheStatus` is `cached`, then re-check. In user-facing flows, show an index action next to baseline results.

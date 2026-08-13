@@ -1,0 +1,12 @@
+---
+title: OpenAPI spec
+description: The machine-readable v1 contract. Frozen field names, additive changes only.
+---
+
+The machine-readable contract for the whole API is an OpenAPI 3.1.0 document: [thekyro.co/kyro-openapi.yaml](https://www.thekyro.co/kyro-openapi.yaml). Import it into codegen, API clients or agent tool definitions; every endpoint, schema and example in it matches live behavior. A reviewer-friendly summary is available as a [3-page PDF](https://www.thekyro.co/docs/Kyro-OpenAPI-Spec.pdf).
+
+The [API Reference](./api-reference) section of this site is generated from that document, so it cannot drift from the contract.
+
+## Versioning policy
+
+v1 field names are frozen. Additive changes (new fields, new codes) can land in v1; breaking changes go to v2. Pin on `version`, `scoreModelVersion` and `decisionModelVersion`: every decision response carries all three.

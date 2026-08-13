@@ -1,0 +1,37 @@
+---
+title: Trust graph
+description: Verified transaction-backed relationships between registered identities, not social follows.
+---
+
+The trust graph records verified wallet-to-wallet relationships. Trust edges are created only from accepted, verified transaction-backed attestations. Usernames, manual profile data and unverified activity do not create graph relationships.
+
+## Verified attestations
+
+Verified attestations are not social claims. A user submits an Arc transaction hash, a registered counterparty and an interaction type. The backend verifies the transaction on chain before any reputation or trust graph effect is applied and the counterparty can accept or decline.
+
+Every attestation passes these checks:
+
+1. Requires a real Arc transaction hash.
+2. The transaction must exist and succeed on Arc.
+3. The connected wallet and the selected counterparty must both participate.
+4. Duplicate transaction hashes cannot be reused.
+5. Self-attestations and unsupported interaction types are rejected.
+6. Only verified transaction-backed attestations can create trust edges.
+
+## Graph properties
+
+The graph tracks trusted peers, strongest relationships, reciprocal edges, total trust weight, network maturity, anomaly hints and a capped propagated trust contribution.
+
+| Property | Behavior |
+| --- | --- |
+| Verified edges only | Every edge maps to a real Arc transaction between two registered identities. |
+| Reciprocal confidence | Two-way relationships carry more signal than one-way attestations. |
+| Capped propagation | Trust flowing through the network is limited to 5 points of the score. |
+
+## Fair use
+
+Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity or abusive verification behavior can reduce trust confidence and trigger anomaly records. Attestations only count after the Arc transaction is verified on chain. The backend checks participants, duplicate use and relationship rules before any trust is created.
+
+## Reading the graph over the API
+
+`GET /api/v1/trust/{wallet}` returns the verified trust graph with metrics and anomaly flags. See [getTrustGraph](/docs/api-reference/getTrustGraph) in the API reference.

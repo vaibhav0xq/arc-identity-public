@@ -1,0 +1,97 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-openapi/css/preset.css';
+
+/*
+ * Kyro docs theme.
+ * Dark (default): Kyro ink graphite with sage green accent, from the
+ * main site's ink and verified tokens. Light: warm paper, same accent
+ * deepened for contrast.
+ */
+
+@theme {
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+:root {
+  --color-fd-background: #f8f7f3;
+  --color-fd-foreground: #232624;
+  --color-fd-muted: #edebe3;
+  --color-fd-muted-foreground: #6b716b;
+  --color-fd-popover: #fdfcf9;
+  --color-fd-popover-foreground: #232624;
+  --color-fd-card: #fdfcf9;
+  --color-fd-card-foreground: #232624;
+  --color-fd-border: #d9d6cb;
+  --color-fd-primary: #3f6e54;
+  --color-fd-primary-foreground: #f8f7f3;
+  --color-fd-secondary: #edebe3;
+  --color-fd-secondary-foreground: #232624;
+  --color-fd-accent: #eceade;
+  --color-fd-accent-foreground: #232624;
+  --color-fd-ring: #3f6e54;
+}
+
+.dark {
+  --color-fd-background: #262927;
+  --color-fd-foreground: #d6d9d2;
+  --color-fd-muted: #2e322f;
+  --color-fd-muted-foreground: #969d94;
+  --color-fd-popover: #2e322f;
+  --color-fd-popover-foreground: #d6d9d2;
+  --color-fd-card: #2e322f;
+  --color-fd-card-foreground: #d6d9d2;
+  --color-fd-border: #454a44;
+  --color-fd-primary: #7fb692;
+  --color-fd-primary-foreground: #14201a;
+  --color-fd-secondary: #2e322f;
+  --color-fd-secondary-foreground: #d6d9d2;
+  --color-fd-accent: #383d38;
+  --color-fd-accent-foreground: #d6d9d2;
+  --color-fd-ring: #7fb692;
+}
+
+.dark #nd-sidebar {
+  --color-fd-muted: #2e322f;
+  --color-fd-secondary: #383d38;
+  --color-fd-muted-foreground: #969d94;
+}
+
+body {
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+}
+
+code,
+kbd,
+samp,
+pre {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
+html {
+  scrollbar-gutter: stable;
+}
+
+html > body[data-scroll-locked] {
+  margin-right: 0px !important;
+  --removed-body-scroll-bar-size: 0px !important;
+}
+
+/*
+ * Wider reading column. The default article caps at 900px, which left
+ * most of the viewport empty on large screens. The layout budget grows
+ * with it so the grid can actually hand that width to the main column.
+ */
+#nd-docs-layout {
+  --fd-layout-width: 106rem;
+}
+
+#nd-page {
+  max-width: 1100px;
+}
+
+#nd-page[data-full='true'] {
+  max-width: 1280px;
+}

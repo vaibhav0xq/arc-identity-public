@@ -1,0 +1,14 @@
+{
+  "title": "API Reference",
+  "pages": [
+    "index",
+    "getDecision",
+    "batchDecisions",
+    "intakeWallet",
+    "getScore",
+    "getProfile",
+    "getTrustGraph",
+    "createDecisionReceipt",
+    "getDecisionReceipt"
+  ]
+}

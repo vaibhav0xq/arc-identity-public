@@ -1,0 +1,91 @@
+---
+title: Decision API
+description: Allow / caution / block verdicts with a recommended USDC limit, reason codes and evidence.
+---
+
+`GET /api/v1/decision/:wallet?useCase=` returns a deterministic verdict for one counterparty. Model version `decision_v0.4.1`. Every response carries both `scoreModelVersion` and `decisionModelVersion` so you can pin behavior.
+
+## Verdicts
+
+| Verdict | Meaning |
+| --- | --- |
+| `allow` | No caution or block reasons remain. |
+| `caution` | Soft risk or missing evidence. Proceed with limits or review. |
+| `block` | Reserved for strong negative evidence: suspicious trust graph, high trust anomaly or high risk penalty. |
+
+Missing evidence alone never produces a block.
+
+## Use-case score bars
+
+The `useCase` query parameter sets the minimum committed score. Scores run 0 to 100.
+
+| Use case | Minimum score | Notes |
+| --- | --- | --- |
+| `payment` | 40 | Default. Everyday transfers and checkout. |
+| `marketplace` | 50 | Seller onboarding and trade matching. |
+| `escrow` | 60 | Higher bar before releasing held funds. |
+| `lending` | 70 | Highest bar. Credit-shaped decisions. |
+
+## Reading the response
+
+- **recommendedLimit** is a conservative USDC amount (`{ amountUsdc, currency, basis }`) tied to the verdict band. Treat it as a starting point for your own policy, not a guarantee.
+- **reasons** drive the verdict. **warnings** are advisory coverage notes and never change the verdict.
+- **evidence.used** lists the fields the verdict consumed and **evidence.missing** lists what was unavailable. Missing evidence keeps verdicts conservative.
+- **freshness.cacheStatus** is `cached` when a committed snapshot backs the verdict and `indexing_required` when the wallet has no committed snapshot yet (conservative baseline). Committed evidence older than 24 hours adds the `DATA_STALE` reason.
+
+## Example response
+
+`GET /api/v1/decision/0xd8dA...?useCase=payment`
+
+```json
+{
+  "ok": true,
+  "version": "v1",
+  "data": {
+    "wallet": "0x1234567890abcdef1234567890abcdef12345678",
+    "username": null,
+    "useCase": "payment",
+    "decision": "caution",
+    "riskLevel": "Trusted",
+    "recommendedLimit": {
+      "amountUsdc": 50,
+      "currency": "USDC",
+      "basis": "Caution band for payment (v0 conservative limits)."
+    },
+    "reasons": [
+      { "code": "KYRO_TRUST_GRAPH_MISSING", "message": "This wallet has no Kyro-native relationship evidence yet. No verified peers or attestations on Kyro." },
+      { "code": "DATA_LIMITED", "message": "Wallet intelligence coverage is limited, partial or not indexed yet." }
+    ],
+    "warnings": [
+      { "code": "DATA_PROVIDER_TRANSIENT", "message": "Chain scans hit temporary provider failures on Base during the last refresh." },
+      { "code": "DATA_HISTORY_CAPPED", "message": "Provider history on Ethereum Mainnet, Arbitrum, Polygon is capped to the oldest rows." }
+    ],
+    "score": 79,
+    "evidence": {
+      "used": ["score", "riskLevel", "riskPenalty", "scoreModelVersion", "globalWalletAgeDays", "cacheStatus", "intelligenceStatus", "refreshInProgress", "refreshRecommended", "lastIndexedAt"],
+      "missing": ["trustGraph", "trustGraph.trustConfidence"]
+    },
+    "freshness": {
+      "cacheStatus": "cached",
+      "lastIndexedAt": "2026-08-11T13:36:05.979Z",
+      "refreshInProgress": false,
+      "refreshRecommended": false
+    },
+    "coverage": {
+      "chains": [
+        { "chain": "Ethereum Mainnet", "status": "indexed", "transient": false, "standing": false, "historyCapped": true, "recencyReliable": false },
+        { "chain": "Base", "status": "error", "transient": true, "standing": false, "historyCapped": null, "recencyReliable": null },
+        { "chain": "BNB Chain", "status": "limited", "transient": false, "standing": true, "historyCapped": null, "recencyReliable": null },
+        { "chain": "Arc Testnet", "status": "indexed", "transient": false, "standing": false, "historyCapped": null, "recencyReliable": null }
+      ],
+      "historyCapped": true,
+      "hasTransientIssues": true,
+      "hasStandingLimitations": true
+    },
+    "scoreModelVersion": "identity_score_v1",
+    "decisionModelVersion": "decision_v0.4.1"
+  }
+}
+```
+
+The full request and schema reference is in the [API Reference](./api-reference).

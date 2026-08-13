@@ -1,0 +1,24 @@
+---
+title: Decision receipts
+description: Immutable point-in-time snapshots of a decision, minted server-side.
+---
+
+A receipt is an immutable point-in-time snapshot of a decision, minted server-side from the same read path as the decision route. `POST /api/v1/decision-receipts` answers 201 with the receipt and a shareable `url` like `/check/r/rcp_Zt3kQ9wXb2LmNpQr` for the human-readable view.
+
+```bash
+curl -X POST https://www.thekyro.co/api/v1/decision-receipts \
+  -H "Content-Type: application/json" \
+  -d '{"wallet":"0x1234567890abcdef1234567890abcdef12345678","useCase":"payment"}'
+```
+
+Minting the identical decision state for the same wallet, use case and UTC day answers 200 with `deduped: true` and the existing receipt. A creation costs 2 standard units since it runs a real decision read. It also has an extra cap of 5 per minute. Batch checks never create receipts.
+
+## Fetching receipts
+
+`GET /api/v1/decision-receipts/:id` fetches a receipt exactly as minted. Ids look like `rcp_Zt3kQ9wXb2LmNpQr`. Receipts never change after creation and successful reads are served with immutable cache headers.
+
+Receipts keep the model versions they were minted with, so an old receipt can reflect an older score or decision model. A receipt proves what Kyro reported at that moment. For current state, run a fresh decision; the receipt page links one.
+
+## Receipts as audit proof
+
+Mint a receipt at decision time and store the returned `url`. The receipt proves what Kyro reported when you acted, even after scores change.

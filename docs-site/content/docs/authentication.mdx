@@ -1,0 +1,23 @@
+---
+title: Authentication
+description: Anonymous by default. An API key raises the rate budget.
+---
+
+Every endpoint except key management works anonymously. Omit the `Authorization` header entirely. Sending a Kyro API key raises the rate budget:
+
+```http
+Authorization: Bearer kyro_live_...
+```
+
+The header is only validated when present. A malformed, unknown or revoked key is rejected with `401 INVALID_KEY`.
+
+## Keys during beta
+
+Keys are invite-only during beta:
+
+- Created from the developer tools on [thekyro.co/developers](https://www.thekyro.co/developers) with a wallet signature.
+- Shown once at creation and stored only as a SHA-256 hash.
+- Capped at 3 active keys per wallet.
+- Key management endpoints (`/api/v1/keys`, `/api/v1/keys/list`, `/api/v1/keys/revoke`) require a wallet signature. List returns key prefixes and metadata, never the raw key.
+
+Kyro never asks for private keys or seed phrases. Wallet ownership is proven by signature only and the API itself needs no wallet connection at all.

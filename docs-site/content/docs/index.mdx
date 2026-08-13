@@ -1,0 +1,55 @@
+---
+title: Overview
+description: Kyro is a pre-transaction counterparty decision layer powered by wallet intelligence and reputation evidence.
+---
+
+Kyro is a pre-transaction counterparty decision layer powered by wallet intelligence and reputation evidence. The decision endpoints are the product surface. Wallet intelligence and the reputation graph are the evidence layer underneath them.
+
+Check a wallet before funds move. Kyro returns an **allow / caution / block** verdict with a recommended USDC limit, machine-readable reason codes and the evidence behind it. Built for agents, payment apps, escrow, marketplaces, lending and USDC workflows.
+
+Kyro is not AML or sanctions screening and it does not provide legal, regulatory or compliance determinations. Verdicts, scores and receipts are advisory signals for your own decision process. When evidence is missing, Kyro reports a conservative baseline and tells you what was missing instead of guessing.
+
+## Start here
+
+<Cards>
+  <Card title="Quickstart" href="/docs/quickstart">
+    First decision call in under a minute. Plain HTTP and JSON, no SDK and no API key needed.
+  </Card>
+  <Card title="Decision API" href="/docs/decision-api">
+    Verdict semantics, use-case score bars and the full response shape with reasons, warnings and
+    evidence.
+  </Card>
+  <Card title="API Reference" href="/docs/api-reference">
+    Every endpoint, generated from the OpenAPI 3.1.0 contract. It cannot drift from live behavior.
+  </Card>
+  <Card title="Reason and warning codes" href="/docs/reason-warning-codes">
+    Machine-readable codes that drive verdicts and the advisory warnings that never change them.
+  </Card>
+</Cards>
+
+## Concepts
+
+<Cards>
+  <Card title="Wallet intelligence" href="/docs/wallet-intelligence">
+    The evidence layer: what Kyro indexes, provider states and how careful refreshes keep scores
+    stable.
+  </Card>
+  <Card title="Reputation scores" href="/docs/reputation-scores">
+    How identity_score_v1 turns verified evidence into one explainable score from 0 to 100.
+  </Card>
+  <Card title="Trust graph" href="/docs/trust-graph">
+    Verified transaction-backed relationships with reciprocal confidence and capped propagation.
+  </Card>
+</Cards>
+
+## At a glance
+
+| Property | Behavior |
+| --- | --- |
+| Base URL | `https://www.thekyro.co` |
+| Core surface | Score, profile, trust, decision, batch, receipts (mint and fetch) and intake. Plus a public stats endpoint. |
+| One envelope | `{ ok, version, data }` on success, `{ ok, version, error }` on failure. On every endpoint. |
+| Anonymous by default | Every endpoint works without a key. A key raises the rate budget. |
+| Conservative on missing evidence | Unknown wallets get a baseline verdict. Batch rows report `no_score` instead of a guessed verdict. |
+| Score model | `identity_score_v1` |
+| Decision model | `decision_v0.4.1` |

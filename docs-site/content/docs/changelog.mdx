@@ -1,0 +1,27 @@
+---
+title: Changelog and versions
+description: Current model versions and the change policy.
+---
+
+## Current versions
+
+| Surface | Version |
+| --- | --- |
+| API envelope | `v1` (field names frozen) |
+| Score model | `identity_score_v1` |
+| Decision model | `decision_v0.4.1` |
+| Stats endpoint | `stats_v0.1` |
+
+Every decision response carries `version`, `scoreModelVersion` and `decisionModelVersion` so you can pin behavior. Receipts keep the model versions they were minted with.
+
+## Change policy
+
+Additive changes (new fields, new codes) can land in v1 without notice. Breaking changes go to v2. Reason and warning code lists can grow; treat unknown codes as informational rather than failing.
+
+## 2026-08
+
+- Intake economics hardening: starting a scan now costs 20 units anonymously (5 with any API key) and scan starts are capped per UTC day (25 per IP anonymous, 200 developer, 1000 pro, 2000 partner). The public score read's background refresh is now metered from the same anonymous budget and respects the same 10-minute per-wallet attempt cooldown as intake. Response shapes are unchanged; daily-cap rejections reuse `429 RATE_LIMITED` with `Retry-After` pointing at the next UTC midnight.
+- TypeScript SDK added to the Kyro repository: a typed client for all 8 v1 operations with a shared error model, rate limit metadata and dual ESM and CJS builds. Not published to npm yet; the [SDK page](/docs/sdk-typescript) shows the planned install command.
+- Plan-aware API limits: keyed budgets and batch caps now follow the key's plan (developer 120 units/min and 50 batch rows, pro 300 and 250, partner 600 and 500 by default with custom caps by agreement). Anonymous limits are unchanged. Additive only: every existing key is on the developer plan, which matches the old keyed behavior exactly.
+- Public documentation site launched at docs.thekyro.co.
+- API v1 contract published: 8 core endpoints, decision model `decision_v0.4.1`, score model `identity_score_v1`.

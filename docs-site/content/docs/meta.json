@@ -1,0 +1,28 @@
+{
+  "pages": [
+    "index",
+    "quickstart",
+    "---Concepts---",
+    "wallet-intelligence",
+    "reputation-scores",
+    "trust-graph",
+    "---Basics---",
+    "authentication",
+    "rate-limits",
+    "response-envelope",
+    "---Decisions---",
+    "decision-api",
+    "batch-checks",
+    "intake",
+    "decision-receipts",
+    "---Evidence---",
+    "data-coverage",
+    "reason-warning-codes",
+    "---Reference---",
+    "api-reference",
+    "sdk-typescript",
+    "integration-patterns",
+    "openapi-spec",
+    "changelog"
+  ]
+}

@@ -1,0 +1,35 @@
+---
+title: Reason and warning codes
+description: Reason codes drive the verdict. Warning codes are advisory and never change it.
+---
+
+Reason codes appear in `reasons` and drive the verdict. Warning codes appear in `warnings` and are advisory only. API error codes (`RATE_LIMITED`, `INVALID_WALLET`, `NOT_FOUND`) live in the [response envelope](./response-envelope.mdx); batch rows without a snapshot use the row status `no_score` rather than a code.
+
+## Reason codes
+
+| Reason code | Class | Meaning | Action |
+| --- | --- | --- | --- |
+| `SCORE_MEETS_THRESHOLD` | allow | The committed score clears the bar for the requested use case and no caution or block reasons remain. | Proceed. |
+| `SCORE_BELOW_THRESHOLD` | caution | The committed score is below the use-case minimum (payment 40, marketplace 50, escrow 60, lending 70). | Lower limits or add manual review. |
+| `WALLET_TOO_NEW` | caution | Less than 30 days of indexed wallet history. | Start with small amounts. |
+| `KYRO_TRUST_GRAPH_MISSING` | caution | No Kyro-native relationship evidence yet. Indexed on-chain history is still recognized. | Weigh score and coverage. Evidence grows with verified attestations. |
+| `EVIDENCE_INCOMPLETE` | caution | One or more evidence sources were unavailable for this verdict. | Check `evidence.missing` before large transfers. |
+| `DATA_LIMITED` | caution | Coverage is limited, partial or the wallet is not indexed yet. | Run intake, then re-check. |
+| `DATA_STALE` | caution | Committed evidence is older than 24 hours. | Re-check. Consider intake to refresh. |
+| `SCORE_MODEL_OUTDATED` | caution | The snapshot was computed by an older score model. | Refresh before relying on the verdict. |
+| `BEHAVIORAL_RISK_ELEVATED` | caution | Behavioral risk signals are present on the wallet. | Manual review. |
+| `HIGH_RISK_PENALTY` | block | High risk level with an active score penalty. | Do not proceed. |
+| `HIGH_TRUST_ANOMALY` | block | Trust graph anomaly score is 60 or higher. | Do not proceed. |
+| `SUSPICIOUS_TRUST_GRAPH` | block | The trust graph around this wallet looks manufactured. | Do not proceed. |
+
+## Warning codes
+
+Advisory only. They never change the verdict.
+
+| Warning code | Meaning | Action |
+| --- | --- | --- |
+| `DATA_PROVIDER_TRANSIENT` | Temporary provider failure on one or more chains during the last refresh. Affected chains count as missing evidence, never as healthy. | Usually clears on the next refresh. Retry later. |
+| `DATA_PROVIDER_UNSUPPORTED` | A provider cannot serve this chain. A standing gap, not wallet behavior. | Treat as reduced coverage. |
+| `DATA_NOT_INDEXED` | The wallet has not been indexed yet. | `POST /api/v1/intake/:wallet`, then re-check. |
+| `DATA_HISTORY_CAPPED` | Provider history is truncated to the oldest available rows on some chains. | Age-related components may be understated. |
+| `COVERAGE_LIMITED` | The verdict was allowed for a high-tier wallet while coverage was limited. | Show the advisory. Re-check after a refresh. |

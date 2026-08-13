@@ -1,0 +1,29 @@
+---
+title: Integration patterns
+description: Recommended patterns for payments, payouts, marketplaces, escrow and audits.
+---
+
+1. **Pre-payment check.** Call the decision endpoint with `useCase=payment` before sending funds. Allow proceeds, caution proceeds with the recommended limit or review, block stops the payment.
+
+2. **Batch payout screening.** Post payroll or payout lists to the batch endpoint. Chunk to 10 rows anonymous or get a key for 50. Honor `Retry-After` between chunks.
+
+3. **Marketplace counterparty check.** Use `useCase=marketplace` when onboarding sellers or matching trades. The score bar is 50 instead of 40.
+
+4. **Escrow release check.** Re-check with `useCase=escrow` before releasing funds. Escrow uses a higher bar (60) and fresh evidence matters more than at deposit time.
+
+5. **Receipts as audit proof.** Mint a receipt at decision time and store the returned `url`. The receipt proves what Kyro reported when you acted, even after scores change.
+
+6. **Caution is not block.** Treat caution as proceed-with-controls: lower limits, delays or review. Reserve hard stops for block, which only fires on strong negative evidence.
+
+7. **Handle no_score with intake.** When a batch row reports `no_score` or a single check returns a baseline, run intake, poll the score until `cacheStatus` is `cached`, then re-check.
+
+8. **Retry after 429.** Read `Retry-After` (seconds), wait, then retry once. Budgets use a fixed 60-second window, so bursts right after a 429 will fail again.
+
+## Trust and safety boundaries
+
+| Principle | What it means for you |
+| --- | --- |
+| Decision support, not compliance | Kyro is not legal, regulatory or compliance advice and it is not AML or sanctions screening. You choose your own policy and thresholds; Kyro supplies the evidence and a conservative recommendation. |
+| Missing evidence is not guilt | Kyro avoids labeling wallets bad when evidence is missing. Gaps produce conservative verdicts and explicit coverage notes, never negative claims. |
+| Show advisories | Surface warnings and coverage notes to your users and reviewers. A verdict with limited coverage should look different from one with full coverage. |
+| No key material, ever | Kyro never asks for private keys or seed phrases. Wallet ownership is proven by signature only and the API itself needs no wallet connection at all. |

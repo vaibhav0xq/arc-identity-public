@@ -2,242 +2,84 @@
 
 # Kyro
 
-**Built on Arc. Wallet intelligence for the Arc economy. Trust, with a record behind it.**
+**Pre-transaction counterparty decisions for wallets. Powered by wallet intelligence and reputation evidence.**
 
-Kyro turns public wallet history into a verified financial credential readable by people, protocols and the systems moving value.
-
-[**thekyro.co**](https://www.thekyro.co) - [Identity model docs](https://www.thekyro.co/docs) - [Developer API](https://www.thekyro.co/developers)
-
-[Privacy](./PRIVACY.md) - [Terms](./TERMS.md) - [Security](./SECURITY.md)
-
-![Next.js](https://img.shields.io/badge/Next.js-15-000000?logo=nextdotjs&logoColor=white)
-![TypeScript](https://img.shields.io/badge/TypeScript-5-3178C6?logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-3-06B6D4?logo=tailwindcss&logoColor=white)
-![Built on Arc](https://img.shields.io/badge/Built_on-Arc-d4af37)
-![Wallet Intelligence](https://img.shields.io/badge/Wallet-Intelligence-111827)
-![Reputation Graph](https://img.shields.io/badge/Reputation-Graph-2f6f5f)
-![Verified Attestations](https://img.shields.io/badge/Verified-Attestations-b8893a)
+[Website](https://www.thekyro.co) · [Live check](https://www.thekyro.co/check) · [Docs](https://docs.thekyro.co) · [API spec](./public/kyro-openapi.yaml) · [X](https://x.com/KyroIdentity)
 
 </div>
 
 ---
 
-Kyro is built on Arc and designed around Arc testnet activity. It is an independent project and is not affiliated with Circle or any network operator.
+Before you pay, escrow, lend to or onboard a wallet, Kyro answers one question: should you transact with this counterparty right now. Every check returns an allow, caution or block verdict with machine readable reason codes, a recommended USDC limit and the exact evidence the verdict was built on. Verdicts are deterministic and conservative by design: missing evidence never counts in a wallet's favor.
 
-## Repository docs
+![The Kyro landing page](public/screenshots/landing.png)
 
-| Document | Purpose |
+## The platform
+
+- **Counterparty check workbench** at [thekyro.co/check](https://www.thekyro.co/check). Paste a wallet or username, pick a use case and read the verdict. No account needed.
+- **Decision API.** Anonymous access on every endpoint; API keys raise the rate budget. One `GET` call returns the verdict, reasons, limit, evidence and freshness.
+- **Decision receipts.** Immutable, shareable snapshots of a verdict for audit trails.
+- **Batch screening** for payroll runs, grant payouts, escrow batches and allowlists.
+- **Identity layer.** Wallets claim a Kyro username, build a trust graph through attestations and carry a scored reputation across chains.
+
+## What is in this repository
+
+| Path | Contents |
 | --- | --- |
-| [Privacy](./PRIVACY.md) | Public copy of the privacy policy |
-| [Terms](./TERMS.md) | Public copy of the terms of use |
-| [Security](./SECURITY.md) | Vulnerability reporting and user safety rules |
-| [Contributing](./CONTRIBUTING.md) | Local setup, review rules and contribution guidelines |
+| `app/`, `components/`, `lib/`, `hooks/` | The Next.js app surface: landing, check workbench, receipt pages, dashboard and developer pages |
+| `public/kyro-openapi.yaml` | The frozen v1 API contract, also as a PDF in `public/docs/` |
+| `sdk/typescript/` | TypeScript SDK generated from the spec |
+| `docs-site/` | Source of [docs.thekyro.co](https://docs.thekyro.co) |
+| `examples/` | Runnable scripts that call the public API |
+| `scripts/` | Offline test suites for the published client logic |
 
-## What it does
+The engine behind the API (the scoring pipeline, decision rules, data providers and persistence) runs in the hosted service and is not part of this repository. Everything here builds and runs against the hosted public API.
 
-Most reputation tools rank wallets by volume. Kyro ranks them by evidence.
+## Run the app locally
 
-The engine indexes public activity across supported networks, verifies transaction-backed attestations between wallets, maps counterparty relationships into a trust graph and compresses all of it into a deterministic Identity Score with every input disclosed. The result is a public credential page any person or protocol can inspect.
-
-- **Evidence over volume.** Every point on a score traces back to indexed transactions, verified attestations or trust relationships.
-- **Deterministic scoring.** The same committed evidence always produces the same score under the same model version.
-- **Explainable by design.** Profiles expose the component breakdown, caps, penalties and data provenance behind the score.
-- **Built for the Arc economy.** Native to Arc testnet activity and designed around stablecoin settlement patterns, with multichain context from Ethereum, Base, Arbitrum, Polygon and BNB Chain.
-
-## Product tour
-
-<table>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Landing page</h3>
-      <p>The public face of the credential. Start with the address. Leave with a record.</p>
-      <img src="./public/screenshots/landing-page.png" alt="Landing page" width="100%" />
-    </td>
-    <td width="50%" valign="top">
-      <h3>Identity workspace</h3>
-      <p>The signed-in overview with score, evidence ledger and signature-verified wallet ownership.</p>
-      <img src="./public/screenshots/identity-workspace.png" alt="Identity workspace" width="100%" />
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Directory</h3>
-      <p>A searchable public registry of claimed identities with score, risk, age and chain coverage.</p>
-      <img src="./public/screenshots/directory-registry.png" alt="Directory" width="100%" />
-    </td>
-    <td width="50%" valign="top">
-      <h3>Verified attestations</h3>
-      <p>Transaction-backed claims that are checked onchain before they affect trust.</p>
-      <img src="./public/screenshots/verify-attestation.png" alt="Verify attestation" width="100%" />
-    </td>
-  </tr>
-  <tr>
-    <td width="50%" valign="top">
-      <h3>Trust graph</h3>
-      <p>Counterparties plotted around a wallet, where closer edges mean stronger verified relationships.</p>
-      <img src="./public/screenshots/trust-graph.png" alt="Trust graph" width="100%" />
-    </td>
-    <td width="50%" valign="top">
-      <h3>Developer API</h3>
-      <p>Credential JSON with score, provenance, coverage and trust context in one response.</p>
-      <img src="./public/screenshots/reputation-api.png" alt="Developer API" width="100%" />
-    </td>
-  </tr>
-  <tr>
-    <td colspan="2" valign="top">
-      <h3>Public record footer</h3>
-      <p>The final trust statement, resource links and project contact surface.</p>
-      <img src="./public/screenshots/landing-page-ending.png" alt="Landing page closing section" width="100%" />
-    </td>
-  </tr>
-</table>
-
-
-## Identity Score model
-
-The production model is versioned as `identity_score_v1`. It is deterministic and evidence capped. A wallet with no indexed or verified evidence starts at 0. Profile creation alone is worth nothing.
-
-| Evidence category | Max points |
-| --- | --- |
-| Arc activity | 25 |
-| Global wallet age | 20 |
-| Indexed transaction activity | 15 |
-| Counterparty diversity | 15 |
-| Verified transaction attestations | 15 |
-| Active chain coverage | 5 |
-| Propagated trust | 5 |
-
-Anomaly evidence and excessive repeated-pair concentration can apply a disclosed penalty of up to 10 points.
-
-Transaction count is one bounded input, not the whole result. Two wallets with similar raw activity can rank differently when Arc footprint, counterparties, verified attestations or risk signals differ. The public profile and score API expose the exact component points behind every comparison.
-
-## Architecture
-
-```txt
-app/            Pages and API routes (Next.js App Router)
-  api/          REST endpoints for score, profile, trust, attestations and onchain data
-  profile/      Public credential pages
-  dashboard/    Signed-in identity workspace
-  docs/         Identity model documentation
-components/     UI components including the trust graph and evidence panels
-lib/            Core engine
-  score.ts            Scoring pipeline
-  score-contract.ts   Versioned model contract and component caps
-  trust-graph.ts      Trust propagation and edge weighting
-  multichain.ts       Cross-chain indexing
-  onchain.ts          Live RPC readers
-  signature.ts        Wallet ownership verification
-data/           Static reference data
-scripts/        Score contract tests, audits and maintenance jobs
-```
-
-Production deployment configuration, private environment files and database operations are intentionally excluded from this public mirror.
-
-## API
-
-Base URL: `https://www.thekyro.co`
-
-| Endpoint | Returns |
-| --- | --- |
-| `GET /api/score/:wallet` | Identity Score with component breakdown, risk level and chain intelligence |
-| `GET /api/profile/:username` | Full public credential including trust graph and attestation history |
-| `GET /api/onchain/:wallet` | Indexed transaction analytics and counterparty metrics |
-
-Example:
+Node.js 20 or later.
 
 ```bash
-curl https://www.thekyro.co/api/score/0xYourWalletAddress
-```
-
-Responses include the model version, cache status and last indexed timestamp so consumers can reason about freshness.
-
-## Tech stack
-
-| Layer | Technology |
-| --- | --- |
-| Framework | Next.js 15 App Router with React and TypeScript |
-| Styling | Tailwind CSS with a custom editorial design system |
-| Wallet layer | viem for RPC reads and signature verification |
-
-## Getting started
-
-Requires Node.js 20 or later.
-
-```bash
-git clone https://github.com/vaibhav0xq/kyro-public.git
-cd kyro-public
 npm install
-```
-
-Create `.env.local` in the project root:
-
-```env
-NEXT_PUBLIC_APP_URL=
-NEXT_PUBLIC_ARC_RPC_URL=
-NEXT_PUBLIC_ARC_CHAIN_ID=
-NEXT_PUBLIC_ARC_EXPLORER_URL=
-NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=
-ETHERSCAN_API_KEY=
-BASESCAN_API_KEY=
-ARBISCAN_API_KEY=
-POLYGONSCAN_API_KEY=
-BSCSCAN_API_KEY=
-```
-
-Run the development server:
-
-```bash
 npm run dev
 ```
 
-The app runs locally on the port shown by the development server.
+Open `http://localhost:3000`. API calls are proxied to the hosted service, so the check workbench and receipt pages work out of the box. Set `KYRO_API_ORIGIN` to point the surface at a different deployment. Wallet bound flows such as claiming a username talk to the live service and follow the same rules as the website. Pages for public profiles and the wallet directory render only on the hosted deployment.
 
-## Scripts
+## Call the API
 
-| Command | Purpose |
-| --- | --- |
-| `npm run dev` | Start the development server |
-| `npm run build` | Production build |
-| `npm run typecheck` | TypeScript checks without emitting |
-| `npm run test:score-contract` | Verify the score model against its contract |
-| `npm run test:score-api` | Integrity checks against the score API |
+No key needed to start:
 
-## Roadmap
+```bash
+curl "https://www.thekyro.co/api/v1/decision/0x1234567890abcdef1234567890abcdef12345678?useCase=payment"
+```
 
-**Now**
+Rate budgets, API keys, reason codes and every endpoint are documented at [docs.thekyro.co](https://docs.thekyro.co). The complete contract lives in [`public/kyro-openapi.yaml`](./public/kyro-openapi.yaml) and more runnable calls live in [`examples/`](./examples).
 
-- Deterministic reputation engine with disclosed caps and penalties
-- Public credential pages, directory and trust graph
-- Transaction-backed attestations with onchain verification
-- Developer API
+## TypeScript SDK
 
-**Next**
+```ts
+import { Kyro } from "@kyro/sdk";
 
-- Deeper trust propagation and reciprocal relationship weighting
-- Expanded chain coverage
-- Wallet clustering and stronger sybil resistance
+const kyro = new Kyro({ apiKey: process.env.KYRO_API_KEY });
+const decision = await kyro.decisions.check("0x1234...5678", { useCase: "escrow" });
+```
 
-**Later**
+The SDK wraps all eight v1 operations with typed methods, a shared error model and rate limit metadata. It is not on npm yet; see [`sdk/typescript/README.md`](./sdk/typescript/README.md) to build it from source.
 
-- Credit intelligence primitives
-- Protocol integrations, SDKs and developer tooling
+## Development checks
 
-## Security
+```bash
+npm run typecheck
+npm run test:intake-pacing
+```
 
-No legitimate Kyro surface will ever ask for private keys or seed phrases. Wallet ownership is proven by signature only.
+The SDK and the docs site are separate packages with their own commands, documented in their READMEs.
 
-Found a vulnerability? See [SECURITY.md](./SECURITY.md) for how to report it responsibly. Repository copies of the public policy pages are available in [PRIVACY.md](./PRIVACY.md) and [TERMS.md](./TERMS.md).
+## Policies
 
-## Contributing
+[Privacy](./PRIVACY.md) · [Terms](./TERMS.md) · [Security policy](./SECURITY.md) · [Contributing](./CONTRIBUTING.md)
 
-Issues and pull requests are welcome. Read [CONTRIBUTING.md](./CONTRIBUTING.md) for setup, conventions and the review process before opening one.
+## License
 
-## Disclaimer
-
-Kyro is informational. It is not financial advice, not a credit bureau and it never takes custody of funds. It is an independent project built on the Arc network and is not affiliated with Circle or any network operator.
-
-## Author
-
-Built by **Vaibhav** ([@vaibhav0xq](https://github.com/vaibhav0xq)) - [X](https://x.com/KyroIdentity) - [arcidentity.build@gmail.com](mailto:arcidentity.build@gmail.com)
-
-Web3 builder focused on wallet intelligence, trust systems and blockchain identity infrastructure.
+Code and documentation in this repository are released under the [MIT License](./LICENSE). The Kyro name, the Kyro logo and the brand assets under `public/brand/` are not covered by the MIT grant and remain all rights reserved. Use of the hosted service and its API is governed by the [Terms](./TERMS.md).

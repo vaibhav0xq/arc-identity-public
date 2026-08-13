@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/useIsomorphicLayoutEffect";
 import { createPortal } from "react-dom";
 import { useRouter } from "next/navigation";
 import { shortenAddress } from "@/lib/wallet";
 import { fetchJsonWithTimeout } from "@/lib/timeouts";
+import { signWalletChallenge } from "@/lib/wallet-challenge-client";
 import { maybeArcUsername } from "@/lib/username";
 import { isIdentityCreatedRevealActive } from "@/lib/onboarding";
 
@@ -97,6 +99,7 @@ function clearWalletScopedState(wallet?: string | null) {
   localStorage.removeItem("arcIdentitySignatureMessage");
   localStorage.removeItem("arcIdentityUsername");
   localStorage.removeItem(lookupWarningKey);
+  sessionStorage.removeItem("arcIdentityVerifiedWallet");
   for (let index = localStorage.length - 1; index >= 0; index -= 1) {
     const key = localStorage.key(index);
     if (!key) continue;
@@ -250,13 +253,14 @@ export function WalletConnectButton({
     };
   }, []);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     function syncWalletState() {
       const stored = localStorage.getItem("arcIdentityWallet") ?? "";
-      const signature = localStorage.getItem("arcIdentitySignature") ?? "";
-      const signatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? "";
+      /* Signatures are no longer cached. "Signature verified" is a
+         tab-scoped display hint set right after a successful challenge. */
+      const verifiedWallet = sessionStorage.getItem("arcIdentityVerifiedWallet") ?? "";
       setWallet(stored);
-      setVerified(Boolean(signature && signatureMessage));
+      setVerified(Boolean(stored) && verifiedWallet.toLowerCase() === stored.toLowerCase());
       onConnect?.(stored);
     }
     syncWalletState();
@@ -373,34 +377,39 @@ export function WalletConnectButton({
 
       setStatus("Requesting signature verification...");
       setStage("sign");
-      const issuedAt = new Date().toISOString();
-      const nonce = crypto.randomUUID();
-      const message = [
-        "Kyro",
-        "Domain: www.thekyro.co",
-        "Purpose: Verify wallet ownership",
-        `Wallet address: ${connected}`,
-        "Username: Not claimed yet",
-        `Nonce: ${nonce}`,
-        `Issued at: ${issuedAt}`,
-        "",
-        "This signature does not send a transaction.",
-        "This signature does not grant token access."
-      ].join("\n");
-      const signature = (await provider.request({
-        method: "personal_sign",
-        params: [message, connected]
-      })) as string;
+      /* The verification message is issued by the server (single use,
+         short expiry) and signed here, never built or cached client side.
+         Connect-time verification is best effort: if challenge issuance is
+         unavailable the wallet still connects unverified, because every
+         mutation demands its own fresh challenge anyway. A user who declines
+         the signature still cancels the connect. */
+      let credentials: { signature: string; signatureMessage: string } | null = null;
+      try {
+        credentials = await signWalletChallenge(provider, connected, "profile-setup");
+      } catch (challengeError) {
+        const code = (challengeError as { code?: number } | null)?.code;
+        if (code === 4001) throw challengeError;
+        console.warn(
+          "[arc-identity] connect verification unavailable, continuing unverified:",
+          challengeError instanceof Error ? challengeError.message : challengeError
+        );
+      }
 
       localStorage.setItem("arcIdentityWallet", connected);
-      localStorage.setItem("arcIdentitySignature", signature);
-      localStorage.setItem("arcIdentitySignatureMessage", message);
+      /* Cached signature pairs are gone; scrub keys left by old sessions. */
+      localStorage.removeItem("arcIdentitySignature");
+      localStorage.removeItem("arcIdentitySignatureMessage");
       localStorage.setItem("arcIdentityWalletProvider", providerName(provider));
+      if (credentials) {
+        sessionStorage.setItem("arcIdentityVerifiedWallet", connected);
+      } else {
+        sessionStorage.removeItem("arcIdentityVerifiedWallet");
+      }
       setWallet(connected);
-      setVerified(true);
+      setVerified(Boolean(credentials));
       onConnect?.(connected);
       shouldClosePicker = true;
-      setStatus("Signature verified. Syncing Kyro profile...");
+      setStatus(credentials ? "Signature verified. Syncing Kyro profile..." : "Wallet connected. Syncing Kyro profile...");
       setStage("sync");
 
       try {
@@ -408,7 +417,7 @@ export function WalletConnectButton({
         const data = await fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ walletAddress: connected, signature, signatureMessage: message })
+          body: JSON.stringify(credentials ? { walletAddress: connected, ...credentials } : { walletAddress: connected })
         }, identityLookupTimeoutMs);
         logIdentityLookup("wallet_identity_lookup_success", { wallet: connected, username: data.profile?.username ?? null });
         const ensuredUsername = maybeArcUsername(data.profile?.username);
@@ -430,7 +439,7 @@ export function WalletConnectButton({
           } else {
             clearCurrentUsername();
             localStorage.removeItem(lookupWarningKey);
-            setStatus("Create your Kyro.");
+            setStatus("Create your Kyro identity.");
             logIdentityLookup("wallet_identity_route_decision", { wallet: connected, route: "/create", source: "unclaimed" });
             routeAfterWalletLookup("/create", connected, "unclaimed");
           }

@@ -1,0 +1,1604 @@
+openapi: 3.1.0
+
+info:
+  title: Kyro API
+  version: v1
+  summary: Pre-transaction counterparty decisions for wallets.
+  description: |
+    Kyro is a pre-transaction counterparty decision layer powered by wallet
+    intelligence and reputation evidence. It provides explainable pre-transaction
+    wallet decisions for applications and agents: before
+    funds move, a caller checks a wallet and receives an **allow / caution / block**
+    verdict with a recommended USDC limit, machine-readable reason codes, the evidence
+    the verdict used (and what was missing), data-coverage notes and an optional
+    immutable, shareable decision receipt. Supporting endpoints expose the underlying
+    wallet score, Kyro profile summaries, the verified-relationship trust graph, batch
+    screening and on-demand intake (indexing) for wallets Kyro has not seen yet.
+
+    Kyro is wallet intelligence and counterparty decision infrastructure. It does not
+    perform AML screening and does not provide legal, sanctions or regulatory
+    compliance determinations.
+
+    ## Authentication
+    Every endpoint works anonymously. Omit the `Authorization` header entirely.
+    Sending a Kyro API key raises your rate limit:
+
+    ```
+    Authorization: Bearer kyro_live_...
+    ```
+
+    A malformed, unknown or revoked key is rejected with `401 INVALID_KEY` (the
+    header is only validated when present).
+
+    ## Rate limits
+    Budgets are counted in units over a fixed 60-second window: **20 units/minute
+    per IP** for anonymous callers. Keyed budgets follow the key's plan:
+    **developer 120** (the default every key starts on), **pro 300**, **partner
+    600 by default** with custom budgets by agreement. Plans are server-side
+    state set by the Kyro team; nothing in a request can choose one.
+    Most requests cost 1 unit; a batch of N unique rows costs N units; starting an
+    intake costs 20 units anonymously or 5 units with any API key
+    (`already_indexed` and `indexing` answers are free).
+    A score read that starts a background rescan of a stale known wallet spends
+    5 more units from the caller's anonymous per-IP budget (see the score read
+    for the exact conditions).
+    Receipt creation additionally has its own budget of 5 creations per minute.
+    Starting intakes is also capped per UTC day: 25 starts per IP for anonymous
+    callers, 200 per key on developer, 1000 on pro and 2000 on partner by
+    agreement. The cap counts only scans that actually start; reaching it
+    answers `429 RATE_LIMITED` with `Retry-After` pointing at the next UTC
+    midnight.
+    Responses carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`; a `429` adds
+    `Retry-After` (seconds).
+
+    ## Response envelope
+    Every response is JSON in a versioned envelope.
+
+    Success:
+    ```json
+    { "ok": true, "version": "v1", "data": { } }
+    ```
+    Error:
+    ```json
+    { "ok": false, "version": "v1", "error": { "code": "RATE_LIMITED", "message": "..." } }
+    ```
+
+    ## No-score semantics
+    Kyro reports nothing instead of guessing. A valid wallet without a committed
+    score snapshot still answers HTTP 200: the score read returns a conservative
+    baseline payload (`cacheStatus` is not `cached`), the single decision read
+    returns a conservative baseline verdict (freshness `cacheStatus` of
+    `indexing_required`) and batch rows report a `no_score` status instead of a
+    guessed verdict. Use the Intake endpoint to index such a wallet, poll the
+    score read until `cacheStatus` is `cached`, then re-run the decision.
+
+servers:
+  - url: https://www.thekyro.co
+    description: Production
+
+tags:
+  - name: Scores
+    description: Committed wallet reputation scores with component breakdowns.
+  - name: Profiles
+    description: Public summaries of registered Kyro identities.
+  - name: Trust
+    description: Verified transaction-backed relationship graphs.
+  - name: Decisions
+    description: Allow / caution / block verdicts with recommended USDC limits, single and batch.
+  - name: Receipts
+    description: Immutable, shareable snapshots of decision verdicts.
+  - name: Intake
+    description: On-demand indexing for wallets Kyro has not seen yet.
+
+security:
+  - {}
+  - bearerApiKey: []
+
+paths:
+  /api/v1/score/{wallet}:
+    get:
+      operationId: getScore
+      tags: [Scores]
+      summary: Get a wallet's committed reputation score
+      description: |
+        Returns the wallet's score snapshot: the 0-100 score, risk level,
+        per-component breakdown, multi-chain activity totals, attestation counts,
+        and freshness metadata. Valid wallets always answer 200: `cacheStatus`
+        `cached` means a committed snapshot; otherwise the payload is a
+        conservative baseline (use Intake to index the wallet, then poll this read
+        until `cacheStatus` is `cached`). Costs 1 rate unit at admission; the
+        rate headers reflect that unit only. A known wallet whose evidence is
+        stale or uncommitted, with no scan in flight and no indexing attempt in
+        the last 10 minutes, may additionally start a background rescan: that
+        spends **5 more units from the caller's anonymous per-IP budget** (also
+        on keyed requests) and shows as `refreshInProgress: true`. When that
+        budget is exhausted the rescan is silently skipped and the cached or
+        baseline payload is served with `refreshInProgress: false`. A wallet
+        Kyro has never seen does not auto-index.
+      parameters:
+        - $ref: '#/components/parameters/WalletPath'
+      responses:
+        '200':
+          description: Score snapshot. Committed evidence when cacheStatus is cached, conservative baseline otherwise.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/ScoreData' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                  username: null
+                  score: 79
+                  scoreModelVersion: identity_score_v1
+                  riskLevel: Trusted
+                  badge: Trusted Wallet Credential
+                  breakdown:
+                    globalWalletAge: 20
+                    crossChainActivity: 4
+                    arcActivity: 25
+                    counterpartyDiversity: 15
+                    verifiedAttestations: 0
+                    propagatedTrust: 0
+                    transactionActivity: 15
+                    riskPenalty: 0
+                  activeChains: [Ethereum Mainnet, Arbitrum, Polygon, Arc Testnet]
+                  totalTxCount: 5664
+                  arcTxCount: 211
+                  globalWalletAgeDays: 3970
+                  attestations: { acceptedCount: 0, uniqueCounterparties: 0 }
+                  cacheStatus: cached
+                  lastIndexedAt: '2026-08-11T13:36:05.979Z'
+                  refreshInProgress: false
+                  refreshRecommended: false
+        '400': { $ref: '#/components/responses/InvalidWallet' }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/profile/{username}:
+    get:
+      operationId: getProfile
+      tags: [Profiles]
+      summary: Get a Kyro profile summary by username
+      description: |
+        Returns a curated public summary of a registered Kyro identity: wallet,
+        display name, score, risk level, activity totals, attestation count and a
+        compact trust summary. Costs 1 rate unit.
+      parameters:
+        - $ref: '#/components/parameters/UsernamePath'
+      responses:
+        '200':
+          description: Profile summary.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/ProfileData' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  username: amara.kyro
+                  wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                  displayName: amara.kyro
+                  createdAt: '2026-03-02T18:11:40.000Z'
+                  score: 72
+                  scoreModelVersion: identity_score_v1
+                  riskLevel: Reliable
+                  globalWalletAgeDays: 1460
+                  activeChainCount: 3
+                  totalTxCount: 2417
+                  scoreUpdatedAt: '2026-08-09T07:52:13.000Z'
+                  dataSource: cached
+                  attestations: { count: 6 }
+                  trust:
+                    trustedPeerCount: 4
+                    reciprocalCount: 2
+                    networkHealth: healthy
+                    trustConfidence: 0.62
+        '400':
+          description: Username is missing or shorter than 2 characters (code `INVALID_USERNAME`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: INVALID_USERNAME, message: 'Provide a Kyro username, e.g. yourname.kyro.' }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '404':
+          description: No profile with this username (code `NOT_FOUND`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: NOT_FOUND, message: This Kyro profile could not be found. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/trust/{wallet}:
+    get:
+      operationId: getTrustGraph
+      tags: [Trust]
+      summary: Get a wallet's verified trust graph
+      description: |
+        Returns the wallet's trust graph: verified transaction-backed edges to
+        peers, a point-in-time trust summary and network metrics computed from
+        those edges at read time, anomaly summaries and plain-language
+        explanations. Anomaly entries are sanitized for public
+        consumption: per-anomaly `details` is always an empty object and
+        `suspiciousWallets` is always an empty list. Costs 1 rate unit.
+      parameters:
+        - $ref: '#/components/parameters/WalletPath'
+      responses:
+        '200':
+          description: Trust graph for the wallet.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/TrustData' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                  trustGraph:
+                    walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+                    edges: []
+                    snapshot:
+                      walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+                      trustedPeerCount: 0
+                      strongestConnectionWallet: null
+                      strongestConnectionWeight: 0
+                      reciprocalCount: 0
+                      networkHealth: isolated
+                      totalTrustWeight: 0
+                      propagatedTrustScore: 0
+                      trustConfidence: 0
+                      anomalyScore: 0
+                      maturityReason: No verified transaction-backed trust edges are available yet.
+                      topTrustedPeers: []
+                      createdAt: null
+                      updatedAt: null
+                    anomalies: []
+                    reciprocalPeers: []
+                    strongestPeers: []
+                    metrics:
+                      trustedPeerCount: 0
+                      reciprocalCount: 0
+                      totalTrustWeight: 0
+                      strongestConnectionWeight: 0
+                      networkHealth: isolated
+                      relationshipDiversity: 0
+                      networkMaturity: isolated
+                      trustLevel: Isolated
+                      propagatedTrustScore: 0
+                      trustConfidence: 0
+                      anomalyScore: 0
+                      maturityReason: No verified transaction-backed trust edges are available yet.
+                      suspicious: false
+                    explanations:
+                      - Network currently isolated.
+                      - No verified transaction-backed trust edges are available yet.
+        '400': { $ref: '#/components/responses/InvalidWallet' }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/decision/{wallet}:
+    get:
+      operationId: getDecision
+      tags: [Decisions]
+      summary: Get an allow / caution / block decision for a wallet
+      description: |
+        The core pre-transaction check: returns a verdict (`allow`, `caution`,
+        `block`) for the wallet under a use case, with a recommended USDC limit,
+        reason codes, advisory warnings, the evidence used and missing, freshness
+        metadata and data-coverage notes. The read is deterministic and
+        side-effect-free: it never triggers indexing or provider scans.
+
+        A valid wallet that Kyro has not indexed yet still answers **200** with a
+        conservative baseline verdict; `freshness.cacheStatus` is
+        `indexing_required` and the verdict must not be treated as evidence about
+        the counterparty. Only `freshness.cacheStatus` of `cached` means the
+        verdict rests on a committed score snapshot. Costs 1 rate unit.
+      parameters:
+        - $ref: '#/components/parameters/WalletPath'
+        - $ref: '#/components/parameters/UseCaseQuery'
+      responses:
+        '200':
+          description: Decision verdict (committed evidence or conservative baseline).
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/DecisionData' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                  username: null
+                  useCase: payment
+                  decision: caution
+                  riskLevel: Trusted
+                  recommendedLimit:
+                    amountUsdc: 50
+                    currency: USDC
+                    basis: Caution band for payment (v0 conservative limits).
+                  reasons:
+                    - code: KYRO_TRUST_GRAPH_MISSING
+                      message: This wallet has no Kyro-native relationship evidence yet. No verified peers or attestations on Kyro.
+                    - code: DATA_LIMITED
+                      message: Wallet intelligence coverage is limited, partial or not indexed yet.
+                  warnings:
+                    - code: DATA_PROVIDER_TRANSIENT
+                      message: Chain scans hit temporary provider failures on Base during the last refresh.
+                    - code: DATA_HISTORY_CAPPED
+                      message: 'Provider history on Ethereum Mainnet, Arbitrum, Polygon is capped to the oldest rows.'
+                  score: 79
+                  evidence:
+                    used: [score, riskLevel, riskPenalty, scoreModelVersion, globalWalletAgeDays, cacheStatus, intelligenceStatus, refreshInProgress, refreshRecommended, lastIndexedAt]
+                    missing: [trustGraph, trustGraph.trustConfidence]
+                  freshness:
+                    cacheStatus: cached
+                    lastIndexedAt: '2026-08-11T13:36:05.979Z'
+                    refreshInProgress: false
+                    refreshRecommended: false
+                  coverage:
+                    chains:
+                      - { chain: Ethereum Mainnet, status: indexed, transient: false, standing: false, historyCapped: true, recencyReliable: false }
+                      - { chain: Base, status: error, transient: true, standing: false, historyCapped: null, recencyReliable: null }
+                      - { chain: BNB Chain, status: limited, transient: false, standing: true, historyCapped: null, recencyReliable: null }
+                      - { chain: Arc Testnet, status: indexed, transient: false, standing: false, historyCapped: null, recencyReliable: null }
+                    historyCapped: true
+                    hasTransientIssues: true
+                    hasStandingLimitations: true
+                  scoreModelVersion: identity_score_v1
+                  decisionModelVersion: decision_v0.4.1
+        '400':
+          description: |
+            Invalid wallet address (code `INVALID_WALLET`) or unknown `useCase`
+            (code `INVALID_REQUEST`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: INVALID_REQUEST, message: 'Unknown useCase "trading". Valid values: payment, escrow, lending, marketplace.' }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '404':
+          description: |
+            Rare: the underlying score store reported no record in a state where a
+            baseline could not be produced (code `NOT_FOUND`). The common
+            unknown-wallet case answers 200 with a conservative baseline instead.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: NOT_FOUND, message: No score record for this wallet. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/decision/batch:
+    post:
+      operationId: batchDecisions
+      tags: [Decisions]
+      summary: Screen many counterparties in one call
+      description: |
+        Batch counterparty check for payroll runs, grant payouts, escrow batches,
+        marketplace onboarding and allowlists. Accepts wallet addresses and Kyro
+        usernames mixed in one list. Entries are trimmed and deduped
+        case-insensitively (first occurrence keeps its position); every unique
+        entry gets its own row in the answer, in input order.
+
+        Committed reads only: a batch never triggers indexing or provider scans,
+        and the input list is processed in memory, never stored. A bad row never
+        fails the batch; it becomes its own row `status`. Rows without a
+        committed score report `no_score` instead of a verdict. No receipts are
+        created by this endpoint.
+
+        Limits scale with the caller's plan. Unique rows after dedupe: **10
+        anonymously**, **50 on a developer key**, **250 on pro**, **500 on
+        partner** by default (partner caps can be custom per agreement). Raw
+        entries before dedupe are capped at 4x the row cap with a floor of
+        200. A batch of N unique rows consumes N rate units; batches rejected
+        for size or shape are not charged.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/BatchRequest' }
+            example:
+              inputs:
+                - '0x1234567890abcdef1234567890abcdef12345678'
+                - '0x1111111111111111111111111111111111111111'
+                - amara.kyro
+              useCase: payment
+      responses:
+        '200':
+          description: One row per unique input, plus a verdict tally. Always 200 for a valid request. Per-row problems are row statuses, not HTTP errors.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/BatchData' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  useCase: payment
+                  decisionModelVersion: decision_v0.4.1
+                  summary: { total: 2, allow: 0, caution: 1, block: 0, noScore: 1, invalid: 0, error: 0 }
+                  results:
+                    - input: '0x1234567890abcdef1234567890abcdef12345678'
+                      status: ok
+                      wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                      username: null
+                      decision: caution
+                      score: 79
+                      riskLevel: Trusted
+                      recommendedLimit: { amountUsdc: 50, currency: USDC, basis: Caution band for payment (v0 conservative limits). }
+                      reasons:
+                        - { code: KYRO_TRUST_GRAPH_MISSING, message: This wallet has no Kyro-native relationship evidence yet. }
+                      warnings: []
+                      note: null
+                    - input: '0x1111111111111111111111111111111111111111'
+                      status: no_score
+                      wallet: '0x1111111111111111111111111111111111111111'
+                      username: null
+                      decision: null
+                      score: null
+                      riskLevel: null
+                      recommendedLimit: null
+                      reasons: []
+                      warnings: []
+                      note: No committed score snapshot for this wallet.
+        '400':
+          description: |
+            Malformed body, `inputs` missing / not an array of strings / empty
+            after trimming, more raw entries than the plan's raw bound, more
+            unique rows than the plan's row cap (10 anonymous, 50 developer,
+            250 pro, 500 partner by default) or unknown `useCase`
+            (code `INVALID_REQUEST`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: INVALID_REQUEST, message: Batch is limited to 10 unique entries for anonymous callers (50 or more with an API key). }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/decision-receipts:
+    post:
+      operationId: createDecisionReceipt
+      tags: [Receipts]
+      summary: Mint an immutable, shareable receipt of a decision
+      description: |
+        Runs the live decision read for one wallet (or username) and use case, and
+        stores the resulting verdict as an immutable receipt. Every stored field
+        comes from the decision handler at creation time; nothing in a receipt is
+        client-supplied except which wallet and use case to check, so receipts
+        cannot disagree with what the decision endpoint said. A failed decision
+        never produces a receipt.
+
+        Receipts dedupe per UTC day: minting the identical decision state
+        twice on the same day returns the existing receipt with `deduped: true`
+        (HTTP 200) instead of creating a new one (HTTP 201). The receipt payload
+        is the decision data without the volatile `coverage` block, plus `id`,
+        `createdAt` and a canonical `payloadHash`.
+
+        Costs: the standard guard unit plus one inner decision read and a
+        separate creation budget of 5 receipts per minute.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/ReceiptCreateRequest' }
+            example:
+              wallet: '0x1234567890abcdef1234567890abcdef12345678'
+              useCase: payment
+      responses:
+        '201':
+          description: New receipt created.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/ReceiptCreateData' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  receipt:
+                    id: rcp_Zt3kQ9wXb2LmNpQr
+                    wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                    username: null
+                    useCase: payment
+                    decision: caution
+                    riskLevel: Trusted
+                    recommendedLimit: { amountUsdc: 50, currency: USDC, basis: Caution band for payment (v0 conservative limits). }
+                    reasons:
+                      - { code: KYRO_TRUST_GRAPH_MISSING, message: This wallet has no Kyro-native relationship evidence yet. }
+                    warnings: []
+                    score: 79
+                    evidence:
+                      used: [score, riskLevel, scoreModelVersion, globalWalletAgeDays, cacheStatus]
+                      missing: [trustGraph]
+                    freshness:
+                      cacheStatus: cached
+                      lastIndexedAt: '2026-08-11T13:36:05.979Z'
+                      refreshInProgress: false
+                      refreshRecommended: false
+                    scoreModelVersion: identity_score_v1
+                    decisionModelVersion: decision_v0.4.1
+                    createdAt: '2026-08-12T09:24:07.512Z'
+                    payloadHash: 9f2c7ad81e5b04c6a3f19d2e8b7c4051a6e3d9f0b2c85174e6a1c3b5d7e9f024
+                  url: /check/r/rcp_Zt3kQ9wXb2LmNpQr
+                  deduped: false
+        '200':
+          description: "Identical decision state was already minted today; the existing receipt is returned with `deduped: true`."
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/ReceiptCreateData' }
+        '400':
+          description: |
+            Malformed body, both or neither of `wallet`/`username` provided
+            (code `INVALID_REQUEST`), invalid wallet (code `INVALID_WALLET`), or
+            invalid username (code `INVALID_USERNAME`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: INVALID_REQUEST, message: Provide exactly one of wallet or username. }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '404':
+          description: Unknown username or no score record for the wallet (code `NOT_FOUND`). No receipt was created.
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: NOT_FOUND, message: No Kyro identity found for "amara.kyro". }
+        '429':
+          description: |
+            Standard rate budget exhausted or the creation-only budget of
+            5 receipts per minute was hit (code `RATE_LIMITED`). `Retry-After`
+            accompanies budget rejections; if the inner decision read is the
+            rate-limited step, only the X-RateLimit headers are present.
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: RATE_LIMITED, message: Receipt creation limit exceeded (5 per minute). Retry in 41s. }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/decision-receipts/{id}:
+    get:
+      operationId: getDecisionReceipt
+      tags: [Receipts]
+      summary: Read a decision receipt by id
+      description: |
+        Returns the immutable receipt. Successful reads are served with long-lived
+        immutable caching. Costs 1 rate unit.
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: Receipt id. `rcp_` followed by 16 URL-safe characters.
+          schema:
+            type: string
+            pattern: '^rcp_[A-Za-z0-9_-]{16}$'
+            examples: [rcp_Zt3kQ9wXb2LmNpQr]
+      responses:
+        '200':
+          description: The receipt.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        type: object
+                        required: [receipt]
+                        properties:
+                          receipt: { $ref: '#/components/schemas/DecisionReceipt' }
+        '400':
+          description: Malformed receipt id (code `INVALID_REQUEST`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: INVALID_REQUEST, message: Receipt ids look like rcp_ followed by 16 URL-safe characters. }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '404':
+          description: No receipt with that id (code `NOT_FOUND`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: NOT_FOUND, message: No receipt with that id. }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/intake/{wallet}:
+    post:
+      operationId: intakeWallet
+      tags: [Intake]
+      summary: Index a wallet Kyro has not seen yet
+      description: |
+        On-demand intake for anyone about to transact with an address Kyro has
+        never indexed. Starts a multi-chain scan of public on-chain data; the
+        wallet owner is not involved and no consent gate exists because all
+        evidence is public. Intake never invents a verdict: poll
+        `GET /api/v1/score/{wallet}` until the snapshot commits, then re-run the
+        decision read.
+
+        Idempotent by state: an already-indexed wallet answers 200 with no work;
+        an in-flight indexing job answers 202 (`status: indexing`); otherwise a
+        new job starts (202, `status: started`). One indexing attempt per wallet
+        per 10 minutes; a recent failed attempt answers 429 with `Retry-After`.
+        Starting a scan consumes **20 rate units anonymously or 5 with any API
+        key** (it is far heavier than a cached read, and anonymous starts cost
+        more because rotating IPs is the cheap way to multiply scans). Starts
+        are also capped per UTC day: 25 per IP anonymously; 200, 1000 or 2000
+        per key on developer, pro and partner. Only scans that actually start
+        count against the cap; reaching it answers 429 with `Retry-After`
+        pointing at the next UTC midnight, before any units are spent. The
+        `already_indexed` and `indexing` answers are free and carry no rate
+        headers. A cooldown 429 arrives after its units were spent, so
+        hammering a failing wallet stays expensive.
+      parameters:
+        - $ref: '#/components/parameters/WalletPath'
+      responses:
+        '200':
+          description: |
+            The wallet already has a committed snapshot; nothing to do. This
+            answer is free: no units are consumed and no rate headers are
+            returned.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/IntakeAlreadyIndexed' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                  status: already_indexed
+                  lastIndexedAt: '2026-08-11T13:36:05.979Z'
+        '202':
+          description: |
+            Indexing accepted; either newly started or already in flight. Rate
+            headers appear only on `started` (20 anonymous or 5 keyed units
+            were spent). Joining an in-flight job (`indexing`) is free and
+            omits them.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/IntakeStarted'
+                          - $ref: '#/components/schemas/IntakeIndexing'
+              example:
+                ok: true
+                version: v1
+                data:
+                  wallet: '0x1111111111111111111111111111111111111111'
+                  status: started
+        '400': { $ref: '#/components/responses/InvalidWallet' }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '429':
+          description: |
+            One of three limits answered (all use code `RATE_LIMITED`;
+            `Retry-After` says when to retry). Per-minute budget exhausted:
+            starting an intake consumes 20 units anonymously or 5 with a key.
+            Per-wallet cooldown: this wallet already had an indexing attempt in
+            the last 10 minutes that did not commit; this 429 arrives after its
+            units were spent. Daily start cap reached: this caller already
+            started its day's worth of scans (25 per IP anonymously; 200, 1000
+            or 2000 per key by plan); this 429 costs nothing and `Retry-After`
+            points at the next UTC midnight.
+          headers:
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: RATE_LIMITED, message: This wallet already had an indexing attempt in the last 10 minutes and it did not commit. Retry in 493s. }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+components:
+  securitySchemes:
+    bearerApiKey:
+      type: http
+      scheme: bearer
+      description: |
+        Optional Kyro API key: `Authorization: Bearer kyro_live_...`. Anonymous
+        access (no header) works on every endpoint with a lower rate limit
+        (20 units/minute per IP; keyed budgets follow the key's plan, starting
+        at developer 120). Keys are validated
+        only when the header is present; a malformed, unknown or revoked key is
+        rejected with `401 INVALID_KEY`.
+
+  parameters:
+    WalletPath:
+      name: wallet
+      in: path
+      required: true
+      description: EVM wallet address. `0x` + 40 hex characters (case-insensitive).
+      schema:
+        type: string
+        pattern: '^0x[a-fA-F0-9]{40}$'
+        examples: ['0x1234567890abcdef1234567890abcdef12345678']
+    UsernamePath:
+      name: username
+      in: path
+      required: true
+      description: Kyro username, e.g. `yourname.kyro`. At least 2 characters.
+      schema:
+        type: string
+        minLength: 2
+        examples: [amara.kyro]
+    UseCaseQuery:
+      name: useCase
+      in: query
+      required: false
+      description: What the caller is about to do with this counterparty. Defaults to `payment`.
+      schema: { $ref: '#/components/schemas/UseCase' }
+
+  headers:
+    XRateLimitLimit:
+      description: Total units allowed in the current 60-second window (20 anonymous; keyed by plan, 120 developer, 300 pro, 600 partner by default).
+      schema: { type: integer }
+    XRateLimitRemaining:
+      description: Units remaining in the current window (advisory; the enforced counter is server-side).
+      schema: { type: integer }
+    RetryAfter:
+      description: Seconds until the caller may retry.
+      schema: { type: integer }
+
+  responses:
+    InvalidWallet:
+      description: The wallet path parameter is not a valid EVM address (code `INVALID_WALLET`).
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            ok: false
+            version: v1
+            error: { code: INVALID_WALLET, message: Provide a valid EVM wallet address (0x + 40 hex characters). }
+    InvalidKey:
+      description: |
+        An `Authorization` header was sent but the key is malformed, unknown, or
+        revoked (code `INVALID_KEY`). Omit the header entirely for anonymous
+        access.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            ok: false
+            version: v1
+            error: { code: INVALID_KEY, message: 'Unknown API key. Send a valid key as "Authorization: Bearer kyro_live_..." or omit the header for anonymous access.' }
+    RateLimited:
+      description: The per-minute unit budget is exhausted (code `RATE_LIMITED`). `Retry-After` says when the window resets.
+      headers:
+        X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+        X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+        Retry-After: { $ref: '#/components/headers/RetryAfter' }
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            ok: false
+            version: v1
+            error: { code: RATE_LIMITED, message: Rate limit exceeded (20 requests per minute). Retry in 17s. }
+    ServerError:
+      description: |
+        Temporary server-side failure (HTTP 500, 502 or 503 depending on which
+        upstream evidence failed). `code` is `INTERNAL` or `SCHEMA_MISSING` on
+        receipt endpoints when receipt storage is not provisioned. Safe to retry;
+        state-changing endpoints report explicitly when nothing was created.
+      content:
+        application/json:
+          schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+          example:
+            ok: false
+            version: v1
+            error: { code: INTERNAL, message: Decision is temporarily unavailable. No receipt was created. Please retry. }
+
+  schemas:
+    SuccessEnvelope:
+      type: object
+      description: Common success envelope. `data` carries the endpoint payload.
+      required: [ok, version]
+      properties:
+        ok:
+          type: boolean
+          enum: [true]
+        version:
+          type: string
+          enum: [v1]
+
+    ErrorEnvelope:
+      type: object
+      description: Common error envelope.
+      required: [ok, version, error]
+      properties:
+        ok:
+          type: boolean
+          enum: [false]
+        version:
+          type: string
+          enum: [v1]
+        error:
+          type: object
+          required: [code, message]
+          properties:
+            code:
+              type: string
+              description: Stable machine-readable error code.
+              enum:
+                - INVALID_WALLET
+                - INVALID_USERNAME
+                - INVALID_REQUEST
+                - INVALID_KEY
+                - NOT_FOUND
+                - RATE_LIMITED
+                - SCHEMA_MISSING
+                - INTERNAL
+            message:
+              type: string
+              description: Human-readable explanation.
+
+    UseCase:
+      type: string
+      description: Supported counterparty use cases.
+      enum: [payment, escrow, lending, marketplace]
+      default: payment
+
+    DecisionVerdict:
+      type: string
+      description: The pre-transaction verdict.
+      enum: [allow, caution, block]
+
+    RiskLevel:
+      type: ['string', 'null']
+      description: 'Reputation band produced by the current score model. Current values: "High Risk", "New / Unproven", "Reliable", "Trusted". Null when no committed evidence exists.'
+
+    DecisionReason:
+      type: object
+      description: Machine-readable reason or advisory warning behind a verdict.
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: 'Stable reason code, e.g. KYRO_TRUST_GRAPH_MISSING, DATA_LIMITED, DATA_PROVIDER_TRANSIENT, DATA_PROVIDER_UNSUPPORTED, DATA_HISTORY_CAPPED.'
+        message:
+          type: string
+          description: Plain-language explanation of the reason.
+
+    RecommendedLimit:
+      type: object
+      description: Conservative recommended exposure for this counterparty and use case.
+      required: [amountUsdc, currency, basis]
+      properties:
+        amountUsdc:
+          type: number
+          description: Recommended maximum amount, denominated in USDC.
+        currency:
+          type: string
+          description: Always "USDC" in the current model.
+        basis:
+          type: string
+          description: Which decision band produced this limit.
+
+    DecisionFreshness:
+      type: object
+      description: How current the evidence behind the verdict is.
+      required: [cacheStatus, lastIndexedAt, refreshInProgress, refreshRecommended]
+      properties:
+        cacheStatus:
+          type: ['string', 'null']
+          description: '"cached" means the verdict rests on a committed score snapshot; "indexing_required" means a conservative baseline with no committed evidence.'
+        lastIndexedAt:
+          type: ['string', 'null']
+          format: date-time
+          description: When the wallet's evidence was last committed.
+        refreshInProgress:
+          type: boolean
+        refreshRecommended:
+          type: boolean
+
+    DecisionCoverageChain:
+      type: object
+      description: Per-chain data-coverage note.
+      required: [chain, status, transient, standing, historyCapped, recencyReliable]
+      properties:
+        chain: { type: string }
+        status:
+          type: string
+          description: 'Chain indexing status: indexed, no_activity, limited, not_configured or error.'
+        transient:
+          type: boolean
+          description: True when the gap comes from a temporary provider failure. Affected chains count as missing evidence, never as healthy.
+        standing:
+          type: boolean
+          description: True when the gap is a standing provider-plan limitation, not new suspicion.
+        historyCapped:
+          type: ['boolean', 'null']
+          description: True when provider history is capped to the oldest rows, making activity totals floors. Null when unknown.
+        recencyReliable:
+          type: ['boolean', 'null']
+          description: Whether last-activity recency on this chain can be trusted. Null when unknown.
+
+    DecisionCoverage:
+      type: ['object', 'null']
+      description: Data-coverage notes for the evidence behind this verdict. Advisory only; coverage never adds reasons.
+      required: [chains, historyCapped, hasTransientIssues, hasStandingLimitations]
+      properties:
+        chains:
+          type: array
+          items: { $ref: '#/components/schemas/DecisionCoverageChain' }
+        historyCapped: { type: boolean }
+        hasTransientIssues: { type: boolean }
+        hasStandingLimitations: { type: boolean }
+
+    DecisionData:
+      type: object
+      description: A single pre-transaction decision.
+      required:
+        - wallet
+        - username
+        - useCase
+        - decision
+        - riskLevel
+        - recommendedLimit
+        - reasons
+        - warnings
+        - score
+        - evidence
+        - freshness
+        - coverage
+        - scoreModelVersion
+        - decisionModelVersion
+      properties:
+        wallet:
+          type: string
+          description: Normalized (lowercase) wallet address.
+        username:
+          type: ['string', 'null']
+          description: Kyro username when this wallet has a claimed profile.
+        useCase: { $ref: '#/components/schemas/UseCase' }
+        decision: { $ref: '#/components/schemas/DecisionVerdict' }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        recommendedLimit: { $ref: '#/components/schemas/RecommendedLimit' }
+        reasons:
+          type: array
+          description: Why the verdict is what it is. Reasons drive the verdict.
+          items: { $ref: '#/components/schemas/DecisionReason' }
+        warnings:
+          type: array
+          description: Advisory data-quality notes. Warnings never change the verdict.
+          items: { $ref: '#/components/schemas/DecisionReason' }
+        score:
+          type: number
+          description: The wallet score the verdict used (baseline zeros when no committed snapshot exists).
+        evidence:
+          type: object
+          required: [used, missing]
+          properties:
+            used:
+              type: array
+              items: { type: string }
+              description: Evidence fields that informed this verdict.
+            missing:
+              type: array
+              items: { type: string }
+              description: Evidence that was unavailable. Missing evidence keeps verdicts conservative.
+        freshness: { $ref: '#/components/schemas/DecisionFreshness' }
+        coverage: { $ref: '#/components/schemas/DecisionCoverage' }
+        scoreModelVersion:
+          type: ['string', 'null']
+        decisionModelVersion:
+          type: string
+
+    ScoreData:
+      type: object
+      description: Wallet score snapshot. cacheStatus "cached" marks committed evidence; any other value marks a conservative baseline.
+      required:
+        - wallet
+        - username
+        - score
+        - scoreModelVersion
+        - riskLevel
+        - badge
+        - breakdown
+        - activeChains
+        - totalTxCount
+        - arcTxCount
+        - globalWalletAgeDays
+        - attestations
+        - cacheStatus
+        - lastIndexedAt
+        - refreshInProgress
+        - refreshRecommended
+      properties:
+        wallet: { type: string }
+        username: { type: ['string', 'null'] }
+        score:
+          type: number
+          description: Reputation score, 0-100.
+        scoreModelVersion: { type: ['string', 'null'] }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        badge:
+          type: ['string', 'null']
+          description: Human-readable credential label for the current band.
+        breakdown:
+          type: ['object', 'null']
+          description: 'Points per score component. Current component keys: globalWalletAge, crossChainActivity, arcActivity, counterpartyDiversity, verifiedAttestations, propagatedTrust, transactionActivity, riskPenalty.'
+          additionalProperties: { type: number }
+        activeChains:
+          type: array
+          items: { type: string }
+          description: Chains with indexed activity for this wallet.
+        totalTxCount: { type: number }
+        arcTxCount: { type: number }
+        globalWalletAgeDays: { type: number }
+        attestations:
+          type: object
+          required: [acceptedCount, uniqueCounterparties]
+          properties:
+            acceptedCount: { type: number }
+            uniqueCounterparties: { type: number }
+        cacheStatus:
+          type: ['string', 'null']
+          description: '"cached" when this is a committed snapshot; any other value (e.g. "indexing_required") means no committed evidence yet.'
+        lastIndexedAt:
+          type: ['string', 'null']
+          format: date-time
+        refreshInProgress: { type: boolean }
+        refreshRecommended: { type: boolean }
+
+    ProfileData:
+      type: object
+      description: Curated public summary of a registered Kyro identity.
+      required:
+        - username
+        - wallet
+        - displayName
+        - createdAt
+        - score
+        - scoreModelVersion
+        - riskLevel
+        - globalWalletAgeDays
+        - activeChainCount
+        - totalTxCount
+        - scoreUpdatedAt
+        - dataSource
+        - attestations
+        - trust
+      properties:
+        username: { type: ['string', 'null'] }
+        wallet: { type: ['string', 'null'] }
+        displayName: { type: ['string', 'null'] }
+        createdAt: { type: ['string', 'null'], format: date-time }
+        score: { type: number }
+        scoreModelVersion: { type: ['string', 'null'] }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        globalWalletAgeDays: { type: number }
+        activeChainCount: { type: number }
+        totalTxCount: { type: number }
+        scoreUpdatedAt: { type: ['string', 'null'], format: date-time }
+        dataSource: { type: ['string', 'null'] }
+        attestations:
+          type: object
+          required: [count]
+          properties:
+            count: { type: number }
+        trust:
+          type: ['object', 'null']
+          description: Compact trust summary; null when no trust snapshot exists.
+          required: [trustedPeerCount, reciprocalCount, networkHealth, trustConfidence]
+          properties:
+            trustedPeerCount: { type: number }
+            reciprocalCount: { type: number }
+            networkHealth: { type: ['string', 'null'] }
+            trustConfidence: { type: ['number', 'null'] }
+
+    TrustEdge:
+      type: object
+      description: A verified, transaction-backed relationship between two wallets.
+      required:
+        - id
+        - sourceWallet
+        - targetWallet
+        - interactionCount
+        - totalVerifiedVolume
+        - firstInteractionAt
+        - lastInteractionAt
+        - interactionTypes
+        - trustWeight
+        - reciprocal
+        - sharedCounterpartyCount
+        - createdAt
+        - updatedAt
+      properties:
+        id: { type: string }
+        sourceWallet: { type: string }
+        targetWallet: { type: string }
+        peerWallet: { type: string }
+        peerUsername: { type: ['string', 'null'] }
+        peerArcScore: { type: ['number', 'null'] }
+        peerCredentialLevel: { type: ['string', 'null'] }
+        peerRiskLevel: { type: ['string', 'null'] }
+        interactionCount: { type: number }
+        totalVerifiedVolume: { type: number }
+        firstInteractionAt: { type: ['string', 'null'], format: date-time }
+        lastInteractionAt: { type: ['string', 'null'], format: date-time }
+        interactionTypes:
+          type: array
+          items: { type: string }
+          description: 'Interaction categories, e.g. payment, service_payment, escrow_release, trade_settlement.'
+        trustWeight: { type: number }
+        reciprocal: { type: boolean }
+        sharedCounterpartyCount: { type: number }
+        createdAt: { type: ['string', 'null'], format: date-time }
+        updatedAt: { type: ['string', 'null'], format: date-time }
+
+    TrustSnapshot:
+      type: object
+      description: Point-in-time trust summary, computed from verified edges at read time. createdAt/updatedAt reflect a stored snapshot row when one exists and are null otherwise.
+      required:
+        - walletAddress
+        - trustedPeerCount
+        - strongestConnectionWallet
+        - strongestConnectionWeight
+        - reciprocalCount
+        - networkHealth
+        - totalTrustWeight
+        - propagatedTrustScore
+        - trustConfidence
+        - anomalyScore
+        - maturityReason
+        - topTrustedPeers
+        - createdAt
+        - updatedAt
+      properties:
+        walletAddress: { type: string }
+        trustedPeerCount: { type: number }
+        strongestConnectionWallet: { type: ['string', 'null'] }
+        strongestConnectionWeight: { type: number }
+        reciprocalCount: { type: number }
+        networkHealth: { type: string }
+        totalTrustWeight: { type: number }
+        propagatedTrustScore: { type: number }
+        trustConfidence: { type: number }
+        anomalyScore: { type: number }
+        maturityReason: { type: ['string', 'null'] }
+        topTrustedPeers:
+          type: array
+          items: { type: string }
+        createdAt: { type: ['string', 'null'], format: date-time }
+        updatedAt: { type: ['string', 'null'], format: date-time }
+
+    TrustAnomaly:
+      type: object
+      description: |
+        A detected trust-graph anomaly, sanitized for public consumption:
+        `details` is always an empty object and `suspiciousWallets` is always an
+        empty list in API responses.
+      required:
+        - id
+        - walletAddress
+        - anomalyType
+        - severity
+        - details
+        - anomalyScore
+        - anomalyReason
+        - clusterSize
+        - suspiciousWallets
+        - createdAt
+      properties:
+        id: { type: string }
+        walletAddress: { type: string }
+        anomalyType:
+          type: string
+          description: 'E.g. tiny_dense_loop, circular_attestations, rapid_trust_farming, excessive_reciprocal_only_cluster, fresh_wallet_trust_ring.'
+        severity: { type: string }
+        details:
+          type: object
+          description: Always empty in public responses.
+        anomalyScore: { type: number }
+        anomalyReason: { type: ['string', 'null'] }
+        clusterSize: { type: ['number', 'null'] }
+        suspiciousWallets:
+          type: array
+          items: { type: string }
+          description: Always empty in public responses.
+        createdAt: { type: string, format: date-time }
+
+    TrustMetrics:
+      type: object
+      description: Computed network metrics for the wallet's trust graph.
+      required:
+        - trustedPeerCount
+        - reciprocalCount
+        - totalTrustWeight
+        - strongestConnectionWeight
+        - networkHealth
+        - relationshipDiversity
+        - networkMaturity
+        - trustLevel
+        - propagatedTrustScore
+        - trustConfidence
+        - anomalyScore
+        - maturityReason
+        - suspicious
+      properties:
+        trustedPeerCount: { type: number }
+        reciprocalCount: { type: number }
+        totalTrustWeight: { type: number }
+        strongestConnectionWeight: { type: number }
+        networkHealth: { type: string }
+        relationshipDiversity: { type: number }
+        networkMaturity:
+          type: string
+          description: 'E.g. isolated, emerging, established, trusted, highly_connected, suspicious_cluster.'
+        trustLevel:
+          type: string
+          description: 'E.g. Isolated, Emerging, Developing, Strong.'
+        propagatedTrustScore: { type: number }
+        trustConfidence: { type: number }
+        anomalyScore: { type: number }
+        maturityReason: { type: string }
+        suspicious: { type: boolean }
+
+    TrustGraph:
+      type: object
+      description: The wallet's full verified trust graph.
+      required:
+        - walletAddress
+        - edges
+        - snapshot
+        - anomalies
+        - reciprocalPeers
+        - strongestPeers
+        - metrics
+        - explanations
+      properties:
+        walletAddress: { type: string }
+        edges:
+          type: array
+          items: { $ref: '#/components/schemas/TrustEdge' }
+        snapshot: { $ref: '#/components/schemas/TrustSnapshot' }
+        anomalies:
+          type: array
+          items: { $ref: '#/components/schemas/TrustAnomaly' }
+        reciprocalPeers:
+          type: array
+          items: { $ref: '#/components/schemas/TrustEdge' }
+        strongestPeers:
+          type: array
+          items: { $ref: '#/components/schemas/TrustEdge' }
+        metrics: { $ref: '#/components/schemas/TrustMetrics' }
+        explanations:
+          type: array
+          items: { type: string }
+          description: Plain-language reading of the graph.
+
+    TrustData:
+      type: object
+      required: [wallet, trustGraph]
+      properties:
+        wallet: { type: string }
+        trustGraph: { $ref: '#/components/schemas/TrustGraph' }
+
+    BatchRequest:
+      type: object
+      required: [inputs]
+      properties:
+        inputs:
+          type: array
+          description: |
+            Wallet addresses and/or Kyro usernames, one per entry. Entries are
+            trimmed and deduped case-insensitively. Unique rows after dedupe
+            are capped by plan: 10 anonymous, 50 developer, 250 pro, 500
+            partner by default. Raw entries before dedupe are capped at 4x the
+            row cap with a floor of 200. Entries starting with `0x` are always
+            treated as addresses.
+          items: { type: string }
+          minItems: 1
+        useCase: { $ref: '#/components/schemas/UseCase' }
+
+    BatchSummary:
+      type: object
+      description: Verdict tally across all rows.
+      required: [total, allow, caution, block, noScore, invalid, error]
+      properties:
+        total: { type: integer }
+        allow: { type: integer }
+        caution: { type: integer }
+        block: { type: integer }
+        noScore: { type: integer }
+        invalid: { type: integer }
+        error: { type: integer }
+
+    BatchRow:
+      type: object
+      description: |
+        One answered input row. `status` is the row's outcome: `ok` carries a
+        verdict; `no_score` means no committed snapshot exists (never a guessed
+        verdict); `invalid` means the entry was not a valid address or known
+        username; `error` means this row was temporarily unavailable. Non-`ok`
+        rows explain themselves in `note`.
+      required:
+        - input
+        - status
+        - wallet
+        - username
+        - decision
+        - score
+        - riskLevel
+        - recommendedLimit
+        - reasons
+        - warnings
+        - note
+      properties:
+        input:
+          type: string
+          description: The original entry, verbatim.
+        status:
+          type: string
+          enum: [ok, no_score, invalid, error]
+        wallet: { type: ['string', 'null'] }
+        username: { type: ['string', 'null'] }
+        decision:
+          oneOf:
+            - $ref: '#/components/schemas/DecisionVerdict'
+            - type: 'null'
+        score: { type: ['number', 'null'] }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        recommendedLimit:
+          oneOf:
+            - $ref: '#/components/schemas/RecommendedLimit'
+            - type: 'null'
+        reasons:
+          type: array
+          items: { $ref: '#/components/schemas/DecisionReason' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/DecisionReason' }
+        note:
+          type: ['string', 'null']
+          description: Human-readable explanation for non-ok rows; null on ok rows.
+
+    BatchData:
+      type: object
+      required: [useCase, decisionModelVersion, summary, results]
+      properties:
+        useCase: { $ref: '#/components/schemas/UseCase' }
+        decisionModelVersion: { type: string }
+        summary: { $ref: '#/components/schemas/BatchSummary' }
+        results:
+          type: array
+          description: One row per unique input, in input order.
+          items: { $ref: '#/components/schemas/BatchRow' }
+
+    ReceiptCreateRequest:
+      type: object
+      description: Provide exactly one of `wallet` or `username`, plus an optional use case.
+      properties:
+        wallet:
+          type: string
+          pattern: '^0x[a-fA-F0-9]{40}$'
+          description: EVM wallet address to check.
+        username:
+          type: string
+          minLength: 2
+          maxLength: 64
+          description: Kyro username to check instead of a wallet.
+        useCase: { $ref: '#/components/schemas/UseCase' }
+      oneOf:
+        - required: [wallet]
+        - required: [username]
+
+    DecisionReceipt:
+      type: object
+      description: |
+        An immutable snapshot of a decision verdict: the decision payload at
+        creation time (without the volatile `coverage` block), plus the receipt
+        id, creation timestamp and a SHA-256 hash of the canonical payload.
+      required:
+        - id
+        - createdAt
+        - payloadHash
+        - wallet
+        - username
+        - useCase
+        - decision
+        - riskLevel
+        - recommendedLimit
+        - reasons
+        - warnings
+        - score
+        - evidence
+        - freshness
+        - scoreModelVersion
+        - decisionModelVersion
+      properties:
+        id:
+          type: string
+          pattern: '^rcp_[A-Za-z0-9_-]{16}$'
+        createdAt: { type: string, format: date-time }
+        payloadHash:
+          type: string
+          description: SHA-256 (hex) of the canonical, key-sorted payload plus the UTC day. This is the basis of same-day dedupe.
+        wallet: { type: string }
+        username: { type: ['string', 'null'] }
+        useCase: { $ref: '#/components/schemas/UseCase' }
+        decision: { $ref: '#/components/schemas/DecisionVerdict' }
+        riskLevel: { $ref: '#/components/schemas/RiskLevel' }
+        recommendedLimit: { $ref: '#/components/schemas/RecommendedLimit' }
+        reasons:
+          type: array
+          items: { $ref: '#/components/schemas/DecisionReason' }
+        warnings:
+          type: array
+          items: { $ref: '#/components/schemas/DecisionReason' }
+        score: { type: number }
+        evidence:
+          type: object
+          required: [used, missing]
+          properties:
+            used:
+              type: array
+              items: { type: string }
+            missing:
+              type: array
+              items: { type: string }
+        freshness: { $ref: '#/components/schemas/DecisionFreshness' }
+        scoreModelVersion: { type: ['string', 'null'] }
+        decisionModelVersion: { type: string }
+
+    ReceiptCreateData:
+      type: object
+      required: [receipt, url, deduped]
+      properties:
+        receipt: { $ref: '#/components/schemas/DecisionReceipt' }
+        url:
+          type: string
+          description: Site-relative share URL for the receipt, e.g. `/check/r/rcp_...` on https://www.thekyro.co.
+        deduped:
+          type: boolean
+          description: True when an identical decision state was already minted today and that receipt was returned instead of a new one.
+
+    IntakeAlreadyIndexed:
+      type: object
+      required: [wallet, status, lastIndexedAt]
+      properties:
+        wallet: { type: string }
+        status:
+          type: string
+          enum: [already_indexed]
+        lastIndexedAt:
+          type: string
+          format: date-time
+          description: When this wallet's snapshot last committed.
+
+    IntakeStarted:
+      type: object
+      required: [wallet, status]
+      properties:
+        wallet: { type: string }
+        status:
+          type: string
+          enum: [started]
+
+    IntakeIndexing:
+      type: object
+      required: [wallet, status, startedAt]
+      properties:
+        wallet: { type: string }
+        status:
+          type: string
+          enum: [indexing]
+        startedAt:
+          type: ['string', 'null']
+          format: date-time
+          description: When the in-flight indexing job started.

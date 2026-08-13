@@ -1,7 +1,11 @@
+"use client";
+
+import { useState } from "react";
 import Link from "next/link";
 import type { TrustEdge, TrustGraph } from "@/lib/types";
 import { shortenAddress } from "@/lib/wallet";
 import { TrustConstellation } from "@/components/TrustConstellation";
+import { RelationshipDrawer } from "@/components/RelationshipDrawer";
 
 function ageLabel(value: string | null) {
   if (!value) return "Unknown";
@@ -48,12 +52,46 @@ function PeerIdentity({ edge, className = "" }: { edge: TrustEdge; className?: s
   );
 }
 
-export function TrustGraphCard({ graph, title = "Trust Network" }: { graph?: TrustGraph | null; title?: string }) {
+export function TrustGraphCard({
+  graph,
+  title = "Trust Network",
+  description,
+  variant = "dashboard"
+}: {
+  graph?: TrustGraph | null;
+  title?: string;
+  description?: string;
+  variant?: "dashboard" | "public";
+}) {
+  const [activeEdge, setActiveEdge] = useState<TrustEdge | null>(null);
+
   if (!graph) {
     return (
     <section className="r4-panel pt-6">
         <p className="arc-section-label">{title}</p>
         <p className="mt-3 text-sm text-mutedc">Trust graph data is not available yet.</p>
+      </section>
+    );
+  }
+
+  if (graph.edges.length === 0) {
+    return (
+      <section className="r4-panel pt-6">
+        <p className="arc-section-label">{title}</p>
+        <h2 className="mt-2.5 text-2xl font-extrabold text-ink">Transaction-verified trust graph</h2>
+        <div className="mt-6 border border-dashed border-linec px-6 py-10 text-center sm:py-12">
+          <p className="kicker">No verified peers yet</p>
+          <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-mutedc">
+            {variant === "public"
+              ? "This wallet has no transaction-verified relationships yet. Peers appear here once an attestation backed by a real onchain transaction is accepted."
+              : "Trust edges are created when an attestation backed by a real onchain transaction is verified. Attest a transaction with a counterparty you have actually transacted with to start building your network."}
+          </p>
+          {variant === "dashboard" ? (
+            <Link href="/attestations" className="arc-button-secondary mt-6 inline-block px-5 py-3 text-sm font-bold">
+              Submit an attestation
+            </Link>
+          ) : null}
+        </div>
       </section>
     );
   }
@@ -66,6 +104,7 @@ export function TrustGraphCard({ graph, title = "Trust Network" }: { graph?: Tru
         <div>
           <p className="arc-section-label">{title}</p>
           <h2 className="mt-2.5 text-2xl font-extrabold text-ink">Transaction-verified trust graph</h2>
+          {description ? <p className="mt-2.5 max-w-xl text-sm leading-relaxed text-mutedc">{description}</p> : null}
         </div>
         <span className={`chip ${healthTone(graph.metrics.networkHealth)}`}><span className="dot" />
           {graph.metrics.suspicious ? "Review" : graph.metrics.networkHealth}
@@ -92,7 +131,7 @@ export function TrustGraphCard({ graph, title = "Trust Network" }: { graph?: Tru
         </div>
       ) : null}
 
-      <TrustConstellation graph={graph} />
+      <TrustConstellation graph={graph} onOpen={setActiveEdge} />
 
       {graph.edges.length > 0 ? (
         <details className="mt-6 border-t border-linec">
@@ -108,6 +147,13 @@ export function TrustGraphCard({ graph, title = "Trust Network" }: { graph?: Tru
                   <div className="flex flex-wrap gap-2">
                     <span className="chip green"><span className="dot" />Verified</span>
                     {edge.reciprocal ? <span className="chip green"><span className="dot" />Reciprocal</span> : null}
+                    <button
+                      type="button"
+                      onClick={() => setActiveEdge(edge)}
+                      className="rounded-[2px] border border-linec px-2.5 py-1 font-mono text-[0.65rem] font-bold uppercase tracking-[0.12em] text-mutedc transition hover:border-ink hover:text-ink"
+                    >
+                      Evidence
+                    </button>
                   </div>
                 </div>
                 <p className="mt-2.5 text-[0.8125rem] leading-relaxed text-slate-400">{edge.interactionTypes.join(", ").replaceAll("_", " ")} · weight {Math.round(edge.trustWeight)} · {edge.interactionCount} interactions · {ageLabel(edge.lastInteractionAt)}</p>
@@ -115,6 +161,15 @@ export function TrustGraphCard({ graph, title = "Trust Network" }: { graph?: Tru
             ))}
           </div>
         </details>
+      ) : null}
+
+      {activeEdge ? (
+        <RelationshipDrawer
+          walletAddress={graph.walletAddress}
+          edge={activeEdge}
+          graph={graph}
+          onClose={() => setActiveEdge(null)}
+        />
       ) : null}
     </section>
   );

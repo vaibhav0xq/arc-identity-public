@@ -12,7 +12,7 @@ export default function MyProfileResolverPage() {
   const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { identity, refreshIdentity } = useArcIdentity();
   const [resolverState, setResolverState] = useState<ResolverState>("idle");
-  const [message, setMessage] = useState("Opening your Kyro...");
+  const [message, setMessage] = useState("Opening your identity...");
   const [retryKey, setRetryKey] = useState(0);
 
   useEffect(() => {
@@ -27,20 +27,20 @@ export default function MyProfileResolverPage() {
 
     async function resolveProfile() {
       transition("resolving");
-      setMessage("Opening your Kyro...");
+      setMessage("Opening your identity...");
       console.log("[arc-identity] resolver_started", { wallet, status: identity.status, source: identity.source });
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
       timeoutRef.current = setTimeout(() => {
         if (cancelled) return;
         console.warn("[arc-identity] resolver_timeout", { wallet });
-        setMessage("Could not open your Kyro. Retry.");
+        setMessage("Could not open your identity. Retry.");
         transition("failed", { reason: "timeout" });
       }, 8000);
 
       if (identity.status === "disconnected") {
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
         transition("failed", { reason: "disconnected" });
-        setMessage("Connect your wallet to open your Kyro.");
+        setMessage("Connect your wallet to open your identity.");
         return;
       }
 
@@ -80,8 +80,8 @@ export default function MyProfileResolverPage() {
     <ArcShell>
       <WalletGate
         sectionLabel="Public profile"
-        title="Connect your wallet to open your Kyro."
-        description="Connect your wallet to open your public Kyro profile."
+        title="Connect your wallet to open your identity."
+        description="Connect your wallet to open your public profile."
       >
       <section className="mx-auto flex min-h-[64vh] max-w-2xl items-center py-10">
          <div className="r4-panel w-full text-center">
@@ -89,11 +89,11 @@ export default function MyProfileResolverPage() {
            <p className="kicker">PUBLIC WALLET CREDENTIAL</p>
             <h1 className="mt-4 font-heading text-3xl font-semibold text-ink">{message}</h1>
            <p className="mx-auto mt-4 max-w-lg text-sm leading-6 text-mutedc">
-            Resolving your connected wallet to the canonical public Kyro profile.
+            Resolving your connected wallet to the canonical public profile.
           </p>
           {resolverState === "resolving" || resolverState === "success" ? (
              <div className="mx-auto mt-8 h-1.5 max-w-sm overflow-hidden rounded-full bg-linec">
-               <div className="h-full w-2/3 animate-pulse rounded-full bg-gold" />
+               <span className="skeleton block h-full w-full" />
            </div>
           ) : resolverState === "failed" ? (
             <div className="mt-7 flex flex-wrap justify-center gap-3">

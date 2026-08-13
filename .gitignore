@@ -1,57 +1,25 @@
-# Dependencies
-node_modules
+# dependencies
+node_modules/
 
-# Next.js
-.next
-out
+# next.js
+.next/
+out/
 
-# Build outputs
-dist
-build
+# builds
+build/
+dist/
+*.tsbuildinfo
 
-# Environment files
+# environment
 .env
 .env.*
-.env.local
 
-# Logs
-*.log
+# logs
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
-pnpm-debug.log*
 
-# TypeScript cache
-*.tsbuildinfo
-
-# Vercel
-.vercel
-
-# OS files
+# misc
 .DS_Store
-Thumbs.db
-
-# VSCode
-.vscode/*
-!.vscode/extensions.json
-!.vscode/settings.json
-
-# Temporary/debug
-tmp
-temp
-debug
-public/arc-identity/
-public/kyro/
-coverage
-playwright-report
-test-results
-
-# Local database/cache
-*.sqlite
-*.db
-
-# Misc
-.cache
-
-# Private deployment schema
-supabase/
+*.pem
+.vercel

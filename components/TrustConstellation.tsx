@@ -7,9 +7,10 @@ import { shortenAddress } from "@/lib/wallet";
 
 /* Trust instrument — a live canvas observatory.
    Peers orbit the wallet on weight rings (closer = stronger). Transaction
-   pulses travel along the edges, a radar sweep pings each peer as it passes,
-   and the whole plate breathes at 60fps. Rendering is client-only, so there
-   are no SSR hydration concerns. */
+   pulses travel along the edges as comets, a radar sweep pings each peer as
+   it passes, every node carries a weight gauge arc, and the whole plate
+   breathes at 60fps with a parallax dust field and vignette depth. Rendering
+   is client-only, so there are no SSR hydration concerns. */
 
 const H = 470;
 
@@ -29,6 +30,12 @@ function hashId(id: string) {
 
 function peerLabel(edge: TrustEdge) {
   return edge.peerUsername ?? shortenAddress(edge.peerWallet ?? edge.targetWallet);
+}
+
+/* Medallion initials: "creepy.kyro" → "C", bare addresses → first two hex chars. */
+function monogram(edge: TrustEdge) {
+  const label = peerLabel(edge);
+  return label.startsWith("0x") ? label.slice(2, 4).toUpperCase() : label.charAt(0).toUpperCase();
 }
 
 function ageLabel(value: string | null) {
@@ -75,7 +82,7 @@ function buildPeers(edges: TrustEdge[]): PeerSpec[] {
       baseAngle: ((-54 + (i * 360) / n + jitter) * Math.PI) / 180,
       drift: (0.016 + (h % 7) * 0.004) * (h % 2 ? 1 : -1),
       phase: (h % 628) / 100,
-      nodeR: 8 + Math.min(5, edge.interactionCount * 0.9),
+      nodeR: 14 + Math.min(6, edge.interactionCount * 1.1),
       risky: /high risk|anomaly|suspicious/i.test(edge.peerRiskLevel ?? ""),
       bow: (h % 2 ? 1 : -1) * (0.09 + (h % 5) * 0.02),
       particles: Array.from({ length: count }, (_, k) => ({
@@ -92,7 +99,7 @@ function buildPeers(edges: TrustEdge[]): PeerSpec[] {
 type PeerAnim = { x: number; y: number; angle: number; scale: number; alpha: number; lastPing: number };
 type Ripple = { x: number; y: number; born: number; max: number; color: string };
 
-export function TrustConstellation({ graph }: { graph: TrustGraph }) {
+export function TrustConstellation({ graph, onOpen }: { graph: TrustGraph; onOpen?: (edge: TrustEdge) => void }) {
   const router = useRouter();
   // Key the peer build on edge data, not array identity, so background data
   // refreshes with identical peers do not rebuild and replay the intro.
@@ -142,7 +149,7 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
     let cy = 0;
     let rMin = 0;
     let rMax = 0;
-    let dust: { x: number; y: number; s: number }[] = [];
+    let dust: { x: number; y: number; s: number; ph: number; par: number }[] = [];
     let raf = 0;
     // Persist the animation clock across effect re-runs so a data refresh
     // never replays the entry animation mid-session.
@@ -169,11 +176,19 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
       cy = H / 2 - 10;
       rMax = Math.min(w / 2 - 175, 186);
       rMin = Math.max(66, rMax * 0.42);
-      // Deterministic dust field, reseeded per layout.
-      dust = Array.from({ length: 46 }, (_, i) => {
+      // Deterministic two-layer dust field, reseeded per layout. The `par`
+      // factor gives each mote its own drift speed so the field reads as a
+      // parallax star field rather than static grain.
+      dust = Array.from({ length: 64 }, (_, i) => {
         const a = Math.abs(Math.sin(i * 127.1) * 43758.5453) % 1;
         const b = Math.abs(Math.sin(i * 311.7) * 12543.8971) % 1;
-        return { x: cx + (a - 0.5) * (rMax * 2.5), y: cy + (b - 0.5) * (rMax * 2.15), s: 0.6 + (i % 3) * 0.35 };
+        return {
+          x: cx + (a - 0.5) * (rMax * 2.6),
+          y: cy + (b - 0.5) * (rMax * 2.2),
+          s: 0.5 + (i % 3) * 0.4,
+          ph: (i * 0.61) % (Math.PI * 2),
+          par: i % 2 === 0 ? 2.2 : 5.5
+        };
       });
     }
 
@@ -218,12 +233,31 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
       ctx.fillStyle = glow;
       ctx.fillRect(0, 0, w, H);
 
-      /* dust field */
+      /* vignette — darkened plate edges give the instrument physical depth */
+      const vig = ctx.createRadialGradient(cx, cy, rMax * 0.55, cx, cy, Math.max(w * 0.62, rMax * 1.9));
+      vig.addColorStop(0, "rgba(0,0,0,0)");
+      vig.addColorStop(1, "rgba(0,0,0,0.30)");
+      ctx.fillStyle = vig;
+      ctx.fillRect(0, 0, w, H);
+
+      /* trusted core — a faint warm disc inside the strongest ring */
+      const core = ctx.createRadialGradient(cx, cy, 0, cx, cy, rMin);
+      core.addColorStop(0, "rgba(201,162,94,0.05)");
+      core.addColorStop(0.75, "rgba(201,162,94,0.028)");
+      core.addColorStop(1, "rgba(201,162,94,0)");
+      ctx.fillStyle = core;
+      ctx.beginPath();
+      ctx.arc(cx, cy, rMin, 0, Math.PI * 2);
+      ctx.fill();
+
+      /* parallax dust field — two drift speeds, twinkling */
       for (let i = 0; i < dust.length; i++) {
         const d = dust[i];
-        const tw = reduce ? 0.1 : 0.055 + 0.055 * Math.sin(t * 0.7 + i * 1.7);
+        const tw = reduce ? 0.1 : 0.05 + 0.055 * Math.sin(t * 0.7 + i * 1.7);
+        const ox = reduce ? 0 : Math.sin(t / d.par + d.ph) * d.par;
+        const oy = reduce ? 0 : Math.cos(t / (d.par * 1.4) + d.ph) * (d.par * 0.5);
         ctx.fillStyle = `rgba(242,238,227,${Math.max(0, tw).toFixed(3)})`;
-        ctx.fillRect(d.x, d.y, d.s, d.s);
+        ctx.fillRect(d.x + ox, d.y + oy, d.s, d.s);
       }
 
       /* weight rings + labels */
@@ -248,19 +282,36 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
         }
       }
 
+      /* engraved meridians — faint spokes every 30 degrees fill the plate */
+      ctx.strokeStyle = "rgba(242,238,227,0.045)";
+      ctx.lineWidth = 1;
+      for (let i = 0; i < 12; i++) {
+        const a = (i * Math.PI) / 6 + Math.PI / 12;
+        ctx.beginPath();
+        ctx.moveTo(cx + Math.cos(a) * (rMin * 0.6), cy + Math.sin(a) * (rMin * 0.6));
+        ctx.lineTo(cx + Math.cos(a) * (rMax + 8), cy + Math.sin(a) * (rMax + 8));
+        ctx.stroke();
+      }
+
       /* tick marks on the outer ring — a rotating instrument bezel */
       const bezelR = rMax + 14;
       const bezelSpin = reduce ? 0 : t * 0.02;
-      ctx.strokeStyle = "rgba(242,238,227,0.14)";
       ctx.lineWidth = 1;
       for (let i = 0; i < 72; i++) {
         const a = bezelSpin + (i * Math.PI * 2) / 72;
-        const len = i % 6 === 0 ? 7 : 3;
+        const major = i % 18 === 0;
+        const len = major ? 9 : i % 6 === 0 ? 7 : 3;
+        ctx.strokeStyle = major ? "rgba(201,162,94,0.4)" : "rgba(242,238,227,0.14)";
         ctx.beginPath();
         ctx.moveTo(cx + Math.cos(a) * bezelR, cy + Math.sin(a) * bezelR);
         ctx.lineTo(cx + Math.cos(a) * (bezelR + len), cy + Math.sin(a) * (bezelR + len));
         ctx.stroke();
       }
+      /* outer hairline — closes the bezel like a watch case */
+      ctx.beginPath();
+      ctx.arc(cx, cy, bezelR + 12, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(242,238,227,0.055)";
+      ctx.stroke();
 
       /* radar sweep */
       const sweepA = ((t * Math.PI * 2) / 13) % (Math.PI * 2);
@@ -303,6 +354,35 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
         }
       }
 
+      /* orbit wakes — each peer rides its ring and trails a luminous arc,
+         so the plate reads as a live orrery instead of empty space */
+      for (const peer of peers) {
+        const anim = animRef.current.get(peer.edge.id)!;
+        const enter = reduce ? 1 : easeOut((t - 0.18 - peer.i * 0.1) / 0.55);
+        if (enter <= 0.01) continue;
+        const isActive = peer.edge.id === activeId;
+        const orbitR = Math.hypot(anim.x - cx, anim.y - cy) || 1;
+        ctx.beginPath();
+        ctx.arc(cx, cy, orbitR, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(242,238,227,${(0.05 * anim.alpha * enter).toFixed(3)})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        if (!reduce) {
+          const dir = peer.drift >= 0 ? 1 : -1;
+          const segs = 6;
+          const span = 1.05;
+          for (let s = 0; s < segs; s++) {
+            const a1 = anim.angle - (dir * span * s) / segs;
+            const a2 = anim.angle - (dir * span * (s + 1)) / segs;
+            ctx.beginPath();
+            ctx.arc(cx, cy, orbitR, Math.min(a1, a2), Math.max(a1, a2));
+            ctx.strokeStyle = `rgba(201,162,94,${((isActive ? 0.4 : 0.2) * (1 - s / segs) * anim.alpha * enter).toFixed(3)})`;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+          }
+        }
+      }
+
       /* edges + flowing particles */
       for (const peer of peers) {
         const anim = animRef.current.get(peer.edge.id)!;
@@ -315,29 +395,73 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
 
         ctx.save();
         ctx.globalAlpha = anim.alpha;
-        const tail = edgePoint(peer, anim, 0);
-        const head = edgePoint(peer, anim, 1);
-        const grad = ctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
-        if (isActive) {
-          grad.addColorStop(0, "rgba(201,162,94,0.16)");
-          grad.addColorStop(1, "rgba(201,162,94,0.95)");
-          ctx.shadowColor = "rgba(201,162,94,0.55)";
-          ctx.shadowBlur = 9;
-        } else {
-          grad.addColorStop(0, "rgba(201,162,94,0.05)");
-          grad.addColorStop(1, "rgba(201,162,94,0.5)");
-        }
+        /* sample the curve once, reuse for every pass */
+        const pts: { x: number; y: number }[] = [];
+        for (let s = 0; s <= upTo; s++) pts.push(edgePoint(peer, anim, s / steps));
+        const tail = pts[0];
+        const head = pts[pts.length - 1];
+
+        /* under-glow pass — a wide, faint halo beneath the ribbon makes
+           the edge read as luminous without expensive blur */
         ctx.beginPath();
-        for (let s = 0; s <= upTo; s++) {
-          const pt = edgePoint(peer, anim, s / steps);
-          if (s === 0) ctx.moveTo(pt.x, pt.y);
-          else ctx.lineTo(pt.x, pt.y);
+        for (let s = 0; s < pts.length; s++) {
+          if (s === 0) ctx.moveTo(pts[s].x, pts[s].y);
+          else ctx.lineTo(pts[s].x, pts[s].y);
         }
-        ctx.strokeStyle = grad;
-        ctx.lineWidth = isActive ? width + 0.7 : width;
+        ctx.strokeStyle = isActive ? "rgba(201,162,94,0.14)" : "rgba(201,162,94,0.06)";
+        ctx.lineWidth = width + 8;
         ctx.lineCap = "round";
         ctx.stroke();
+
+        /* tapered ribbon — wide at the wallet, narrowing toward the peer,
+           built as a filled polygon between two offset curves */
+        const weightBoost = 0.75 + (clampWeight(peer.edge.trustWeight) / 100) * 0.6;
+        const wRoot = (isActive ? 5.6 : 3.6) * weightBoost;
+        const wTip = (isActive ? 1.7 : 1.1) * weightBoost;
+        const lastIdx = pts.length - 1 || 1;
+        const leftPts: { x: number; y: number }[] = [];
+        const rightPts: { x: number; y: number }[] = [];
+        for (let s = 0; s < pts.length; s++) {
+          const prev = pts[Math.max(0, s - 1)];
+          const next = pts[Math.min(pts.length - 1, s + 1)];
+          const tx = next.x - prev.x;
+          const ty = next.y - prev.y;
+          const tl = Math.hypot(tx, ty) || 1;
+          const nx = -ty / tl;
+          const ny = tx / tl;
+          const half = (wRoot + (wTip - wRoot) * (s / lastIdx)) / 2;
+          leftPts.push({ x: pts[s].x + nx * half, y: pts[s].y + ny * half });
+          rightPts.push({ x: pts[s].x - nx * half, y: pts[s].y - ny * half });
+        }
+        const grad = ctx.createLinearGradient(tail.x, tail.y, head.x, head.y);
+        if (isActive) {
+          grad.addColorStop(0, "rgba(201,162,94,0.24)");
+          grad.addColorStop(1, "rgba(201,162,94,0.95)");
+          ctx.shadowColor = "rgba(201,162,94,0.5)";
+          ctx.shadowBlur = 10;
+        } else {
+          grad.addColorStop(0, "rgba(201,162,94,0.08)");
+          grad.addColorStop(1, "rgba(201,162,94,0.6)");
+        }
+        ctx.beginPath();
+        ctx.moveTo(leftPts[0].x, leftPts[0].y);
+        for (let s = 1; s < leftPts.length; s++) ctx.lineTo(leftPts[s].x, leftPts[s].y);
+        for (let s = rightPts.length - 1; s >= 0; s--) ctx.lineTo(rightPts[s].x, rightPts[s].y);
+        ctx.closePath();
+        ctx.fillStyle = grad;
+        ctx.fill();
         ctx.shadowBlur = 0;
+
+        /* bright spine keeps the ribbon crisp */
+        ctx.beginPath();
+        for (let s = 0; s < pts.length; s++) {
+          if (s === 0) ctx.moveTo(pts[s].x, pts[s].y);
+          else ctx.lineTo(pts[s].x, pts[s].y);
+        }
+        ctx.strokeStyle = isActive ? "rgba(242,238,227,0.45)" : "rgba(242,238,227,0.16)";
+        ctx.lineWidth = 0.8;
+        ctx.lineCap = "round";
+        ctx.stroke();
 
         /* reciprocal companion line — animated dashes flowing back */
         if (peer.edge.reciprocal) {
@@ -360,21 +484,33 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
           ctx.setLineDash([]);
         }
 
-        /* transaction pulses */
+        /* transaction pulses — comets with fading tails */
         if (!reduce && enter > 0.9) {
           for (const part of peer.particles) {
             const u = (((part.p + t * part.speed * part.dir) % 1) + 1) % 1;
-            const pt = edgePoint(peer, anim, u);
             const color = part.dir === 1 ? GOLD : GREEN;
+            const baseA = anim.alpha * (isActive ? 0.95 : 0.6) * Math.sin(u * Math.PI);
+            /* tail — trailing samples shrink and fade behind the head */
+            ctx.fillStyle = color;
+            for (let k = 4; k >= 1; k--) {
+              const ut = u - part.dir * k * 0.022;
+              if (ut < 0 || ut > 1) continue;
+              const tp = edgePoint(peer, anim, ut);
+              ctx.globalAlpha = baseA * (0.32 - k * 0.06);
+              ctx.beginPath();
+              ctx.arc(tp.x, tp.y, part.size * (isActive ? 1.25 : 1) * (1 - k * 0.16), 0, Math.PI * 2);
+              ctx.fill();
+            }
+            /* head */
+            const pt = edgePoint(peer, anim, u);
             ctx.shadowColor = color;
             ctx.shadowBlur = 7;
-            ctx.fillStyle = color;
-            ctx.globalAlpha = anim.alpha * (isActive ? 0.95 : 0.6) * Math.sin(u * Math.PI);
+            ctx.globalAlpha = baseA;
             ctx.beginPath();
             ctx.arc(pt.x, pt.y, part.size * (isActive ? 1.25 : 1), 0, Math.PI * 2);
             ctx.fill();
+            ctx.shadowBlur = 0;
           }
-          ctx.shadowBlur = 0;
         }
         ctx.restore();
       }
@@ -387,49 +523,87 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
           ripples.splice(i, 1);
           continue;
         }
-        ctx.beginPath();
-        ctx.arc(rp.x, rp.y, 6 + easeOut(age) * rp.max, 0, Math.PI * 2);
+        const rr = 6 + easeOut(age) * rp.max;
         ctx.strokeStyle = rp.color;
-        ctx.globalAlpha = (1 - age) * 0.5;
         ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, rr, 0, Math.PI * 2);
+        ctx.globalAlpha = (1 - age) * 0.5;
+        ctx.stroke();
+        /* trailing second ring, sonar style */
+        ctx.beginPath();
+        ctx.arc(rp.x, rp.y, rr * 0.62, 0, Math.PI * 2);
+        ctx.globalAlpha = (1 - age) * 0.24;
         ctx.stroke();
         ctx.globalAlpha = 1;
       }
 
-      /* center node — breathing aura + rotating dashed orbit */
+      /* center node — a wound instrument crown with a confidence dial */
       const centerEnter = reduce ? 1 : easeOut(t / 0.5);
       ctx.save();
       ctx.globalAlpha = centerEnter;
-      const auraR = 44 + (reduce ? 0 : Math.sin(t * 0.9) * 5);
+      const auraR = 52 + (reduce ? 0 : Math.sin(t * 0.9) * 5);
       const aura = ctx.createRadialGradient(cx, cy, 8, cx, cy, auraR);
-      aura.addColorStop(0, "rgba(201,162,94,0.22)");
+      aura.addColorStop(0, "rgba(201,162,94,0.24)");
       aura.addColorStop(1, "rgba(201,162,94,0)");
       ctx.fillStyle = aura;
       ctx.beginPath();
       ctx.arc(cx, cy, auraR, 0, Math.PI * 2);
       ctx.fill();
+
+      /* confidence dial — trust confidence winds around the crown */
+      const confRaw = graph.metrics?.trustConfidence ?? 0;
+      const conf = Math.max(0, Math.min(1, confRaw > 1 ? confRaw / 100 : confRaw)) * centerEnter;
       ctx.beginPath();
-      ctx.arc(cx, cy, 30, 0, Math.PI * 2);
-      ctx.strokeStyle = "rgba(201,162,94,0.5)";
+      ctx.arc(cx, cy, 33, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(242,238,227,0.1)";
+      ctx.lineWidth = 2.4;
+      ctx.stroke();
+      if (conf > 0.01) {
+        ctx.beginPath();
+        ctx.arc(cx, cy, 33, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * conf);
+        ctx.strokeStyle = GOLD;
+        ctx.lineWidth = 2.4;
+        ctx.lineCap = "round";
+        ctx.stroke();
+      }
+
+      /* counter-rotating orbits — gyroscope feel */
+      ctx.beginPath();
+      ctx.arc(cx, cy, 40, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(201,162,94,0.4)";
       ctx.lineWidth = 1;
       ctx.setLineDash([3, 6]);
       ctx.lineDashOffset = reduce ? 0 : -t * 7;
       ctx.stroke();
-      ctx.setLineDash([]);
       ctx.beginPath();
-      ctx.arc(cx, cy, 21 * centerEnter, 0, Math.PI * 2);
-      ctx.fillStyle = "#31352f";
-      ctx.shadowColor = "rgba(0,0,0,0.4)";
-      ctx.shadowBlur = 10;
+      ctx.arc(cx, cy, 47, 0, Math.PI * 2);
+      ctx.strokeStyle = "rgba(201,162,94,0.18)";
+      ctx.setLineDash([1.5, 8]);
+      ctx.lineDashOffset = reduce ? 0 : t * 5;
+      ctx.stroke();
+      ctx.setLineDash([]);
+
+      const crown = ctx.createRadialGradient(cx - 8, cy - 8, 4, cx, cy, 27);
+      crown.addColorStop(0, "#3d423b");
+      crown.addColorStop(1, "#2b2f2a");
+      ctx.beginPath();
+      ctx.arc(cx, cy, 27 * centerEnter, 0, Math.PI * 2);
+      ctx.fillStyle = crown;
+      ctx.shadowColor = "rgba(0,0,0,0.45)";
+      ctx.shadowBlur = 12;
       ctx.fill();
       ctx.shadowBlur = 0;
       ctx.strokeStyle = GOLD;
-      ctx.lineWidth = 1.5;
+      ctx.lineWidth = 1.6;
       ctx.stroke();
       ctx.fillStyle = BONE;
-      ctx.font = `700 11.5px ${monoFamily}`;
+      ctx.font = `700 12.5px ${monoFamily}`;
       ctx.textAlign = "center";
-      ctx.fillText("You", cx, cy + 4);
+      ctx.fillText("You", cx, cy + 1);
+      ctx.fillStyle = QUIET;
+      ctx.font = mono(8);
+      ctx.fillText(`${Math.round(conf * 100)}% conf`, cx, cy + 13);
       ctx.restore();
 
       /* peer nodes + labels (active drawn last, on top) */
@@ -444,9 +618,29 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
         ctx.save();
         ctx.globalAlpha = anim.alpha * enter;
 
+        /* weight gauge — an arc around the medallion showing trust weight
+           out of 100, like a wound instrument dial */
+        const gaugeR = R + 5.5;
+        const frac = (clampWeight(peer.edge.trustWeight) / 100) * enter;
+        ctx.beginPath();
+        ctx.arc(anim.x, anim.y, gaugeR, 0, Math.PI * 2);
+        ctx.strokeStyle = "rgba(242,238,227,0.12)";
+        ctx.lineWidth = 2.2;
+        ctx.stroke();
+        if (frac > 0.01) {
+          ctx.beginPath();
+          ctx.arc(anim.x, anim.y, gaugeR, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * frac);
+          ctx.strokeStyle = peer.risky ? ROSE : GOLD;
+          ctx.globalAlpha = anim.alpha * enter * (isActive ? 0.95 : 0.6);
+          ctx.lineWidth = 2.2;
+          ctx.lineCap = "round";
+          ctx.stroke();
+          ctx.globalAlpha = anim.alpha * enter;
+        }
+
         if (peer.edge.reciprocal) {
           ctx.beginPath();
-          ctx.arc(anim.x, anim.y, R + 5, 0, Math.PI * 2);
+          ctx.arc(anim.x, anim.y, R + 9.5, 0, Math.PI * 2);
           ctx.strokeStyle = "rgba(127,169,141,0.7)";
           ctx.lineWidth = 1;
           ctx.setLineDash([2, 3]);
@@ -459,28 +653,100 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
           ctx.shadowColor = "rgba(201,162,94,0.6)";
           ctx.shadowBlur = 14;
         }
+        /* node body — radial fill gives it a machined, domed surface */
+        const body = ctx.createRadialGradient(anim.x - R * 0.35, anim.y - R * 0.35, R * 0.15, anim.x, anim.y, R);
+        if (isActive) {
+          body.addColorStop(0, "#faf7ee");
+          body.addColorStop(1, "#e6e0cf");
+        } else {
+          body.addColorStop(0, "#474c45");
+          body.addColorStop(1, "#343833");
+        }
         ctx.beginPath();
         ctx.arc(anim.x, anim.y, R, 0, Math.PI * 2);
-        ctx.fillStyle = isActive ? BONE : "#3a3e3a";
+        ctx.fillStyle = body;
         ctx.fill();
         ctx.shadowBlur = 0;
         ctx.strokeStyle = peer.risky ? ROSE : isActive ? GOLD : "#8f9489";
         ctx.lineWidth = isActive ? 2 : 1.2;
         ctx.stroke();
+        /* specular — a hairline catch of light on the upper-left rim.
+           Guard the radius: during the entry animation R can dip below the
+           inset and a negative arc radius throws, killing the draw loop. */
+        if (R > 2.5) {
+          ctx.beginPath();
+          ctx.arc(anim.x, anim.y, R - 1.2, Math.PI * 0.85, Math.PI * 1.45);
+          ctx.strokeStyle = isActive ? "rgba(255,255,255,0.5)" : "rgba(242,238,227,0.22)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
 
-        /* labels */
+        /* medallion initial — gives every peer a face at a glance */
+        if (R > 7) {
+          ctx.font = `700 ${Math.max(9, R * 0.68)}px ${monoFamily}`;
+          ctx.textAlign = "center";
+          ctx.fillStyle = isActive ? INK : "#cfd3c9";
+          ctx.fillText(monogram(peer.edge), anim.x, anim.y + R * 0.24);
+        }
+
+        /* targeting reticle — corner brackets lock onto the active node */
+        if (isActive && dimming) {
+          const lock = Math.max(0, Math.min(1, (anim.scale - 1) / 0.26));
+          if (lock > 0.05) {
+            const B = R + 13 - lock * 3;
+            const L = 6;
+            ctx.strokeStyle = GOLD;
+            ctx.globalAlpha = anim.alpha * enter * lock * 0.9;
+            ctx.lineWidth = 1.4;
+            for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const) {
+              ctx.beginPath();
+              ctx.moveTo(anim.x + sx * B - sx * L, anim.y + sy * B);
+              ctx.lineTo(anim.x + sx * B, anim.y + sy * B);
+              ctx.lineTo(anim.x + sx * B, anim.y + sy * B - sy * L);
+              ctx.stroke();
+            }
+            ctx.globalAlpha = anim.alpha * enter;
+          }
+        }
+
+        /* label plates — name, a weight bar and the interaction tally on an
+           engraved backing plate for legibility over rings */
         const cos = (anim.x - cx) / (Math.hypot(anim.x - cx, anim.y - cy) || 1);
         const anchor: CanvasTextAlign = cos > 0.35 ? "left" : cos < -0.35 ? "right" : "center";
-        const lx = anim.x + (anchor === "left" ? R + 9 : anchor === "right" ? -(R + 9) : 0);
+        const lx = anim.x + (anchor === "left" ? R + 14 : anchor === "right" ? -(R + 14) : 0);
         const above = anim.y < cy;
-        const ly = anchor === "center" ? (above ? anim.y - R - 16 : anim.y + R + 20) : anim.y - 1;
-        ctx.textAlign = anchor;
-        ctx.font = mono(12.5);
-        ctx.fillStyle = isActive ? BONE : "#d9d6ca";
-        ctx.fillText(`${peerLabel(peer.edge)}${peer.edge.reciprocal ? " ↔" : ""}`, lx, ly);
+        const ly = anchor === "center" ? (above ? anim.y - R - 30 : anim.y + R + 26) : anim.y - 5;
+        const nameText = `${peerLabel(peer.edge)}${peer.edge.reciprocal ? " ↔" : ""}`;
+        const subText = `w${Math.round(clampWeight(peer.edge.trustWeight))} · ${peer.edge.interactionCount}× verified`;
+        ctx.font = mono(13);
+        const w1 = ctx.measureText(nameText).width;
         ctx.font = mono(9.5);
-        ctx.fillStyle = QUIET;
-        ctx.fillText(`w${Math.round(clampWeight(peer.edge.trustWeight))} · ${peer.edge.interactionCount}×`, lx, ly + 13);
+        const w2 = ctx.measureText(subText).width;
+        const bw = Math.max(w1, w2, 60) + 16;
+        const bx = anchor === "left" ? lx - 8 : anchor === "right" ? lx - bw + 8 : lx - bw / 2;
+        if (typeof ctx.roundRect === "function") {
+          ctx.beginPath();
+          ctx.roundRect(bx, ly - 13, bw, 40, 2);
+          ctx.fillStyle = "rgba(28,31,29,0.72)";
+          ctx.fill();
+          ctx.strokeStyle = isActive ? "rgba(201,162,94,0.45)" : "rgba(242,238,227,0.1)";
+          ctx.lineWidth = 1;
+          ctx.stroke();
+        }
+        ctx.textAlign = anchor;
+        ctx.font = mono(13);
+        ctx.fillStyle = isActive ? BONE : "#d9d6ca";
+        ctx.fillText(nameText, lx, ly);
+        /* weight bar — instant visual for how strong this bond is */
+        const barW = bw - 16;
+        const barX = anchor === "left" ? lx : anchor === "right" ? lx - barW : lx - barW / 2;
+        ctx.fillStyle = "rgba(242,238,227,0.14)";
+        ctx.fillRect(barX, ly + 6, barW, 3);
+        ctx.fillStyle = peer.risky ? ROSE : GOLD;
+        ctx.fillRect(barX, ly + 6, barW * (clampWeight(peer.edge.trustWeight) / 100) * enter, 3);
+        ctx.font = mono(9.5);
+        ctx.fillStyle = isActive ? MUTED : QUIET;
+        ctx.fillText(subText, lx, ly + 21);
         ctx.restore();
       }
 
@@ -488,7 +754,7 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
       ctx.textAlign = "left";
       ctx.font = mono(9.5);
       ctx.fillStyle = QUIET;
-      ctx.fillText("── verified edge   ╌╌ reciprocal   ● flowing = interactions", 16, H - 14);
+      ctx.fillText("▰ ribbon = verified bond   ◠ gauge + bar = weight   ● comets = interactions   ⌒ wake = orbit", 16, H - 14);
     }
 
     function loop(now: number) {
@@ -537,6 +803,15 @@ export function TrustConstellation({ graph }: { graph: TrustGraph }) {
   }
 
   function open(peer: PeerSpec) {
+    if (onOpen) {
+      /* Clear the sticky selection so the other nodes are not left dimmed
+         after the drawer closes; lastActive keeps the readout on this peer
+         without triggering the dimming treatment. */
+      setSelected(null);
+      setLastActive(peer.edge.id);
+      onOpen(peer.edge);
+      return;
+    }
     if (peer.edge.peerUsername) router.push(`/profile/${peer.edge.peerUsername}`);
     else setSelected(peer.edge.id);
   }

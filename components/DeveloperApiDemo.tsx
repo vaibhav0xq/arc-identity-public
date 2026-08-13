@@ -4,7 +4,7 @@ import { useState } from "react";
 
 const DEMO_REQUEST_TIMEOUT_MS = 15_000;
 const walletPattern = /^0x[a-fA-F0-9]{40}$/;
-const usernamePattern = /^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9](?:\.(?:kyro|arcid))?$/;
+const usernamePattern = /^[a-z0-9][a-z0-9_-]{1,28}[a-z0-9](?:\.arcid|\.kyro)?$/;
 
 function normalizeLookupInput(value: string) {
   return value.trim();
@@ -21,7 +21,7 @@ function normalizeWalletLookup(value: string) {
 function normalizeUsernameLookup(value: string) {
   const normalized = normalizeLookupInput(value).toLowerCase();
   if (!usernamePattern.test(normalized)) return null;
-  return normalized.endsWith(".kyro") || normalized.endsWith(".arcid") ? normalized : `${normalized}.kyro`;
+  return normalized.endsWith(".arcid") || normalized.endsWith(".kyro") ? normalized : `${normalized}.kyro`;
 }
 
 function timeoutResult() {

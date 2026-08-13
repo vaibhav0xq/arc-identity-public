@@ -12,7 +12,7 @@ type ChainCoverageExplorerProps = {
 type DisplayChainStatus = "indexed" | "no_activity" | "limited" | "pending" | "error";
 
 const providerIssuePattern = /provider|timeout|timed out|api|rate limit|429|missing key|api key|not configured|unavailable|failed to fetch|network|fetch failed|econn|etherscan|blockscout|arcscan|rpc|coverage|free tier|paid plan|requires paid/i;
-const internalFailurePattern = /internal application|application failure|invariant|database|supabase|schema|constraint|serialization|unexpected app/i;
+const internalFailurePattern = /internal application|application failure|invariant|database|schema|constraint|serialization|unexpected app/i;
 
 function displayStatus(chain: ChainSnapshot): DisplayChainStatus {
   if (chain.status === "indexed") return "indexed";

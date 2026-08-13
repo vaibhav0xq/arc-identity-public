@@ -11,7 +11,7 @@ export function ReportIssueLink({ helperText, className = "" }: ReportIssueLinkP
       href={ARC_FEEDBACK_FORM_URL}
       target="_blank"
       rel="noopener noreferrer"
-      aria-label="Report an Kyro issue"
+      aria-label="Report a Kyro identity issue"
       className={className}
     >
       <span>Report issue</span>

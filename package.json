@@ -1,22 +1,18 @@
 {
   "name": "kyro",
-  "version": "0.1.0",
+  "version": "1.0.0",
   "private": true,
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "typecheck": "tsc --noEmit",
-    "test:score-contract": "node --experimental-strip-types scripts/test-score-contract-v2.mjs",
-    "test:score-api": "node scripts/test-score-integrity-v2.mjs",
-    "backfill:score-v2": "node scripts/backfill-score-model-v2.mjs"
+    "test:intake-pacing": "node scripts/test-intake-pacing.mjs"
   },
   "dependencies": {
-    "@supabase/supabase-js": "^2.105.3",
     "next": "^15.5.18",
     "react": "18.3.1",
-    "react-dom": "18.3.1",
-    "viem": "^2.55.2"
+    "react-dom": "18.3.1"
   },
   "devDependencies": {
     "@types/node": "22.7.5",

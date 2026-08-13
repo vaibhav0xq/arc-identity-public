@@ -2,6 +2,8 @@
 
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { ArcShell } from "@/components/ArcShell";
+import { ConnectGatePanel } from "@/components/ConnectGatePanel";
+import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { TxLink } from "@/components/TxLink";
 import { useArcIdentity } from "@/hooks/useArcIdentity";
 import type { Attestation, IdentityRecord, InteractionType } from "@/lib/types";
@@ -95,8 +97,8 @@ function friendlyError(error: unknown, fallback: string) {
 function normalizeIdentitySearch(value: string) {
   const normalized = value.trim().toLowerCase();
   return {
-    full: normalized.endsWith(".kyro") || normalized.endsWith(".arcid") ? normalized : `${normalized}.kyro`,
-    base: normalized.replace(/\.(?:kyro|arcid)$/i, ""),
+    full: normalized.endsWith(".arcid") || normalized.endsWith(".kyro") ? normalized : `${normalized}.kyro`,
+    base: normalized.replace(/\.(arcid|kyro)$/i, ""),
     raw: normalized
   };
 }
@@ -192,7 +194,7 @@ function CounterpartyPicker({
     if (!canSearch) return false;
     const wallet = item.profile.walletAddress.toLowerCase();
     const usernameFull = (item.profile.username ?? "").trim().toLowerCase();
-    const usernameBase = usernameFull.replace(/\.(?:kyro|arcid)$/i, "");
+    const usernameBase = usernameFull.replace(/\.(arcid|kyro)$/i, "");
     return [
       usernameFull,
       usernameBase,
@@ -270,9 +272,16 @@ function CounterpartyPicker({
           {open && canSearch ? (
             <div className="absolute left-0 right-0 top-full z-[90] mt-1 max-h-72 overflow-y-auto rounded-[2px] border border-linec bg-bone shadow-panel">
               {loading ? (
-                <p className="p-4 text-sm text-mutedc">Loading registered counterparties...</p>
+                <div className="p-4">
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="py-2">
+                      <span className="skeleton h-4 w-40 max-w-full" />
+                      <span className="skeleton mt-2 h-3 w-28 max-w-full" />
+                    </div>
+                  ))}
+                </div>
               ) : filtered.length === 0 ? (
-                <p className="p-4 text-sm text-mutedc">No registered Kyro found.</p>
+                <p className="p-4 text-sm text-mutedc">No registered identity found.</p>
               ) : (
                 <>
                   {filtered.map((item, index) => {
@@ -375,7 +384,7 @@ export default function AttestationsPage() {
     setWallet(current);
     if (identity.status === "checking") {
       setIdentityStatus("checking");
-      setMessage("Checking Kyro...");
+      setMessage("Checking identity...");
       setUsersLoading(false);
       console.log("[arc-identity] attestations_final_decision", { requestId, state: "checking" });
       return;
@@ -391,7 +400,7 @@ export default function AttestationsPage() {
     }
     if (identity.status === "unclaimed") {
       setIdentityStatus("unregistered");
-      setMessage("Claim your Kyro before creating attestations.");
+      setMessage("Claim your identity before creating attestations.");
       setUsersLoading(false);
       setHistoryLoaded(false);
       registeredWalletRef.current = "";
@@ -405,7 +414,7 @@ export default function AttestationsPage() {
         console.log("[arc-identity] attestations_final_decision", { requestId, state: "registered", reason: "previous_success_preserved" });
       } else {
         setIdentityStatus("failed");
-        setMessage("Could not verify your Kyro. Retry the identity check.");
+        setMessage("Could not verify your identity. Retry the identity check.");
         console.log("[arc-identity] attestations_final_decision", { requestId, state: "failed" });
       }
       setUsersLoading(false);
@@ -556,7 +565,7 @@ export default function AttestationsPage() {
 
   function attestationFormError() {
     if (submitting) return "";
-    if (!selectedCounterparty) return "Select a registered Kyro counterparty.";
+    if (!selectedCounterparty) return "Select a registered counterparty.";
     if (wallet && normalizeWallet(wallet) === normalizeWallet(selectedCounterparty.profile.walletAddress)) return "You cannot submit an attestation with your own wallet as the counterparty.";
     if (!isInteractionType(interactionType)) return "Choose a supported interaction type.";
     if (!txHash.trim()) return "Paste the Arc transaction hash involving both wallets.";
@@ -584,42 +593,33 @@ export default function AttestationsPage() {
         </header>
 
         {identityStatus !== "registered" ? (
-         <div className="grid grid-cols-1 gap-6 transition-all duration-300 ease-out md:gap-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
-              <div className="r4-panel min-w-0">
-               <p className="kicker">{identityStatus === "checking" ? "Checking identity" : identityStatus === "failed" ? "Retry available" : "Identity required"}</p>
-               <h2 className="mt-3 text-2xl">
-                {identityStatus === "checking"
-                  ? "Checking Kyro..."
-                  : identityStatus === "failed"
-                    ? "Could not verify your Kyro."
-                    : identityStatus === "disconnected"
-                      ? "Connect your wallet to continue."
-                      : "Claim your Kyro before creating attestations."}
-              </h2>
-               <p className="mt-3 max-w-2xl text-sm leading-6 text-mutedc">
-                {identityStatus === "checking"
-                  ? "Looking up the connected wallet directly against the Kyro registry."
-                  : identityStatus === "failed"
-                    ? "The registry lookup did not complete. Retry the check without leaving this page."
-                    : "Claim your Kyro to create verified attestations."}
-              </p>
-              <div className="mt-5 flex flex-wrap gap-3">
-                {identityStatus === "unregistered" || identityStatus === "disconnected" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim Kyro</a> : null}
-                {identityStatus !== "checking" ? <button type="button" onClick={() => void refreshIdentity(identity.normalizedWallet)} className="arc-button-secondary px-5 py-3 text-sm font-bold">Retry check</button> : null}
-              </div>
-            </div>
-             <div className="grid min-w-0 gap-6 border-t border-linec pt-6 md:gap-8">
-                  <div className="r4-panel">
-                  <p className="kicker">How it works</p>
-                 <div className="mt-4 grid gap-3 text-sm leading-6 text-mutedc">
-                   <p><span className="font-bold text-gold">1.</span> Connect and verify your wallet.</p>
-                   <p><span className="font-bold text-gold">2.</span> Claim your Kyro username.</p>
-                   <p><span className="font-bold text-gold">3.</span> Return here to verify real Arc transactions.</p>
+          <div className="grid gap-6 md:gap-8">
+            <ConnectGatePanel
+              kicker={identityStatus === "checking" ? "Checking identity" : identityStatus === "failed" ? "Connection error" : identityStatus === "disconnected" ? "Wallet required" : "Identity required"}
+              title={identityStatus === "checking" ? "Checking identity..." : identityStatus === "failed" ? "Could not verify your identity." : identityStatus === "disconnected" ? "Connect your wallet to continue." : "Claim your identity before creating attestations."}
+              description={identityStatus === "checking" ? "Looking up the connected wallet directly against the registry." : identityStatus === "failed" ? "The registry lookup did not complete. Retry the check without leaving this page." : identityStatus === "disconnected" ? "Connect and claim your identity to turn real transactions into verified attestations." : "Claim your identity to create verified attestations."}
+              checking={identityStatus === "checking"}
+              unlocks={["Create transaction-backed attestations", "Track your verified records", "Grow durable trust edges"]}
+              actions={
+                <>
+                  {identityStatus === "disconnected" ? <WalletConnectButton /> : null}
+                  {identityStatus === "unregistered" ? <a href="/create" className="arc-button-primary px-5 py-3 text-sm font-extrabold">Claim username</a> : null}
+                  {identityStatus === "failed" ? <button type="button" onClick={() => void refreshIdentity(identity.normalizedWallet)} className="arc-button-secondary px-5 py-3 text-sm font-bold">Retry check</button> : null}
+                </>
+              }
+            />
+            <div className="grid gap-6 md:grid-cols-2 md:gap-8">
+              <div className="r4-panel p-6 sm:p-7">
+                <p className="kicker">How it works</p>
+                <div className="mt-4 grid gap-3 text-sm leading-6 text-mutedc">
+                  <p><span className="font-bold text-gold">1.</span> Connect and verify your wallet.</p>
+                  <p><span className="font-bold text-gold">2.</span> Claim your username.</p>
+                  <p><span className="font-bold text-gold">3.</span> Return here to verify real Arc transactions.</p>
                 </div>
               </div>
-                <div className="r4-panel border-t-2 border-limited bg-transparent px-0 py-5">
-                  <p className="kicker text-limited">Anti-sybil guidance</p>
-                 <p className="mt-3 text-sm leading-6 text-limited">Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity or abusive verification behavior may reduce trust confidence and trigger anomaly detection.</p>
+              <div className="r4-panel border-limited bg-limited-bg p-6 sm:p-7">
+                <p className="kicker text-limited">Anti-sybil guidance</p>
+                <p className="mt-3 text-sm leading-6 text-limited">Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity or abusive verification behavior may reduce trust confidence and trigger anomaly detection.</p>
               </div>
             </div>
           </div>
@@ -639,7 +639,7 @@ export default function AttestationsPage() {
         <div className="grid grid-cols-1 gap-6 transition-all duration-300 ease-out md:gap-8 xl:grid-cols-[minmax(0,1.35fr)_minmax(360px,0.65fr)]">
            <div className="r4-panel min-w-0 p-5 sm:p-7">
             <div>
-                <p className="kicker">Steps 01–03 / interaction record</p>
+                <p className="kicker">Steps 01-03 / interaction record</p>
                 <h2 className="mt-2 text-3xl">What happened?</h2>
             </div>
             <div className="mt-6 grid min-w-0 gap-5 md:grid-cols-2">
@@ -699,7 +699,22 @@ export default function AttestationsPage() {
              <span className="rounded-[2px] border border-linec bg-paper-deep px-3 py-2 font-mono text-xs text-mutedc">{history.length} records</span>
           </div>
           {historyLoading || !historyLoaded ? (
-              <div className="mt-8 border-t border-linec pt-5"><p className="kicker">Ledger loading</p><h3 className="mt-2 text-2xl">Reading verified evidence</h3><p className="mt-2 text-sm text-mutedc">Pulling the latest transaction-backed records for this wallet.</p></div>
+              <div className="mt-8 border-t border-linec pt-5">
+                <p className="kicker">Ledger loading</p>
+                <div className="mt-4 grid gap-3">
+                  {[0, 1, 2].map((row) => (
+                    <div key={row} className="rounded-[2px] border border-linec bg-bone p-4">
+                      <div className="flex items-center justify-between gap-4">
+                        <div className="min-w-0 flex-1">
+                          <span className="skeleton h-4 w-56 max-w-full" />
+                          <span className="skeleton mt-2 h-3 w-40 max-w-full" />
+                        </div>
+                        <span className="skeleton h-6 w-20" />
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
           ) : historyError ? (
             <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded border border-amber-300/20 bg-amber-300/10 p-4 text-amber-50/85">
               <span>{historyError}</span>

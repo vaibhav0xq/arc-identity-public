@@ -1,11 +1,13 @@
 "use client";
 
 import { type FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { useIsomorphicLayoutEffect } from "@/lib/useIsomorphicLayoutEffect";
 import { useRouter } from "next/navigation";
 import { ArcShell } from "@/components/ArcShell";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 import { revealRouteFor, setPostClaimRevealContext } from "@/lib/onboarding";
 import { fetchJsonWithTimeout } from "@/lib/timeouts";
+import { signChallengeWithConnectedWallet } from "@/lib/wallet-challenge-client";
 import { normalizeUsernameInput, profileRouteFor, toArcUsername } from "@/lib/username";
 import { shortenAddress } from "@/lib/wallet";
 
@@ -116,8 +118,6 @@ function validateUsername(value: string) {
 export default function CreateProfilePage() {
   const router = useRouter();
   const [walletAddress, setWalletAddress] = useState("");
-  const [signature, setSignature] = useState("");
-  const [signatureMessage, setSignatureMessage] = useState("");
   const [username, setUsername] = useState("");
   const [loading, setLoading] = useState(false);
   const [checkingProfile, setCheckingProfile] = useState(false);
@@ -133,12 +133,14 @@ export default function CreateProfilePage() {
 
   const usernameValue = normalizeUsernameInput(username);
   const usernameValidation = validateUsername(usernameValue);
-  const canClaim = Boolean(walletAddress && signature && signatureMessage && usernameValidation.valid && !loading && availability !== "taken");
+  const canClaim = Boolean(walletAddress && usernameValidation.valid && !loading && availability !== "taken");
 
-  const checkExistingIdentity = useCallback(async (wallet: string, storedSignature: string, storedSignatureMessage: string, showFailureNote = false) => {
+  const checkExistingIdentity = useCallback(async (wallet: string, showFailureNote = false) => {
     if (onboardingCompleteRef.current) return;
-    const lookupKey = wallet && storedSignature && storedSignatureMessage ? `${wallet.toLowerCase()}:${storedSignature}:${storedSignatureMessage}` : "";
-    if (!wallet || !storedSignature || !storedSignatureMessage) {
+    /* Wallet-only lookup: ensure without credentials is a pure
+       read, so no signature is needed to check for an existing identity. */
+    const lookupKey = wallet ? wallet.toLowerCase() : "";
+    if (!wallet) {
       lastCheckedWalletRef.current = "";
       setExistingUsername(null);
       setSuccess("");
@@ -162,7 +164,7 @@ export default function CreateProfilePage() {
       const ensure = await fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: wallet, signature: storedSignature, signatureMessage: storedSignatureMessage })
+        body: JSON.stringify({ walletAddress: wallet })
       }, identityLookupTimeoutMs);
       console.log("[arc-identity] ensure_profile_lookup_success", { wallet, username: ensure.profile?.username ?? null });
       const ensuredUsername = cleanUsername(ensure.profile?.username);
@@ -221,14 +223,12 @@ export default function CreateProfilePage() {
 
   function retryLookup() {
     const wallet = localStorage.getItem("arcIdentityWallet") ?? walletAddress;
-    const storedSignature = localStorage.getItem("arcIdentitySignature") ?? signature;
-    const storedSignatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? signatureMessage;
     lastCheckedWalletRef.current = "";
-    void checkExistingIdentity(wallet, storedSignature, storedSignatureMessage, true);
+    void checkExistingIdentity(wallet, true);
   }
 
   function claimFormReady() {
-    return Boolean(walletAddress && signature && signatureMessage && !existingUsername && identityState === "unclaimed" && !checkingProfile);
+    return Boolean(walletAddress && !existingUsername && identityState === "unclaimed" && !checkingProfile);
   }
 
   function likelyClaimed() {
@@ -241,8 +241,6 @@ export default function CreateProfilePage() {
 
   const syncWalletState = useCallback(() => {
     const wallet = localStorage.getItem("arcIdentityWallet") ?? "";
-    const storedSignature = localStorage.getItem("arcIdentitySignature") ?? "";
-    const storedSignatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? "";
     const normalizedWallet = wallet.toLowerCase();
     const previousWallet = currentWalletRef.current;
     const walletChanged = Boolean(normalizedWallet && previousWallet && normalizedWallet !== previousWallet);
@@ -256,21 +254,18 @@ export default function CreateProfilePage() {
     }
     currentWalletRef.current = normalizedWallet;
     setWalletAddress(wallet);
-    setSignature(storedSignature);
-
-      setSignatureMessage(storedSignatureMessage);
     setLookupWarning("");
-    if (!wallet || !storedSignature || !storedSignatureMessage) {
+    if (!wallet) {
       lastCheckedWalletRef.current = "";
       setExistingUsername(null);
       setIdentityState("idle");
       setCheckingProfile(false);
       return;
     }
-    void checkExistingIdentity(wallet, storedSignature, storedSignatureMessage, false);
+    void checkExistingIdentity(wallet, false);
   }, [checkExistingIdentity]);
 
-  useEffect(() => {
+  useIsomorphicLayoutEffect(() => {
     syncWalletState();
   }, [syncWalletState]);
 
@@ -294,11 +289,9 @@ export default function CreateProfilePage() {
   async function createProfile(event?: FormEvent<HTMLFormElement>) {
     event?.preventDefault();
     if (loading) return;
-    const storedSignature = localStorage.getItem("arcIdentitySignature") ?? signature;
-    const storedSignatureMessage = localStorage.getItem("arcIdentitySignatureMessage") ?? signatureMessage;
     const wallet = localStorage.getItem("arcIdentityWallet") ?? walletAddress;
-    if (!storedSignature || !storedSignatureMessage || !wallet) {
-      setError("Connect and sign with your wallet before profile creation.");
+    if (!wallet) {
+      setError("Connect your wallet before profile creation.");
       return;
     }
     if (!usernameValidation.valid) {
@@ -312,14 +305,18 @@ export default function CreateProfilePage() {
 
     setLoading(true);
     setError("");
-    setSuccess("Creating your Kyro...");
+    setSuccess("Confirm the verification message in your wallet...");
     console.log("[arc-identity] username_claim_started", { wallet, username: usernameValue });
 
     try {
+      /* Claims sign a fresh single-use challenge at submit time.
+         Signatures are never read from or written to localStorage. */
+      const credentials = await signChallengeWithConnectedWallet(wallet, "username-claim");
+      setSuccess("Creating your identity...");
       const response = await fetch("/api/profile/create", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ walletAddress: wallet, username: usernameValue, signature: storedSignature, signatureMessage: storedSignatureMessage })
+        body: JSON.stringify({ walletAddress: wallet, username: usernameValue, signature: credentials.signature, signatureMessage: credentials.signatureMessage })
       });
       const data = await response.json() as ProfileCreateResponse;
       if (!response.ok) throw new Error(data.error ?? "Unable to claim username");
@@ -331,16 +328,13 @@ export default function CreateProfilePage() {
       }
 
       localStorage.setItem("arcIdentityWallet", claimedWallet);
-      localStorage.setItem("arcIdentitySignature", storedSignature);
-      localStorage.setItem("arcIdentitySignatureMessage", storedSignatureMessage);
+      localStorage.removeItem("arcIdentitySignature");
+      localStorage.removeItem("arcIdentitySignatureMessage");
       storeUsernameForWallet(claimedWallet, claimedUsername);
       localStorage.removeItem(lookupWarningKey);
       localStorage.removeItem(dashboardCacheKey(claimedWallet));
       localStorage.setItem(postClaimKey(claimedWallet), claimedUsername);
       setWalletAddress(claimedWallet);
-      setSignature(storedSignature);
-
-      setSignatureMessage(storedSignatureMessage);
       const byWalletResponse = await fetch(`/api/profile/by-wallet/${encodeURIComponent(claimedWallet)}?t=${Date.now()}`, {
         headers: { "Cache-Control": "no-store" },
         cache: "no-store"
@@ -386,26 +380,28 @@ export default function CreateProfilePage() {
     }
   }
 
+  const pendingIdentityLookup = checkingProfile || identityState === "checking" || (identityState === "idle" && Boolean(walletAddress));
+
   return (
     <ArcShell>
-      <section className="mx-auto grid w-full max-w-4xl flex-1 content-start py-6 sm:content-center sm:py-14">
+      <section className="fade-in mx-auto grid w-full max-w-4xl flex-1 content-start py-6 sm:content-center sm:py-14">
         <div className="rounded border border-white/10 bg-slate-950/70 p-5 shadow-panel sm:p-8">
           <p className="text-sm uppercase tracking-[0.24em] text-emerald-200">Create profile</p>
-          <h1 className="mt-3 text-4xl font-black text-white">{existingUsername ? "Identity already claimed" : claimFormReady() ? "Create your Kyro" : "Claim your Kyro"}</h1>
+          <h1 className="mt-3 text-4xl font-black text-white">{existingUsername ? "Identity already claimed" : pendingIdentityLookup ? "Checking your identity" : claimFormReady() ? "Create your identity" : "Claim your identity"}</h1>
           <form onSubmit={createProfile} className="mt-6 grid gap-4 sm:mt-8 sm:gap-5">
             <div className="rounded border border-emerald-300/30 bg-emerald-300/10 px-4 py-4 text-left">
               <span className="block font-bold text-emerald-100">Wallet identity</span>
               <span className="mt-1 block text-sm text-slate-400">
                 {walletAddress ? `Connected ${shortenAddress(walletAddress)}` : "Connect an Arc-compatible EVM wallet before claiming a profile"}
               </span>
-              <span className="mt-2 block text-sm text-slate-400">{signature ? "Signature verified" : "Signature required before profile creation"}</span>
+              <span className="mt-2 block text-sm text-slate-400">{walletAddress ? "You will confirm the claim with a wallet signature." : "A wallet signature is requested when you claim."}</span>
               <span className="mt-4 block">
                 <WalletConnectButton onConnect={syncWalletState} />
               </span>
             </div>
             {confirmedClaimed() || likelyClaimed() ? (
               <div className="rounded border border-emerald-300/20 bg-emerald-300/10 p-5">
-                <p className="text-sm text-emerald-100/70">{identityState === "claimed" ? "This wallet already has a public Kyro." : "Local profile state indicates this identity is already claimed. Verification can be retried."}</p>
+                <p className="text-sm text-emerald-100/70">{identityState === "claimed" ? "This wallet already has a claimed identity." : "Local profile state indicates this identity is already claimed. Verification can be retried."}</p>
                 <p className="mt-2 text-2xl font-black text-white">{existingUsername}</p>
                 <div className="mt-4 flex flex-wrap gap-3">
                     <button type="button" onClick={() => router.push("/dashboard")} className="rounded bg-emerald-300 px-4 py-3 font-black text-slate-950 transition hover:bg-emerald-200">View Dashboard</button>
@@ -413,9 +409,9 @@ export default function CreateProfilePage() {
                   {identityState === "likely_claimed" ? <button type="button" onClick={retryLookup} className="rounded border border-white/10 px-4 py-3 font-bold text-white transition hover:bg-white/10">Retry</button> : null}
                 </div>
               </div>
-            ) : checkingProfile || identityState === "checking" ? (
+            ) : pendingIdentityLookup ? (
               <div className="rounded border border-cyan-300/20 bg-cyan-300/[0.08] p-5">
-                <p className="text-sm font-bold text-cyan-100">Checking Kyro profile...</p>
+                <p className="text-sm font-bold text-cyan-100">Checking identity profile...</p>
                 <p className="mt-2 text-sm leading-6 text-slate-400">We are confirming whether this wallet already has a username before opening the claim form.</p>
               </div>
             ) : claimFormReady() ? (
@@ -441,7 +437,7 @@ export default function CreateProfilePage() {
                       className="min-w-0 flex-1 bg-transparent px-4 py-4 text-white outline-none"
                       placeholder="yourname"
                     />
-                    <span className="border-l border-white/10 px-4 py-4 font-semibold text-emerald-200">.arcid</span>
+                    <span className="border-l border-white/10 px-4 py-4 font-semibold text-emerald-200">.kyro</span>
                   </div>
                   <div className="mt-2 grid min-h-[4.75rem] content-start gap-1 text-xs leading-5 transition-none">
                     <p className={usernameValidation.valid ? "text-emerald-100/80" : "text-slate-500"}>{usernameValidation.message}</p>
@@ -459,7 +455,7 @@ export default function CreateProfilePage() {
                       </p>
                     ) : null}
                     {usernameValidation.valid && availability === "error" ? <p className="text-mutedc">Availability check unavailable. You can still try claiming.</p> : null}
-                    {checkingProfile ? <p className="text-slate-500">New wallet? Claim a username to complete your Kyro.</p> : null}
+                    {checkingProfile ? <p className="text-slate-500">New wallet? Claim a username to complete your identity.</p> : null}
                   </div>
                 </label>
               </div>

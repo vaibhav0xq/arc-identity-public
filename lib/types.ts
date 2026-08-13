@@ -51,6 +51,12 @@ export type ChainSnapshot = {
   indexedAt: string;
   providerSource: string;
   errorMessage?: string | null;
+  /* Phase 0 coverage metadata. All nullable: null = unknown (legacy rows
+     written before the coverage-metadata migration). */
+  rawResultCount?: number | null;
+  historyCapped?: boolean | null;
+  errorTransient?: boolean | null;
+  recencyReliable?: boolean | null;
 };
 
 export type MultiChainWalletProfile = {

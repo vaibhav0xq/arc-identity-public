@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useEffect, useRef } from "react";
 import { ArcIntegrationCard } from "@/components/ArcIntegrationCard";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
+import { StatsSection } from "@/components/landing/StatsSection";
 import { ARC_GITHUB_REPO_URL, ARC_SUPPORT_EMAIL, ARC_TWITTER_URL } from "@/lib/links";
 
 const evidence = [
@@ -234,7 +235,7 @@ export function LandingExperience() {
           </p>
           <div className="landing-hero-actions" data-cascade>
             <Link href="/dashboard" className="landing-button landing-button-dark">Launch Identity <span>↗</span></Link>
-            <Link href="/docs" className="landing-button landing-button-light">View Docs</Link>
+            <a href="https://docs.thekyro.co" target="_blank" rel="noopener noreferrer" className="landing-button landing-button-light">View Docs <span>↗</span></a>
           </div>
           <div className="landing-hero-note" data-cascade>
             <span className="landing-note-mark">ARC</span>
@@ -300,20 +301,22 @@ export function LandingExperience() {
         </div>
       </section>
 
+      <StatsSection />
+
       <section className="landing-developer landing-reveal">
-        <div data-cascade><span className="landing-eyebrow">03 / For builders</span><h2>Give your protocol<br />a better <em>first question.</em></h2></div>
+        <div data-cascade><span className="landing-eyebrow">04 / For builders</span><h2>Give your protocol<br />a better <em>first question.</em></h2></div>
         <div data-cascade><p>Bring wallet intelligence into payments, lending, escrow and reputation checks without rebuilding the evidence layer.</p><Link href="/developers" className="landing-text-link">Explore the developer surface <span>→</span></Link></div>
       </section>
 
       <section className="landing-support landing-reveal">
-        <div className="landing-support-copy"><span className="landing-eyebrow">04 / Built for Arc</span><h2>Native to the network <em>value settles on.</em></h2><p>Arc-native, EVM-compatible and designed around the realities of stablecoin activity.</p></div>
+        <div className="landing-support-copy"><span className="landing-eyebrow">05 / Built for Arc</span><h2>Native to the network <em>value settles on.</em></h2><p>Arc-native, EVM-compatible and designed around the realities of stablecoin activity.</p></div>
         <ArcIntegrationCard />
       </section>
 
       <section className="landing-footer-cta landing-reveal">
         <span className="landing-eyebrow" data-cascade>Start with the address. Leave with a record.</span>
         <h2 data-parallax="-0.045">Make trust<br /><em>inspectable.</em></h2>
-        <div data-cascade><Link href="/dashboard" className="landing-button landing-button-dark">Launch Identity <span>↗</span></Link><Link href="/docs" className="landing-text-link">Read the identity model <span>→</span></Link></div>
+        <div data-cascade><Link href="/dashboard" className="landing-button landing-button-dark">Launch Identity <span>↗</span></Link><a href="https://docs.thekyro.co/docs/reputation-scores" target="_blank" rel="noopener noreferrer" className="landing-text-link">Read the identity model <span>→</span></a></div>
       </section>
       <footer className="landing-footer">
         <div className="landing-footer-grid">
@@ -331,7 +334,7 @@ export function LandingExperience() {
           </nav>
           <nav className="landing-footer-col" aria-label="Resources">
             <p>Resources</p>
-            <Link href="/docs">Identity model docs</Link>
+            <a href="https://docs.thekyro.co" target="_blank" rel="noopener noreferrer">Documentation ↗</a>
             <a href={ARC_GITHUB_REPO_URL} target="_blank" rel="noopener noreferrer">GitHub</a>
             <a href={ARC_TWITTER_URL} target="_blank" rel="noopener noreferrer">X / Twitter</a>
             <ReportIssueLink />

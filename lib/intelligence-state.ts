@@ -1,4 +1,5 @@
 import type { ChainSnapshot, IdentityRecord, WalletActivitySnapshot } from "@/lib/types";
+import { isProviderCoverageRestriction } from "@/lib/chain-status";
 
 export type IntelligenceState =
   | "unconnected"
@@ -49,8 +50,17 @@ export function deriveIntelligenceState(input: {
   const totalTx = Number(score?.totalTxCount ?? input.identity?.multiChain?.totalTxCount ?? input.snapshot?.txCount ?? input.identity?.profile.txCount ?? 0);
   const activeChains = Number(score?.activeChains?.length ?? input.identity?.multiChain?.activeChains.length ?? input.identity?.profile.activeChainCount ?? 0);
 
+  // Standing limitations are permanent provider-plan coverage gaps (e.g. BNB Chain
+  // requires a paid explorer plan). They exist on every refresh, so they should not
+  // downgrade an otherwise successful refresh to "partial". Transient failures of
+  // normally-available chains still do.
+  const isStandingLimitation = (chain: ChainSnapshot) =>
+    chain.status === "limited" && (chain.providerSource === "limited_provider_required" || isProviderCoverageRestriction(chain.errorMessage));
+  const transientUnavailable = unavailableChains.filter((chain) => !isStandingLimitation(chain));
+  const actionableProviderErrors = providerErrors.filter((issue) => !(issue && typeof issue === "object" && (issue as { standing?: boolean }).standing === true));
+
   if (totalTx > 0 || activeChains > 0 || indexedChains.length > 0) {
-    return unavailableChains.length > 0 || providerErrors.length > 0 ? "partial_indexed" : "indexed";
+    return transientUnavailable.length > 0 || actionableProviderErrors.length > 0 ? "partial_indexed" : "indexed";
   }
 
   if (providerErrors.length > 0 || (unavailableChains.length > 0 && indexedChains.length === 0 && noActivityChains.length === 0) || score?.arcProviderStatus === "unavailable") {
@@ -65,7 +75,7 @@ export function intelligenceStateCopy(state: IntelligenceState) {
     case "unconnected":
       return "Connect a wallet to open Kyro.";
     case "unclaimed":
-      return "Claim your Kyro to unlock wallet intelligence.";
+      return "Claim your Kyro identity to unlock wallet intelligence.";
     case "indexing":
       return "Updating wallet intelligence...";
     case "indexed":

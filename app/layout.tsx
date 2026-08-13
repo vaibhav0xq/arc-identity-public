@@ -25,11 +25,12 @@ const dmMono = DM_Mono({
 });
 
 const metadataDescription = "Payments are solved, trust isn't. Kyro is an onchain reputation and wallet intelligence platform for Arc stablecoin users - transaction-verified trust scoring, multichain analytics and portable identity.";
-const brandIcon = "/brand/arc-identity-icon.png";
-const brandIcon32 = "/brand/arc-identity-icon-32.png";
-const brandIcon192 = "/brand/arc-identity-icon-192.png";
-const brandIcon512 = "/brand/arc-identity-icon-512.png";
-const brandWordmark = "/brand/arc-identity-wordmark.png";
+const brandIcon = "/brand/kyro-icon-512.png";
+const brandIcon32 = "/brand/kyro-icon-32.png";
+const brandIcon192 = "/brand/kyro-icon-192.png";
+const brandIcon512 = "/brand/kyro-icon-512.png";
+const brandIconSvg = "/brand/kyro-tile-site.svg";
+const brandOgImage = "/brand/kyro-og.png";
 
 export const metadata: Metadata = {
   metadataBase: new URL(ARC_PUBLIC_APP_URL),
@@ -43,6 +44,7 @@ export const metadata: Metadata = {
       { url: brandIcon32, sizes: "32x32", type: "image/png" },
       { url: brandIcon192, sizes: "192x192", type: "image/png" },
       { url: brandIcon512, sizes: "512x512", type: "image/png" },
+      { url: brandIconSvg, type: "image/svg+xml" },
       { url: brandIcon, type: "image/png" }
     ],
     shortcut: [{ url: brandIcon32, sizes: "32x32", type: "image/png" }],
@@ -55,10 +57,10 @@ export const metadata: Metadata = {
     url: ARC_PUBLIC_APP_URL,
     images: [
       {
-        url: brandWordmark,
-        width: 2376,
-        height: 621,
-        alt: "Kyro wordmark"
+        url: brandOgImage,
+        width: 1200,
+        height: 630,
+        alt: "Kyro: onchain reputation and wallet intelligence"
       }
     ]
   },
@@ -66,7 +68,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "Kyro",
     description: metadataDescription,
-    images: [brandWordmark]
+    images: [brandOgImage]
   }
 };
 

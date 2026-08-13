@@ -28,7 +28,7 @@ const clauses = [
     title: "Acceptable use",
     body: [
       "Only submit attestations for legitimate economic interactions. Circular trust farming, fake activity, sybil networks or abusive verification behavior may reduce trust confidence, trigger anomaly detection and result in removal of records or access.",
-      "Do not use the service to harass, impersonate or defraud others, or to scrape and resell credential data at scale."
+      "Do not use the service to harass, impersonate or defraud others or to scrape and resell credential data at scale."
     ]
   },
   {
@@ -59,7 +59,7 @@ const clauses = [
 
 export default function TermsPage() {
   return (
-    <main className="min-h-screen w-full pb-24">
+    <main className="page-enter min-h-screen w-full pb-24">
       <div className="flex items-center justify-between border-b border-[color:var(--line,#d6d1c4)] px-6 py-5 md:px-14">
         <Link href="/" className="landing-text-link">Kyro <span>→</span></Link>
         <p className="hidden font-mono text-[0.62rem] uppercase tracking-[0.18em] text-slate-500 md:block">Instrument · Terms of use</p>

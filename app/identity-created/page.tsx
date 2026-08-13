@@ -48,7 +48,7 @@ type RevealContext = {
 };
 
 const revealSteps = [
-  "Creating your Kyro...",
+  "Creating your Kyro identity...",
   "Verifying wallet signature...",
   "Scanning wallet footprints...",
   "Preparing Identity Score..."
@@ -114,8 +114,6 @@ export default function IdentityCreatedPage() {
     }, 850);
     const reveal = getPostClaimRevealContext();
     const wallet = reveal?.wallet ?? "";
-    const signature = localStorage.getItem("arcIdentitySignature") || "";
-    const signatureMessage = localStorage.getItem("arcIdentitySignatureMessage") || "";
     const initialUsername = reveal?.username ?? null;
     const initialProfileUrl = reveal?.profileUrl ?? (initialUsername ? profileRouteFor(initialUsername) : null);
 
@@ -136,11 +134,12 @@ export default function IdentityCreatedPage() {
       let nextUsername = initialUsername;
       let nextScore: ScoreLookupResponse | null = null;
 
-      const ensurePromise = wallet && signature && signatureMessage
+      /* Wallet-only ensure: a pure read, no signature required. */
+      const ensurePromise = wallet
         ? fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
             method: "POST",
             headers: { "Content-Type": "application/json", "Cache-Control": "no-store" },
-            body: JSON.stringify({ walletAddress: wallet, signature, signatureMessage })
+            body: JSON.stringify({ walletAddress: wallet })
           }, 3000).catch(() => null)
         : Promise.resolve(null);
 
@@ -176,7 +175,7 @@ export default function IdentityCreatedPage() {
   const publicProfileHref = resolvedProfileUrl ?? (resolvedUsername ? `/profile/${resolvedUsername}` : "/profile/me");
   const profileHref = resolvedWallet ? publicProfileHref : "/create";
   const dashboardHref = "/dashboard";
-  const displayUsername = resolvedUsername ?? "your Kyro";
+  const displayUsername = resolvedUsername ?? "your Kyro identity";
   const displayWallet = resolvedWallet ? shortenAddress(resolvedWallet) : "Verified wallet";
   const arcScore = scoreFor(score);
   const riskLevel = score?.riskLevel ?? "High Risk";
@@ -203,7 +202,7 @@ export default function IdentityCreatedPage() {
           <div className="arc-surface w-full rounded-3xl p-7 text-center shadow-panel sm:p-10">
             <p className="arc-section-label">{checking ? "Preparing reveal" : "Identity reveal unavailable"}</p>
             <h1 className="mt-4 text-3xl font-black text-white sm:text-4xl">
-              {checking ? "Preparing your Kyro reveal..." : "Connect your wallet to view the Kyro reveal."}
+              {checking ? "Preparing your Kyro identity reveal..." : "Connect your wallet to view the Kyro reveal."}
             </h1>
             <p className="mx-auto mt-4 max-w-xl text-sm leading-6 text-slate-400">
               {checking

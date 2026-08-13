@@ -7,16 +7,25 @@ import { ProfileNavButton } from "@/components/ProfileNavButton";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
 
+const toolsNav: Array<[string, string]> = [
+  ["Counterparty Check", "/check"]
+];
+
 const consoleNav: Array<[string, string]> = [
   ["Overview", "/dashboard"],
-  ["Verified Attestations", "/attestations"],
-  ["Directory", "/directory"],
-  ["Developer API", "/developers"]
+  ["Attestations", "/attestations"],
+  ["Directory", "/directory"]
+];
+
+const developersNav: Array<[string, string]> = [
+  ["API", "/developers"],
+  ["Docs", "https://docs.thekyro.co"]
 ];
 
 const marketingNav: Array<[string, string]> = [
+  ["Counterparty Check", "/check"],
   ["Directory", "/directory"],
-  ["Docs", "/docs"],
+  ["Docs", "https://docs.thekyro.co"],
   ["Developer API", "/developers"]
 ];
 
@@ -30,12 +39,13 @@ function Wordmark({ dark = false }: { dark?: boolean }) {
   return (
     <Link href="/" className="flex min-w-0 items-center gap-3 transition-opacity duration-200 hover:opacity-80">
       <Image
-        src="/brand/arc-identity-icon.png"
+        src="/brand/kyro-tile-site.svg"
         alt="Kyro icon"
         width={40}
         height={40}
         priority
-        className={`h-8 w-8 shrink-0 rounded-full border object-contain ${dark ? "border-[#555a52]" : "border-linec"}`}
+        unoptimized
+        className="h-8 w-8 shrink-0 object-contain"
       />
       <span className={`block whitespace-nowrap text-[0.85rem] font-semibold tracking-tight ${dark ? "text-bone" : "text-ink"}`}>
         Kyro
@@ -44,7 +54,17 @@ function Wordmark({ dark = false }: { dark?: boolean }) {
   );
 }
 
+/** Clicking the nav item for the page you are already on should do nothing. */
+function stayPut(active: boolean) {
+  return (event: React.MouseEvent) => {
+    if (active) event.preventDefault();
+  };
+}
+
 function MarketingShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const isCurrent = (href: string) => pathname === href;
+
   return (
     <main className="arc4 relative min-h-screen w-full max-w-full bg-paper text-ink">
       <header className="relative z-40 border-b border-linec bg-paper/95 backdrop-blur-sm md:sticky md:top-0">
@@ -56,11 +76,31 @@ function MarketingShell({ children }: { children: React.ReactNode }) {
             </span>
           </div>
           <nav className="hidden items-center gap-6 text-[0.8rem] font-medium text-mutedc lg:flex">
-            {marketingNav.map(([label, href]) => (
-              <Link key={href} href={href} className="transition-colors duration-150 hover:text-ink">
-                {label}
-              </Link>
-            ))}
+            {marketingNav.map(([label, href]) =>
+              href.startsWith("http") ? (
+                <a
+                  key={href}
+                  href={href}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="transition-colors duration-150 hover:text-ink"
+                >
+                  {label} <span aria-hidden="true">↗</span>
+                </a>
+              ) : (
+                <Link
+                  key={href}
+                  href={href}
+                  onClick={stayPut(isCurrent(href))}
+                  aria-current={isCurrent(href) ? "page" : undefined}
+                  className={`transition-colors duration-150 hover:text-ink ${
+                    isCurrent(href) ? "text-ink underline decoration-gold decoration-2 underline-offset-8" : ""
+                  }`}
+                >
+                  {label}
+                </Link>
+              )
+            )}
             <ReportIssueLink className="text-limited transition-colors duration-150 hover:text-ink" />
           </nav>
           <div className="flex min-w-0 flex-wrap items-center justify-end gap-2">
@@ -69,19 +109,35 @@ function MarketingShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
         <nav className="arc-mobile-nav -mx-1 flex w-[calc(100%+0.5rem)] min-w-0 gap-1.5 overflow-x-auto px-4 pb-2 text-[0.8rem] font-medium text-mutedc sm:px-6 lg:hidden">
-          {marketingNav.map(([label, href]) => (
-            <Link
-              key={href}
-              href={href}
-              className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-linec bg-bone px-3 py-2 text-center transition-colors duration-150 hover:text-ink"
-            >
-              {label}
-            </Link>
-          ))}
+          {marketingNav.map(([label, href]) =>
+            href.startsWith("http") ? (
+              <a
+                key={href}
+                href={href}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-linec bg-bone px-3 py-2 text-center transition-colors duration-150 hover:text-ink"
+              >
+                {label} <span aria-hidden="true">↗</span>
+              </a>
+            ) : (
+              <Link
+                key={href}
+                href={href}
+                onClick={stayPut(isCurrent(href))}
+                aria-current={isCurrent(href) ? "page" : undefined}
+                className={`min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border px-3 py-2 text-center transition-colors duration-150 ${
+                  isCurrent(href) ? "border-graphite bg-graphite text-bone" : "border-linec bg-bone hover:text-ink"
+                }`}
+              >
+                {label}
+              </Link>
+            )
+          )}
           <ReportIssueLink className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-[#d9c9a4] bg-[#f0e3c8]/60 px-3 py-2 text-center text-limited transition-colors duration-150 hover:bg-[#f0e3c8]" />
         </nav>
       </header>
-      <div className="relative z-10 w-full">{children}</div>
+      <div className="page-enter relative z-10 w-full">{children}</div>
     </main>
   );
 }
@@ -95,6 +151,37 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
 
   const isActive = (href: string) => pathname === href || pathname.startsWith(`${href}/`);
 
+  const railLink = (label: string, href: string) => {
+    if (href.startsWith("http")) {
+      return (
+        <a
+          key={href}
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="-ml-3 border-l-2 border-transparent py-2 pl-3 text-[0.8rem] text-[#a3a89e] transition-colors duration-150 hover:text-bone"
+        >
+          {label} <span aria-hidden="true">↗</span>
+        </a>
+      );
+    }
+    return (
+      <Link
+        key={href}
+        href={href}
+        onClick={stayPut(pathname === href)}
+        aria-current={pathname === href ? "page" : undefined}
+        className={`-ml-3 border-l-2 py-2 pl-3 text-[0.8rem] transition-colors duration-150 ${
+          isActive(href)
+            ? "border-gold text-bone"
+            : "border-transparent text-[#a3a89e] hover:text-bone"
+        }`}
+      >
+        {label}
+      </Link>
+    );
+  };
+
   return (
     <main className="arc4 relative min-h-screen w-full max-w-full bg-[#e4e0d5] text-ink lg:grid lg:grid-cols-[250px_minmax(0,1fr)]">
       {/* Desktop workspace rail */}
@@ -102,25 +189,18 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
         <Wordmark dark />
         <p className="mt-12 font-mono text-[0.56rem] uppercase tracking-[0.2em] text-[#8f948a]">Workspace</p>
         <nav className="mt-3 flex flex-col gap-0.5">
-          {consoleNav.map(([label, href]) => (
-            <Link
-              key={href}
-              href={href}
-              className={`-ml-3 border-l-2 py-2 pl-3 text-[0.8rem] transition-colors duration-150 ${
-                isActive(href)
-                  ? "border-gold text-bone"
-                  : "border-transparent text-[#a3a89e] hover:text-bone"
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
+          {consoleNav.map(([label, href]) => railLink(label, href))}
+        </nav>
+        <p className="mt-9 font-mono text-[0.56rem] uppercase tracking-[0.2em] text-[#8f948a]">Tools</p>
+        <nav className="mt-3 flex flex-col gap-0.5">
+          {toolsNav.map(([label, href]) => railLink(label, href))}
+        </nav>
+        <p className="mt-9 font-mono text-[0.56rem] uppercase tracking-[0.2em] text-[#8f948a]">Developers</p>
+        <nav className="mt-3 flex flex-col gap-0.5">
+          {developersNav.map(([label, href]) => railLink(label, href))}
         </nav>
         <div className="mt-auto border-t border-[#464b44] pb-8 pt-4">
           <ReportIssueLink className="block py-1.5 text-[0.72rem] text-[#d3b878] transition-colors duration-150 hover:text-bone" />
-          <Link href="/docs" className="block py-1.5 text-[0.72rem] text-[#a3a89e] transition-colors duration-150 hover:text-bone">
-            Identity model docs
-          </Link>
         </div>
       </aside>
 
@@ -149,17 +229,31 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
               </div>
             </div>
             <nav className="arc-mobile-nav -mx-1 flex w-[calc(100%+0.5rem)] min-w-0 gap-1.5 overflow-x-auto px-1 pb-1 text-[0.8rem] font-medium text-mutedc">
-              {consoleNav.map(([label, href]) => (
-                <Link
-                  key={href}
-                  href={href}
-                  className={`min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border px-3 py-2 text-center transition-colors duration-150 ${
-                    isActive(href) ? "border-graphite bg-graphite text-bone" : "border-linec bg-bone hover:text-ink"
-                  }`}
-                >
-                  {label}
-                </Link>
-              ))}
+              {[...consoleNav, ...toolsNav, ...developersNav].map(([label, href]) =>
+                href.startsWith("http") ? (
+                  <a
+                    key={href}
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-linec bg-bone px-3 py-2 text-center transition-colors duration-150 hover:text-ink"
+                  >
+                    {label} <span aria-hidden="true">↗</span>
+                  </a>
+                ) : (
+                  <Link
+                    key={href}
+                    href={href}
+                    onClick={stayPut(pathname === href)}
+                    aria-current={pathname === href ? "page" : undefined}
+                    className={`min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border px-3 py-2 text-center transition-colors duration-150 ${
+                      isActive(href) ? "border-graphite bg-graphite text-bone" : "border-linec bg-bone hover:text-ink"
+                    }`}
+                  >
+                    {label}
+                  </Link>
+                )
+              )}
               <ReportIssueLink className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-[#d9c9a4] bg-[#f0e3c8]/60 px-3 py-2 text-center text-limited transition-colors duration-150 hover:bg-[#f0e3c8]" />
             </nav>
             <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
@@ -169,7 +263,7 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
           </div>
         </header>
 
-        <div className="relative z-10 mx-auto flex w-full max-w-[1500px] flex-1 flex-col px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:py-6 lg:px-8 lg:pt-8">
+        <div className="page-enter relative z-10 mx-auto flex w-full max-w-[1500px] flex-1 flex-col px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:py-6 lg:px-8 lg:pt-8">
           {children}
         </div>
       </div>

@@ -92,7 +92,7 @@ export default function PrivacyPage() {
         </div>
       </aside>
 
-      <div className="px-6 pb-24 pt-10 md:px-14 md:pt-14">
+      <div className="page-enter px-6 pb-24 pt-10 md:px-14 md:pt-14">
         {sections.map((s, i) => (
           <section
             key={s.title}

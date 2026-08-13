@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
-import type { ChainSnapshot, IdentityRecord, Profile } from "@/lib/types";
+import type { ChainSnapshot, IdentityRecord, Profile, TrustGraph } from "@/lib/types";
+import { isProviderCoverageRestriction } from "@/lib/chain-status";
 
 export const publicNoStoreHeaders = {
   "Cache-Control": "no-store, no-cache, max-age=0, must-revalidate"
 };
 
-export function isValidWalletAddress(wallet: string | null | undefined) {
-  return /^0x[a-f0-9]{40}$/.test((wallet ?? "").trim().toLowerCase());
-}
+/* Canonical implementation lives in lib/wallet-validation; this
+   re-export keeps the many existing route imports stable. */
+export { isValidWalletAddress } from "@/lib/wallet-validation";
 
 export function publicApiError(error: string, message: string, status = 500, extra: Record<string, unknown> = {}) {
   return NextResponse.json({ error, message, ...extra }, { status, headers: publicNoStoreHeaders });
@@ -24,6 +25,9 @@ function publicSource(source?: string | null) {
   if (normalized.includes("live") || normalized.includes("rpc")) return "arc_rpc";
   if (normalized.includes("verified") || normalized.includes("attestation")) return "verified_attestation_context";
   if (normalized.includes("unavailable")) return "unavailable";
+  // Keep the standing provider-plan limitation label distinct so clients can tell a
+  // permanent coverage gap apart from a transient failure after sanitization.
+  if (normalized === "limited_provider_required") return "limited_provider_required";
   if (normalized.includes("limited") || normalized.includes("not_configured") || normalized.includes("error")) return "limited_coverage";
   return "cached_wallet_intelligence";
 }
@@ -85,12 +89,33 @@ export function sanitizeIdentityRecord(identity: IdentityRecord): IdentityRecord
   };
 }
 
+/* The trust graph is deliberately public — verified relationships are the
+   product. What stays private is the fraud-detection internals: per-anomaly
+   evidence details and the list of third-party wallets flagged as suspicious. */
+export function sanitizeTrustGraph(graph: TrustGraph): TrustGraph;
+export function sanitizeTrustGraph(graph: TrustGraph | null): TrustGraph | null;
+export function sanitizeTrustGraph(graph: TrustGraph | null): TrustGraph | null {
+  if (!graph) return graph;
+  return {
+    ...graph,
+    anomalies: graph.anomalies.map((anomaly) => ({
+      ...anomaly,
+      details: {},
+      suspiciousWallets: []
+    }))
+  };
+}
+
 export function sanitizeCoverageIssues(chains: ChainSnapshot[] = []) {
   return chains
     .filter((chain) => chain.status === "error" || chain.status === "limited" || chain.status === "not_configured")
     .map((chain) => ({
       chain: chain.chain,
       status: chain.status === "error" ? "limited" : chain.status,
-      message: "Some chain data is temporarily unavailable."
+      message: "Some chain data is temporarily unavailable.",
+      // A standing limitation is a known provider-plan coverage gap (e.g. BNB Chain
+      // needs a paid explorer plan). It is permanent until the plan changes, so the
+      // UI should not raise a fresh partial-coverage warning on every refresh for it.
+      standing: chain.status === "limited" && (chain.providerSource === "limited_provider_required" || isProviderCoverageRestriction(chain.errorMessage))
     }));
 }

@@ -157,9 +157,11 @@ declare global {
 
 export function useArcIdentity() {
   const requestIdRef = useRef(0);
+  const stateRef = useRef<ArcIdentityState>(emptyState);
   const [state, setState] = useState<ArcIdentityState>(emptyState);
 
   const transition = useCallback((next: ArcIdentityState, details: Record<string, unknown> = {}) => {
+    stateRef.current = next;
     setState((previous) => {
       console.log("[arc-identity] identity_state_transition", {
         from: previous.status,
@@ -183,8 +185,19 @@ export function useArcIdentity() {
       return;
     }
 
+    // Stale-while-revalidate: once this hook has a resolved answer for this
+    // wallet (claimed or unclaimed), background re-checks (focus, storage,
+    // wallet-changed events) must not downgrade the UI to "checking" — that
+    // unmounts entire gated pages and causes visible flicker loops.
+    const previous = stateRef.current;
+    const previouslyResolved =
+      previous.normalizedWallet === normalizedWallet &&
+      (previous.status === "claimed" || previous.status === "unclaimed");
+
     const cachedState = stateFromCache(normalizedWallet);
-    transition(cachedState.status === "claimed" ? cachedState : { ...cachedState, status: "checking" }, { requestId, source: cachedState.source });
+    if (!previouslyResolved) {
+      transition(cachedState.status === "claimed" ? cachedState : { ...cachedState, status: "checking" }, { requestId, source: cachedState.source });
+    }
 
     const timeout = timeoutSignal(5000);
     try {
@@ -214,6 +227,10 @@ export function useArcIdentity() {
         return;
       }
       const data = await response.json().catch(() => null) as ProfileByWalletResponse | { error?: string } | null;
+      if (requestIdRef.current !== requestId) {
+        console.log("[arc-identity] stale_identity_response_ignored", { wallet: normalizedWallet, requestId, latestRequestId: requestIdRef.current, stage: "json" });
+        return;
+      }
       if (!response.ok) throw new Error(data && "error" in data && data.error ? data.error : `Profile lookup failed with ${response.status}`);
       const username = maybeArcUsername((data as ProfileByWalletResponse)?.profile?.username ?? (data as ProfileByWalletResponse)?.username);
       if (!username) {
@@ -249,11 +266,22 @@ export function useArcIdentity() {
         return;
       }
       const cached = stateFromCache(normalizedWallet);
+      // Transient lookup failures must not hide a page that was already
+      // resolved: fall back to the cache first, then the previous in-memory
+      // resolution, and only surface "error" when we never had an answer.
+      const fallbackStatus = cached.status === "claimed"
+        ? "claimed"
+        : previouslyResolved
+          ? previous.status
+          : "error";
+      const fallbackUsername = cached.username ?? (previouslyResolved ? previous.username : null);
       transition({
         ...cached,
         wallet: normalizedWallet,
         normalizedWallet,
-        status: cached.status === "claimed" ? "claimed" : "error",
+        status: fallbackStatus,
+        username: fallbackStatus === "claimed" ? fallbackUsername : null,
+        profileUrl: fallbackStatus === "claimed" ? (fallbackUsername ? profileRouteFor(fallbackUsername) : "/profile/me") : null,
         error: error instanceof Error ? error.message : "Unable to verify identity",
         checkedAt: Date.now()
       }, { requestId, reason: "lookup_failed" });

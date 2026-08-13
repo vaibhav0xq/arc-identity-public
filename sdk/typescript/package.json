@@ -1,0 +1,51 @@
+{
+  "name": "@kyro/sdk",
+  "version": "0.1.0",
+  "private": true,
+  "description": "TypeScript SDK for the Kyro counterparty decision API.",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=18.17"
+  },
+  "main": "./dist/index.cjs",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.cts",
+  "exports": {
+    ".": {
+      "import": {
+        "types": "./dist/index.d.ts",
+        "default": "./dist/index.js"
+      },
+      "require": {
+        "types": "./dist/index.d.cts",
+        "default": "./dist/index.cjs"
+      }
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "sideEffects": false,
+  "scripts": {
+    "generate:types": "openapi-typescript ../../public/kyro-openapi.yaml -o src/generated/openapi.ts",
+    "check:generated": "openapi-typescript ../../public/kyro-openapi.yaml -o /tmp/kyro-openapi-regen.ts && diff -u src/generated/openapi.ts /tmp/kyro-openapi-regen.ts",
+    "typecheck": "tsc --noEmit",
+    "test": "node --import tsx --test tests/*.test.ts",
+    "test:dist": "node tests/dist-smoke/esm-import.mjs && node tests/dist-smoke/cjs-require.cjs",
+    "build": "tsup"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "openapi-typescript": "^7.13.0",
+    "tsup": "^8.5.1",
+    "tsx": "^4.23.12",
+    "typescript": "^5.6.3"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/vaibhav0xq/kyro-public.git",
+    "directory": "sdk/typescript"
+  }
+}

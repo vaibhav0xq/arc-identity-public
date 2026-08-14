@@ -6,8 +6,8 @@
 
 **Know your counterparty before funds move.**
 
-Kyro answers one question: should you transact with this wallet right now.
-Allow, caution or block, with the evidence behind it.
+Kyro is a wallet intelligence and reputation platform for pre-transaction decisions.
+Ask one question: should you transact with this wallet right now. Allow, caution or block, built from evidence and honest about coverage.
 
 [Website](https://www.thekyro.co) · [Live check](https://www.thekyro.co/check) · [Docs](https://docs.thekyro.co) · [API spec](./public/kyro-openapi.yaml) · [SDK](./sdk/typescript) · [Examples](./examples) · [Release](https://github.com/vaibhav0xq/kyro-public/releases/latest) · [X](https://x.com/KyroIdentity)
 
@@ -23,17 +23,26 @@ Allow, caution or block, with the evidence behind it.
 
 ![A completed counterparty check on the live console](public/screenshots/readme/check-verdict.png)
 
-<p align="center"><sub>A completed check on the live console: verdict, recommended limit, reason codes and the evidence behind them. The wallet shown is a public example wallet.</sub></p>
+<p align="center"><sub>A completed check on the live console: verdict, recommended limit and reason codes, with the evidence and coverage tabs the verdict was built from. The wallet shown is a public example wallet.</sub></p>
 
-Before you pay, escrow, lend to or onboard a wallet, Kyro answers one question: should you transact with this counterparty right now. Every check returns an allow, caution or block verdict with machine readable reason codes, a recommended USDC limit and the exact evidence the verdict was built on. Verdicts are deterministic and conservative by design: missing evidence never counts in a wallet's favor.
+Before you pay, escrow, lend to or onboard a wallet, Kyro answers one question: should you transact with this counterparty right now. The check is the front door. Underneath it is a wallet intelligence layer: indexed on-chain history across supported chains, a trust graph built from attestations between wallets and reputation evidence carried by every Kyro identity. Every check returns an allow, caution or block verdict with machine readable reason codes, a recommended USDC limit and the evidence rows the verdict was built on. Verdicts are deterministic and conservative by design: missing evidence never counts in a wallet's favor; it shows up as reduced coverage instead.
 
 ## What Kyro does
 
-- **Counterparty check workbench** at [thekyro.co/check](https://www.thekyro.co/check). Paste a wallet or username, pick a use case and read the verdict. No account needed.
+- **Wallet intelligence.** Kyro indexes a wallet's on-chain history across supported chains into evidence: activity, counterparties and longevity, every row tied to where it came from.
+- **Reputation evidence.** Wallets claim a Kyro username, build a trust graph through attestations and carry a scored reputation across chains. Scores summarize evidence; they never replace it.
+- **Counterparty check workbench** at [thekyro.co/check](https://www.thekyro.co/check). Paste a wallet or username, pick a use case and read the verdict with the evidence and coverage behind it. No account needed.
 - **Decision API.** Anonymous access on every endpoint; API keys raise the rate budget. One `GET` call returns the verdict, reasons, limit, evidence and freshness.
 - **Decision receipts.** Immutable, shareable snapshots of a verdict: proof of what Kyro said and when.
 - **Batch screening** for payroll runs, grant payouts, escrow batches and allowlists.
-- **Identity layer.** Wallets claim a Kyro username, build a trust graph through attestations and carry a scored reputation across chains.
+
+## How a verdict is made
+
+Three things produce every verdict, all of them visible in the product:
+
+- **Evidence.** Indexed activity, trust graph attestations and identity signals: the rows a verdict cites, each with its source.
+- **Coverage.** An explicit account of what was and was not indexed for this wallet and how fresh it is. Verdicts state their coverage instead of hiding gaps.
+- **Missing data handling.** Thin evidence produces a conservative verdict and a reason code that says why, never a confident guess.
 
 ## Product surfaces
 
@@ -53,7 +62,7 @@ Before you pay, escrow, lend to or onboard a wallet, Kyro answers one question: 
 
 ![The Decision API page of the Kyro developer docs](public/screenshots/readme/docs-decision-api.png)
 
-<sub>The developer docs at [docs.thekyro.co](https://docs.thekyro.co): concepts, rate budgets and an API reference built from the OpenAPI contract.</sub>
+<sub>The developer docs at [docs.thekyro.co](https://docs.thekyro.co): evidence and coverage concepts, rate budgets and an API reference built from the OpenAPI contract.</sub>
 
 ## Repository map
 

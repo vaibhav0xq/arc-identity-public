@@ -1,28 +1,61 @@
 <div align="center">
 
-# Kyro
+<img src="public/brand/kyro-banner.png" alt="Kyro. Trust, with a record behind it." width="820" />
 
-**Pre-transaction counterparty decisions for wallets. Powered by wallet intelligence and reputation evidence.**
+<br />
 
-[Website](https://www.thekyro.co) · [Live check](https://www.thekyro.co/check) · [Docs](https://docs.thekyro.co) · [API spec](./public/kyro-openapi.yaml) · [X](https://x.com/KyroIdentity)
+**Know your counterparty before funds move.**
+
+Kyro answers one question: should you transact with this wallet right now.
+Allow, caution or block, with the evidence behind it.
+
+[Website](https://www.thekyro.co) · [Live check](https://www.thekyro.co/check) · [Docs](https://docs.thekyro.co) · [API spec](./public/kyro-openapi.yaml) · [SDK](./sdk/typescript) · [Examples](./examples) · [Release](https://github.com/vaibhav0xq/kyro-public/releases/latest) · [X](https://x.com/KyroIdentity)
+
+[![License: MIT](https://img.shields.io/badge/License-MIT-2b2b28?style=flat-square&labelColor=8a8578)](./LICENSE)
+[![OpenAPI v1](https://img.shields.io/badge/OpenAPI-v1-2b2b28?style=flat-square&labelColor=8a8578)](./public/kyro-openapi.yaml)
+[![TypeScript SDK](https://img.shields.io/badge/SDK-TypeScript-2b2b28?style=flat-square&labelColor=8a8578)](./sdk/typescript)
+[![Docs](https://img.shields.io/badge/Docs-docs.thekyro.co-2b2b28?style=flat-square&labelColor=8a8578)](https://docs.thekyro.co)
+[![Release](https://img.shields.io/github/v/release/vaibhav0xq/kyro-public?style=flat-square&color=2b2b28&labelColor=8a8578&label=Release)](https://github.com/vaibhav0xq/kyro-public/releases/latest)
 
 </div>
 
 ---
 
+![A completed counterparty check on the live console](public/screenshots/readme/check-verdict.png)
+
+<p align="center"><sub>A completed check on the live console: verdict, recommended limit, reason codes and the evidence behind them. The wallet shown is a public example wallet.</sub></p>
+
 Before you pay, escrow, lend to or onboard a wallet, Kyro answers one question: should you transact with this counterparty right now. Every check returns an allow, caution or block verdict with machine readable reason codes, a recommended USDC limit and the exact evidence the verdict was built on. Verdicts are deterministic and conservative by design: missing evidence never counts in a wallet's favor.
 
-![The Kyro landing page](public/screenshots/landing.png)
-
-## The platform
+## What Kyro does
 
 - **Counterparty check workbench** at [thekyro.co/check](https://www.thekyro.co/check). Paste a wallet or username, pick a use case and read the verdict. No account needed.
 - **Decision API.** Anonymous access on every endpoint; API keys raise the rate budget. One `GET` call returns the verdict, reasons, limit, evidence and freshness.
-- **Decision receipts.** Immutable, shareable snapshots of a verdict for audit trails.
+- **Decision receipts.** Immutable, shareable snapshots of a verdict: proof of what Kyro said and when.
 - **Batch screening** for payroll runs, grant payouts, escrow batches and allowlists.
 - **Identity layer.** Wallets claim a Kyro username, build a trust graph through attestations and carry a scored reputation across chains.
 
-## What is in this repository
+## Product surfaces
+
+### Batch screening
+
+![The batch counterparty register with one caution row and two rows awaiting their first snapshot](public/screenshots/readme/batch-register.png)
+
+<sub>One run across many wallets, each row with its own verdict and limit. Rows without a committed snapshot say so instead of guessing.</sub>
+
+### Decision receipts
+
+![A decision receipt recording a caution verdict as an immutable snapshot](public/screenshots/readme/decision-receipt.png)
+
+<sub>A decision receipt: an immutable snapshot of a verdict with its evidence, made to be shared. It never updates.</sub>
+
+### Developer docs and API contract
+
+![The Decision API page of the Kyro developer docs](public/screenshots/readme/docs-decision-api.png)
+
+<sub>The developer docs at [docs.thekyro.co](https://docs.thekyro.co): concepts, rate budgets and an API reference built from the OpenAPI contract.</sub>
+
+## Repository map
 
 | Path | Contents |
 | --- | --- |

@@ -20,6 +20,7 @@ Additive changes (new fields, new codes) can land in v1 without notice. Breaking
 
 ## 2026-08
 
+- TypeScript SDK published to npm as [`@kyrodev/sdk`](https://www.npmjs.com/package/@kyrodev/sdk) (v0.1.0, MIT): all ten v1 operations, zero runtime dependencies and dual ESM and CJS builds. Install with `npm install @kyrodev/sdk`; the [SDK page](/docs/sdk-typescript) covers usage.
 - Intake economics hardening: starting a scan now costs 20 units anonymously (5 with any API key) and scan starts are capped per UTC day (25 per IP anonymous, 200 developer, 1000 pro, 2000 partner). The public score read's background refresh is now metered from the same anonymous budget and respects the same 10-minute per-wallet attempt cooldown as intake. Response shapes are unchanged; daily-cap rejections reuse `429 RATE_LIMITED` with `Retry-After` pointing at the next UTC midnight.
 - TypeScript SDK added to the Kyro repository: a typed client for all 8 v1 operations with a shared error model, rate limit metadata and dual ESM and CJS builds. Not published to npm yet; the [SDK page](/docs/sdk-typescript) shows the planned install command.
 - Plan-aware API limits: keyed budgets and batch caps now follow the key's plan (developer 120 units/min and 50 batch rows, pro 300 and 250, partner 600 and 500 by default with custom caps by agreement). Anonymous limits are unchanged. Additive only: every existing key is on the developer plan, which matches the old keyed behavior exactly.

@@ -12,8 +12,9 @@ info:
     verdict with a recommended USDC limit, machine-readable reason codes, the evidence
     the verdict used (and what was missing), data-coverage notes and an optional
     immutable, shareable decision receipt. Supporting endpoints expose the underlying
-    wallet score, Kyro profile summaries, the verified-relationship trust graph, batch
-    screening and on-demand intake (indexing) for wallets Kyro has not seen yet.
+    wallet score, Kyro profile summaries, the verified-relationship trust graph,
+    the score-neutral observed Interaction Graph, batch screening and on-demand
+    intake (indexing) for wallets Kyro has not seen yet.
 
     Kyro is wallet intelligence and counterparty decision infrastructure. It does not
     perform AML screening and does not provide legal, sanctions or regulatory
@@ -37,7 +38,7 @@ info:
     600 by default** with custom budgets by agreement. Plans are server-side
     state set by the Kyro team; nothing in a request can choose one.
     Most requests cost 1 unit; a batch of N unique rows costs N units; starting an
-    intake costs 20 units anonymously or 5 units with any API key
+    intake costs 8 units anonymously or 5 units with any API key
     (`already_indexed` and `indexing` answers are free).
     A score read that starts a background rescan of a stale known wallet spends
     5 more units from the caller's anonymous per-IP budget (see the score read
@@ -48,6 +49,11 @@ info:
     agreement. The cap counts only scans that actually start; reaching it
     answers `429 RATE_LIMITED` with `Retry-After` pointing at the next UTC
     midnight.
+    Re-indexing an already-indexed wallet
+    (`POST /api/v1/interaction-graph/{wallet}/refresh`) requires an API key,
+    costs 5 units when a run actually starts, and draws from its own daily cap:
+    50 re-index starts per key on developer, 150 on plus, 500 on pro and 1000
+    on partner by default (`fresh` and `indexing` answers are free).
     Responses carry `X-RateLimit-Limit` and `X-RateLimit-Remaining`; a `429` adds
     `Retry-After` (seconds).
 
@@ -83,6 +89,8 @@ tags:
     description: Public summaries of registered Kyro identities.
   - name: Trust
     description: Verified transaction-backed relationship graphs.
+  - name: Interactions
+    description: Persisted observed onchain counterparties, separate from verified trust and score.
   - name: Decisions
     description: Allow / caution / block verdicts with recommended USDC limits, single and batch.
   - name: Receipts
@@ -308,6 +316,198 @@ paths:
                       - Network currently isolated.
                       - No verified transaction-backed trust edges are available yet.
         '400': { $ref: '#/components/responses/InvalidWallet' }
+        '401': { $ref: '#/components/responses/InvalidKey' }
+        '429': { $ref: '#/components/responses/RateLimited' }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/interaction-graph/{wallet}:
+    get:
+      operationId: getInteractionGraph
+      tags: [Interactions]
+      summary: Get a wallet's observed Interaction Graph
+      description: |
+        Returns deduplicated onchain counterparty addresses from Kyro's newest
+        persisted snapshot for each supported chain. A counterparty can carry a
+        registered Kyro profile link and a `verifiedKyroPeer` overlay when the
+        existing verified Trust Graph also contains that wallet.
+
+        Interaction Graph is score-neutral and is not an endorsement. Each
+        node carries a required, nullable `metrics` object read from Kyro's
+        persisted snapshot evidence: transaction count, in/out direction and
+        first/last interaction, with a `lowerBound` flag and a per-chain
+        `basis` reporting how complete the counts are. Nodes whose snapshots
+        predate stats capture return `metrics: null` until the wallet's next
+        refresh; Arc evidence is aggregate-only and never yields counts.
+        Value and asset details are not exposed; the `capabilities` object
+        reports exactly what is supported. The GET is database-only and never
+        starts indexing or a provider scan. Coverage status, stale/capped flags
+        and explanations say when the returned address set is a lower bound.
+        Results are address-sorted and cursor-paginated by default.
+        `sort=activity` opts into an observed-activity ranking: transaction
+        count, then most recent interaction, then address; `metrics: null`
+        nodes trail with `rank: null`. Ranked reads return a single page
+        (`nextCursor` null, no cursor accepted). Ranking is observational
+        only, never endorsement or trust, and never affects score. Costs 1
+        rate unit.
+      parameters:
+        - $ref: '#/components/parameters/WalletPath'
+        - $ref: '#/components/parameters/InteractionLimitQuery'
+        - $ref: '#/components/parameters/InteractionCursorQuery'
+        - $ref: '#/components/parameters/InteractionSortQuery'
+      responses:
+        '200':
+          description: Observed Interaction Graph from persisted snapshot evidence.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    required: [data]
+                    properties:
+                      data: { $ref: '#/components/schemas/InteractionGraphData' }
+              examples:
+                indexedGraph:
+                  summary: Indexed wallet with a measured node and a metrics-null node
+                  value:
+                    ok: true
+                    version: v1
+                    data:
+                      wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                      interactionGraph:
+                        walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+                        nodes:
+                          - walletAddress: '0xabcdef1234567890abcdef1234567890abcdef12'
+                            username: amara.kyro
+                            profileUrl: /profile/amara.kyro
+                            registered: true
+                            verifiedKyroPeer: true
+                            chains:
+                              - chain: Ethereum Mainnet
+                                chainId: 1
+                                explorerUrl: 'https://etherscan.io/address/0xabcdef1234567890abcdef1234567890abcdef12'
+                              - chain: Polygon
+                                chainId: 137
+                                explorerUrl: 'https://polygonscan.com/address/0xabcdef1234567890abcdef1234567890abcdef12'
+                            metrics:
+                              transactionCount: { total: 18, in: 7, out: 11 }
+                              firstInteractionAt: '2025-11-03T14:22:09Z'
+                              lastInteractionAt: '2026-08-14T07:51:33Z'
+                              lowerBound: false
+                              basis: { counted: 2, pending: 0, unavailable: 0 }
+                          - walletAddress: '0x9f8e7d6c5b4a39281706f5e4d3c2b1a098765432'
+                            username: null
+                            profileUrl: null
+                            registered: false
+                            verifiedKyroPeer: false
+                            chains:
+                              - chain: Ethereum Mainnet
+                                chainId: 1
+                                explorerUrl: 'https://etherscan.io/address/0x9f8e7d6c5b4a39281706f5e4d3c2b1a098765432'
+                            metrics: null
+                        summary:
+                          totalCounterparties: 2
+                          returnedCounterparties: 2
+                          kyroProfilesOnPage: 1
+                          verifiedKyroPeers: 1
+                          chainsWithCounterparties: 2
+                        coverage:
+                          status: complete
+                          source: persisted_snapshot
+                          observedAt: '2026-08-25T08:41:05Z'
+                          stale: false
+                          indexing: false
+                          historyCapped: false
+                          hasTransientIssues: false
+                          hasStandingLimitations: false
+                          chains:
+                            - chain: Ethereum Mainnet
+                              chainId: 1
+                              status: indexed
+                              counterpartyCount: 2
+                              indexedAt: '2026-08-25T08:41:05Z'
+                              source: cached_wallet_intelligence
+                              historyCapped: false
+                              recencyReliable: true
+                              transientIssue: false
+                              standingLimitation: false
+                            - chain: Polygon
+                              chainId: 137
+                              status: indexed
+                              counterpartyCount: 1
+                              indexedAt: '2026-08-25T08:41:05Z'
+                              source: cached_wallet_intelligence
+                              historyCapped: false
+                              recencyReliable: true
+                              transientIssue: false
+                              standingLimitation: false
+                        pagination:
+                          limit: 25
+                          nextCursor: null
+                          hasMore: false
+                        capabilities:
+                          perCounterpartyTransactionCount: true
+                          direction: true
+                          firstInteractionAt: true
+                          lastInteractionAt: true
+                          value: false
+                          assetDetails: false
+                        explanations:
+                          - Some counterparties predate metrics capture; counts appear after this wallet's next refresh.
+                notIndexed:
+                  summary: Never-indexed wallet answers with a conservative empty graph
+                  value:
+                    ok: true
+                    version: v1
+                    data:
+                      wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                      interactionGraph:
+                        walletAddress: '0x1234567890abcdef1234567890abcdef12345678'
+                        nodes: []
+                        summary:
+                          totalCounterparties: 0
+                          returnedCounterparties: 0
+                          kyroProfilesOnPage: 0
+                          verifiedKyroPeers: 0
+                          chainsWithCounterparties: 0
+                        coverage:
+                          status: not_indexed
+                          source: persisted_snapshot
+                          observedAt: null
+                          stale: false
+                          indexing: false
+                          historyCapped: false
+                          hasTransientIssues: false
+                          hasStandingLimitations: false
+                          chains: []
+                        pagination:
+                          limit: 25
+                          nextCursor: null
+                          hasMore: false
+                        capabilities:
+                          perCounterpartyTransactionCount: true
+                          direction: true
+                          firstInteractionAt: true
+                          lastInteractionAt: true
+                          value: false
+                          assetDetails: false
+                        explanations:
+                          - No persisted chain snapshot is available yet. Start indexing before relying on this graph.
+        '400':
+          description: |
+            The wallet path parameter is not a valid EVM address (code
+            `INVALID_WALLET`); or `sort` carries a value other than `activity`,
+            or `cursor` was combined with `sort=activity` (code `INVALID_SORT`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: INVALID_SORT, message: 'Ranked mode returns a single page; cursor cannot be combined with sort=activity.' }
         '401': { $ref: '#/components/responses/InvalidKey' }
         '429': { $ref: '#/components/responses/RateLimited' }
         '5XX': { $ref: '#/components/responses/ServerError' }
@@ -718,7 +918,7 @@ paths:
         an in-flight indexing job answers 202 (`status: indexing`); otherwise a
         new job starts (202, `status: started`). One indexing attempt per wallet
         per 10 minutes; a recent failed attempt answers 429 with `Retry-After`.
-        Starting a scan consumes **20 rate units anonymously or 5 with any API
+        Starting a scan consumes **8 rate units anonymously or 5 with any API
         key** (it is far heavier than a cached read, and anonymous starts cost
         more because rotating IPs is the cheap way to multiply scans). Starts
         are also capped per UTC day: 25 per IP anonymously; 200, 1000 or 2000
@@ -785,7 +985,7 @@ paths:
           description: |
             One of three limits answered (all use code `RATE_LIMITED`;
             `Retry-After` says when to retry). Per-minute budget exhausted:
-            starting an intake consumes 20 units anonymously or 5 with a key.
+            starting an intake consumes 8 units anonymously or 5 with a key.
             Per-wallet cooldown: this wallet already had an indexing attempt in
             the last 10 minutes that did not commit; this 429 arrives after its
             units were spent. Daily start cap reached: this caller already
@@ -801,6 +1001,139 @@ paths:
                 ok: false
                 version: v1
                 error: { code: RATE_LIMITED, message: This wallet already had an indexing attempt in the last 10 minutes and it did not commit. Retry in 493s. }
+        '5XX': { $ref: '#/components/responses/ServerError' }
+
+  /api/v1/interaction-graph/{wallet}/refresh:
+    post:
+      operationId: refreshInteractionGraph
+      summary: Re-index a wallet (keyed)
+      description: |
+        Ask Kyro to (re)index a wallet so its Observed Interaction Graph does
+        not stay `not_indexed` or stale forever. Runs the same persisted
+        indexing pipeline as intake; observed counterparties remain untrusted
+        observations and never confer endorsement.
+
+        **Requires an API key.** Anonymous callers receive `401 NOT_ALLOWED`;
+        they can still index a never-seen wallet once via
+        `POST /api/v1/intake/{wallet}`.
+
+        State machine:
+        - an in-flight run answers `202` with `status: indexing` (free);
+        - a snapshot committed within the last 60 minutes answers `200` with
+          `status: fresh`, `lastIndexedAt`, `nextRefreshAt` and
+          `retryAfterSeconds` (free);
+        - otherwise the run starts and answers `202` with `status: started`
+          and `mode`: `reindex` for a wallet with a committed snapshot,
+          `first_index` for one without.
+
+        Cost: starting a run consumes **5 units**. A `first_index` start draws
+        from the caller's daily intake cap; a `reindex` start draws from the
+        separate daily refresh cap (developer 50, plus 150, pro 500, partner
+        1000 by default). Free answers (`fresh`, `indexing`) carry no rate
+        headers and consume nothing. A wallet whose last attempt failed within
+        the past 10 minutes answers `429` after units were consumed, same as
+        intake. Concurrent requests collapse into a single run.
+
+        If the refresh ledger is not provisioned on the deployment, `reindex`
+        requests answer `503 SCHEMA_MISSING` and nothing is charged or
+        started (the endpoint fails closed; there is no in-memory fallback
+        for a paid budget).
+      tags: [Wallets]
+      security:
+        - bearerApiKey: []
+      parameters:
+        - $ref: '#/components/parameters/WalletPath'
+      responses:
+        '200':
+          description: Snapshot is fresher than the 60-minute cooldown; nothing started, nothing charged.
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data: { $ref: '#/components/schemas/RefreshFresh' }
+              example:
+                ok: true
+                version: v1
+                data:
+                  wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                  status: fresh
+                  lastIndexedAt: '2026-08-25T14:32:18Z'
+                  nextRefreshAt: '2026-08-25T15:32:18Z'
+                  retryAfterSeconds: 2130
+        '202':
+          description: A run just started (`started`, with `mode`) or was already in flight (`indexing`, free).
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+          content:
+            application/json:
+              schema:
+                allOf:
+                  - $ref: '#/components/schemas/SuccessEnvelope'
+                  - type: object
+                    properties:
+                      data:
+                        oneOf:
+                          - $ref: '#/components/schemas/RefreshStarted'
+                          - $ref: '#/components/schemas/IntakeIndexing'
+              examples:
+                started:
+                  summary: Run started (5 units against the daily cap named by mode)
+                  value:
+                    ok: true
+                    version: v1
+                    data:
+                      wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                      status: started
+                      mode: reindex
+                alreadyIndexing:
+                  summary: A run was already in flight so this request joined it (free)
+                  value:
+                    ok: true
+                    version: v1
+                    data:
+                      wallet: '0x1234567890abcdef1234567890abcdef12345678'
+                      status: indexing
+                      startedAt: '2026-08-25T15:03:27Z'
+        '400': { $ref: '#/components/responses/InvalidWallet' }
+        '401':
+          description: |
+            No usable key. `INVALID_KEY` when an `Authorization` header was
+            sent but the key is malformed, unknown, revoked or paused;
+            `NOT_ALLOWED` when the request is anonymous (this endpoint
+            requires a key).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: NOT_ALLOWED, message: 'Refreshing a wallet''s interaction graph requires an API key. Anonymous callers can index a never-seen wallet once via POST /api/v1/intake/{wallet}.' }
+        '403':
+          description: The key is real but its account is frozen (code `NOT_ALLOWED`).
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+        '429':
+          description: |
+            Three flavors, all `RATE_LIMITED`: the per-minute unit budget is
+            exhausted; the daily refresh (or intake) cap is reached
+            (`Retry-After` points at the next UTC midnight); or this wallet
+            had a non-committed indexing attempt in the last 10 minutes.
+          headers:
+            X-RateLimit-Limit: { $ref: '#/components/headers/XRateLimitLimit' }
+            X-RateLimit-Remaining: { $ref: '#/components/headers/XRateLimitRemaining' }
+            Retry-After: { $ref: '#/components/headers/RetryAfter' }
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/ErrorEnvelope' }
+              example:
+                ok: false
+                version: v1
+                error: { code: RATE_LIMITED, message: Daily refresh quota reached (50 re-index runs per UTC day for this API key's plan). Retry after the next UTC midnight. }
         '5XX': { $ref: '#/components/responses/ServerError' }
 
 components:
@@ -841,6 +1174,40 @@ components:
       required: false
       description: What the caller is about to do with this counterparty. Defaults to `payment`.
       schema: { $ref: '#/components/schemas/UseCase' }
+    InteractionLimitQuery:
+      name: limit
+      in: query
+      required: false
+      description: Counterparty nodes per page. Defaults to 25 and is capped at 50.
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 50
+        default: 25
+    InteractionCursorQuery:
+      name: cursor
+      in: query
+      required: false
+      description: Opaque cursor returned in interactionGraph.pagination.nextCursor.
+      schema: { type: string }
+    InteractionSortQuery:
+      name: sort
+      in: query
+      required: false
+      description: |
+        Opt-in ranked read. The only accepted value is `activity`: counterparties
+        are ordered by observed activity: transaction count (desc), then most
+        recent interaction (desc), then address (asc). Nodes with `metrics: null`
+        follow all measured nodes, address-ascending, and carry `rank: null`.
+        Ranked mode returns a single page: `pagination.nextCursor` is `null` and
+        `cursor` cannot be combined with `sort` (400, code `INVALID_SORT`). Any
+        other value is rejected (400, code `INVALID_SORT`). Observed activity is
+        not endorsement or trust and never affects score; when `sort` is absent
+        the default enumeration (address-ascending, cursor-paginated) is
+        unchanged.
+      schema:
+        type: string
+        enum: [activity]
 
   headers:
     XRateLimitLimit:
@@ -938,6 +1305,7 @@ components:
                 - INVALID_USERNAME
                 - INVALID_REQUEST
                 - INVALID_KEY
+                - INVALID_SORT
                 - NOT_FOUND
                 - RATE_LIMITED
                 - SCHEMA_MISSING
@@ -1376,6 +1744,13 @@ components:
         strongestPeers:
           type: array
           items: { $ref: '#/components/schemas/TrustEdge' }
+        peerEdges:
+          type: array
+          items: { $ref: '#/components/schemas/TrustEdge' }
+          description: >-
+            Verified trust edges between the wallet's peers themselves. Both
+            endpoints of every row are peers of this wallet. Optional; older
+            cached summaries omit it.
         metrics: { $ref: '#/components/schemas/TrustMetrics' }
         explanations:
           type: array
@@ -1388,6 +1763,175 @@ components:
       properties:
         wallet: { type: string }
         trustGraph: { $ref: '#/components/schemas/TrustGraph' }
+
+    InteractionGraphNodeChain:
+      type: object
+      required: [chain, chainId, explorerUrl]
+      properties:
+        chain: { type: string }
+        chainId: { type: integer }
+        explorerUrl: { type: ['string', 'null'], format: uri }
+
+    InteractionGraphNode:
+      type: object
+      description: >-
+        One deduplicated observed counterparty. Saved transaction counts,
+        direction and first/last interaction ride the nullable `metrics`
+        object; no relationship strength is inferred.
+      required: [walletAddress, username, profileUrl, registered, verifiedKyroPeer, chains, metrics]
+      properties:
+        walletAddress: { type: string }
+        username: { type: ['string', 'null'] }
+        profileUrl:
+          type: ['string', 'null']
+          description: Site-relative public profile route when the counterparty has a registered Kyro username.
+        registered: { type: boolean }
+        verifiedKyroPeer:
+          type: boolean
+          description: True only when the separate verified Trust Graph also contains this wallet.
+        chains:
+          type: array
+          items: { $ref: '#/components/schemas/InteractionGraphNodeChain' }
+        metrics:
+          description: >-
+            Saved counts, direction and recency for this counterparty, or
+            null when no countable evidence is captured yet (the snapshot
+            predates stats capture, or the evidence is Arc aggregate-only).
+          oneOf:
+            - $ref: '#/components/schemas/InteractionGraphNodeMetrics'
+            - type: 'null'
+        rank:
+          type: ['integer', 'null']
+          description: >-
+            Present only in ranked (sort=activity) responses. Measured nodes
+            carry 1-based contiguous ranks; metrics-null nodes trail all
+            measured nodes with rank null. Observed activity only: never
+            endorsement, trust or a score input. Absent in default
+            enumeration responses.
+
+    InteractionGraphNodeMetrics:
+      type: object
+      description: >-
+        Saved per-counterparty evidence merged across the chains listed on
+        the node. lowerBound means the counts read "at least": a counted
+        chain hit a provider history cap, or some contributing chains have
+        no captured stats. basis reports how many contributing chains were
+        counted, are pending capture, or are aggregate-only (Arc).
+      required: [transactionCount, firstInteractionAt, lastInteractionAt, lowerBound, basis]
+      properties:
+        transactionCount:
+          type: object
+          required: [total, in, out]
+          properties:
+            total: { type: integer }
+            in: { type: integer }
+            out: { type: integer }
+        firstInteractionAt: { type: ['string', 'null'], format: date-time }
+        lastInteractionAt: { type: ['string', 'null'], format: date-time }
+        lowerBound: { type: boolean }
+        basis:
+          type: object
+          required: [counted, pending, unavailable]
+          properties:
+            counted: { type: integer }
+            pending: { type: integer }
+            unavailable: { type: integer }
+
+    InteractionGraphSummary:
+      type: object
+      required: [totalCounterparties, returnedCounterparties, kyroProfilesOnPage, verifiedKyroPeers, chainsWithCounterparties]
+      properties:
+        totalCounterparties: { type: integer }
+        returnedCounterparties: { type: integer }
+        kyroProfilesOnPage: { type: integer }
+        verifiedKyroPeers: { type: integer }
+        chainsWithCounterparties: { type: integer }
+
+    InteractionGraphCoverageChain:
+      type: object
+      required: [chain, chainId, status, counterpartyCount, indexedAt, source, historyCapped, recencyReliable, transientIssue, standingLimitation]
+      properties:
+        chain: { type: string }
+        chainId: { type: integer }
+        status:
+          type: string
+          enum: [indexed, not_configured, no_activity, limited, error]
+        counterpartyCount: { type: integer }
+        indexedAt: { type: string, format: date-time }
+        source:
+          type: string
+          description: Sanitized source category; raw provider errors are never exposed.
+        historyCapped: { type: ['boolean', 'null'] }
+        recencyReliable: { type: ['boolean', 'null'] }
+        transientIssue: { type: boolean }
+        standingLimitation: { type: boolean }
+
+    InteractionGraphCoverage:
+      type: object
+      required: [status, source, observedAt, stale, indexing, historyCapped, hasTransientIssues, hasStandingLimitations, chains]
+      properties:
+        status:
+          type: string
+          enum: [not_indexed, indexing, complete, partial, unavailable]
+        source:
+          type: string
+          enum: [persisted_snapshot]
+        observedAt: { type: ['string', 'null'], format: date-time }
+        stale: { type: boolean }
+        indexing: { type: boolean }
+        historyCapped: { type: boolean }
+        hasTransientIssues: { type: boolean }
+        hasStandingLimitations: { type: boolean }
+        chains:
+          type: array
+          items: { $ref: '#/components/schemas/InteractionGraphCoverageChain' }
+
+    InteractionGraphPagination:
+      type: object
+      required: [limit, nextCursor, hasMore]
+      properties:
+        limit: { type: integer }
+        nextCursor: { type: ['string', 'null'] }
+        hasMore: { type: boolean }
+
+    InteractionGraphCapabilities:
+      type: object
+      description: >-
+        Availability contract. Per-counterparty transaction count, direction
+        and first/last interaction are supported, read from persisted
+        snapshot stats. Value and asset details remain explicitly false
+        until their own release.
+      required: [perCounterpartyTransactionCount, direction, firstInteractionAt, lastInteractionAt, value, assetDetails]
+      properties:
+        perCounterpartyTransactionCount: { type: boolean, enum: [true] }
+        direction: { type: boolean, enum: [true] }
+        firstInteractionAt: { type: boolean, enum: [true] }
+        lastInteractionAt: { type: boolean, enum: [true] }
+        value: { type: boolean, enum: [false] }
+        assetDetails: { type: boolean, enum: [false] }
+
+    InteractionGraph:
+      type: object
+      required: [walletAddress, nodes, summary, coverage, pagination, capabilities, explanations]
+      properties:
+        walletAddress: { type: string }
+        nodes:
+          type: array
+          items: { $ref: '#/components/schemas/InteractionGraphNode' }
+        summary: { $ref: '#/components/schemas/InteractionGraphSummary' }
+        coverage: { $ref: '#/components/schemas/InteractionGraphCoverage' }
+        pagination: { $ref: '#/components/schemas/InteractionGraphPagination' }
+        capabilities: { $ref: '#/components/schemas/InteractionGraphCapabilities' }
+        explanations:
+          type: array
+          items: { type: string }
+
+    InteractionGraphData:
+      type: object
+      required: [wallet, interactionGraph]
+      properties:
+        wallet: { type: string }
+        interactionGraph: { $ref: '#/components/schemas/InteractionGraph' }
 
     BatchRequest:
       type: object
@@ -1602,3 +2146,39 @@ components:
           type: ['string', 'null']
           format: date-time
           description: When the in-flight indexing job started.
+
+    RefreshStarted:
+      type: object
+      required: [wallet, status, mode]
+      properties:
+        wallet: { type: string }
+        status:
+          type: string
+          enum: [started]
+        mode:
+          type: string
+          enum: [reindex, first_index]
+          description: >-
+            Which daily budget the start drew from: `reindex` for a wallet
+            with a committed snapshot (refresh cap), `first_index` for a
+            never-indexed wallet (intake cap).
+
+    RefreshFresh:
+      type: object
+      required: [wallet, status, lastIndexedAt, nextRefreshAt, retryAfterSeconds]
+      properties:
+        wallet: { type: string }
+        status:
+          type: string
+          enum: [fresh]
+        lastIndexedAt:
+          type: string
+          format: date-time
+          description: When this wallet's snapshot last committed.
+        nextRefreshAt:
+          type: string
+          format: date-time
+          description: When the 60-minute per-wallet cooldown ends and a re-index may start.
+        retryAfterSeconds:
+          type: integer
+          description: Seconds until `nextRefreshAt`.

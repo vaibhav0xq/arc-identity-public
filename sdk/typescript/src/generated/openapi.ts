@@ -84,6 +84,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/interaction-graph/{wallet}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get a wallet's observed Interaction Graph
+         * @description Returns deduplicated onchain counterparty addresses from Kyro's newest
+         *     persisted snapshot for each supported chain. A counterparty can carry a
+         *     registered Kyro profile link and a `verifiedKyroPeer` overlay when the
+         *     existing verified Trust Graph also contains that wallet.
+         *
+         *     Interaction Graph is score-neutral and is not an endorsement. Each
+         *     node carries a required, nullable `metrics` object read from Kyro's
+         *     persisted snapshot evidence: transaction count, in/out direction and
+         *     first/last interaction, with a `lowerBound` flag and a per-chain
+         *     `basis` reporting how complete the counts are. Nodes whose snapshots
+         *     predate stats capture return `metrics: null` until the wallet's next
+         *     refresh; Arc evidence is aggregate-only and never yields counts.
+         *     Value and asset details are not exposed; the `capabilities` object
+         *     reports exactly what is supported. The GET is database-only and never
+         *     starts indexing or a provider scan. Coverage status, stale/capped flags
+         *     and explanations say when the returned address set is a lower bound.
+         *     Results are address-sorted and cursor-paginated by default.
+         *     `sort=activity` opts into an observed-activity ranking: transaction
+         *     count, then most recent interaction, then address; `metrics: null`
+         *     nodes trail with `rank: null`. Ranked reads return a single page
+         *     (`nextCursor` null, no cursor accepted). Ranking is observational
+         *     only, never endorsement or trust, and never affects score. Costs 1
+         *     rate unit.
+         */
+        get: operations["getInteractionGraph"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/decision/{wallet}": {
         parameters: {
             query?: never;
@@ -228,7 +270,7 @@ export interface paths {
          *     an in-flight indexing job answers 202 (`status: indexing`); otherwise a
          *     new job starts (202, `status: started`). One indexing attempt per wallet
          *     per 10 minutes; a recent failed attempt answers 429 with `Retry-After`.
-         *     Starting a scan consumes **20 rate units anonymously or 5 with any API
+         *     Starting a scan consumes **8 rate units anonymously or 5 with any API
          *     key** (it is far heavier than a cached read, and anonymous starts cost
          *     more because rotating IPs is the cheap way to multiply scans). Starts
          *     are also capped per UTC day: 25 per IP anonymously; 200, 1000 or 2000
@@ -240,6 +282,55 @@ export interface paths {
          *     hammering a failing wallet stays expensive.
          */
         post: operations["intakeWallet"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/interaction-graph/{wallet}/refresh": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-index a wallet (keyed)
+         * @description Ask Kyro to (re)index a wallet so its Observed Interaction Graph does
+         *     not stay `not_indexed` or stale forever. Runs the same persisted
+         *     indexing pipeline as intake; observed counterparties remain untrusted
+         *     observations and never confer endorsement.
+         *
+         *     **Requires an API key.** Anonymous callers receive `401 NOT_ALLOWED`;
+         *     they can still index a never-seen wallet once via
+         *     `POST /api/v1/intake/{wallet}`.
+         *
+         *     State machine:
+         *     - an in-flight run answers `202` with `status: indexing` (free);
+         *     - a snapshot committed within the last 60 minutes answers `200` with
+         *       `status: fresh`, `lastIndexedAt`, `nextRefreshAt` and
+         *       `retryAfterSeconds` (free);
+         *     - otherwise the run starts and answers `202` with `status: started`
+         *       and `mode`: `reindex` for a wallet with a committed snapshot,
+         *       `first_index` for one without.
+         *
+         *     Cost: starting a run consumes **5 units**. A `first_index` start draws
+         *     from the caller's daily intake cap; a `reindex` start draws from the
+         *     separate daily refresh cap (developer 50, plus 150, pro 500, partner
+         *     1000 by default). Free answers (`fresh`, `indexing`) carry no rate
+         *     headers and consume nothing. A wallet whose last attempt failed within
+         *     the past 10 minutes answers `429` after units were consumed, same as
+         *     intake. Concurrent requests collapse into a single run.
+         *
+         *     If the refresh ledger is not provisioned on the deployment, `reindex`
+         *     requests answer `503 SCHEMA_MISSING` and nothing is charged or
+         *     started (the endpoint fails closed; there is no in-memory fallback
+         *     for a paid budget).
+         */
+        post: operations["refreshInteractionGraph"];
         delete?: never;
         options?: never;
         head?: never;
@@ -268,7 +359,7 @@ export interface components {
                  * @description Stable machine-readable error code.
                  * @enum {string}
                  */
-                code: "INVALID_WALLET" | "INVALID_USERNAME" | "INVALID_REQUEST" | "INVALID_KEY" | "NOT_FOUND" | "RATE_LIMITED" | "SCHEMA_MISSING" | "INTERNAL";
+                code: "INVALID_WALLET" | "INVALID_USERNAME" | "INVALID_REQUEST" | "INVALID_KEY" | "INVALID_SORT" | "NOT_FOUND" | "RATE_LIMITED" | "SCHEMA_MISSING" | "INTERNAL";
                 /** @description Human-readable explanation. */
                 message: string;
             };
@@ -511,6 +602,8 @@ export interface components {
             anomalies: components["schemas"]["TrustAnomaly"][];
             reciprocalPeers: components["schemas"]["TrustEdge"][];
             strongestPeers: components["schemas"]["TrustEdge"][];
+            /** @description Verified trust edges between the wallet's peers themselves. Both endpoints of every row are peers of this wallet. Optional; older cached summaries omit it. */
+            peerEdges?: components["schemas"]["TrustEdge"][];
             metrics: components["schemas"]["TrustMetrics"];
             /** @description Plain-language reading of the graph. */
             explanations: string[];
@@ -518,6 +611,114 @@ export interface components {
         TrustData: {
             wallet: string;
             trustGraph: components["schemas"]["TrustGraph"];
+        };
+        InteractionGraphNodeChain: {
+            chain: string;
+            chainId: number;
+            /** Format: uri */
+            explorerUrl: string | null;
+        };
+        /** @description One deduplicated observed counterparty. Saved transaction counts, direction and first/last interaction ride the nullable `metrics` object; no relationship strength is inferred. */
+        InteractionGraphNode: {
+            walletAddress: string;
+            username: string | null;
+            /** @description Site-relative public profile route when the counterparty has a registered Kyro username. */
+            profileUrl: string | null;
+            registered: boolean;
+            /** @description True only when the separate verified Trust Graph also contains this wallet. */
+            verifiedKyroPeer: boolean;
+            chains: components["schemas"]["InteractionGraphNodeChain"][];
+            /** @description Saved counts, direction and recency for this counterparty, or null when no countable evidence is captured yet (the snapshot predates stats capture, or the evidence is Arc aggregate-only). */
+            metrics: components["schemas"]["InteractionGraphNodeMetrics"] | null;
+            /** @description Present only in ranked (sort=activity) responses. Measured nodes carry 1-based contiguous ranks; metrics-null nodes trail all measured nodes with rank null. Observed activity only: never endorsement, trust or a score input. Absent in default enumeration responses. */
+            rank?: number | null;
+        };
+        /** @description Saved per-counterparty evidence merged across the chains listed on the node. lowerBound means the counts read "at least": a counted chain hit a provider history cap, or some contributing chains have no captured stats. basis reports how many contributing chains were counted, are pending capture, or are aggregate-only (Arc). */
+        InteractionGraphNodeMetrics: {
+            transactionCount: {
+                total: number;
+                in: number;
+                out: number;
+            };
+            /** Format: date-time */
+            firstInteractionAt: string | null;
+            /** Format: date-time */
+            lastInteractionAt: string | null;
+            lowerBound: boolean;
+            basis: {
+                counted: number;
+                pending: number;
+                unavailable: number;
+            };
+        };
+        InteractionGraphSummary: {
+            totalCounterparties: number;
+            returnedCounterparties: number;
+            kyroProfilesOnPage: number;
+            verifiedKyroPeers: number;
+            chainsWithCounterparties: number;
+        };
+        InteractionGraphCoverageChain: {
+            chain: string;
+            chainId: number;
+            /** @enum {string} */
+            status: "indexed" | "not_configured" | "no_activity" | "limited" | "error";
+            counterpartyCount: number;
+            /** Format: date-time */
+            indexedAt: string;
+            /** @description Sanitized source category; raw provider errors are never exposed. */
+            source: string;
+            historyCapped: boolean | null;
+            recencyReliable: boolean | null;
+            transientIssue: boolean;
+            standingLimitation: boolean;
+        };
+        InteractionGraphCoverage: {
+            /** @enum {string} */
+            status: "not_indexed" | "indexing" | "complete" | "partial" | "unavailable";
+            /** @enum {string} */
+            source: "persisted_snapshot";
+            /** Format: date-time */
+            observedAt: string | null;
+            stale: boolean;
+            indexing: boolean;
+            historyCapped: boolean;
+            hasTransientIssues: boolean;
+            hasStandingLimitations: boolean;
+            chains: components["schemas"]["InteractionGraphCoverageChain"][];
+        };
+        InteractionGraphPagination: {
+            limit: number;
+            nextCursor: string | null;
+            hasMore: boolean;
+        };
+        /** @description Availability contract. Per-counterparty transaction count, direction and first/last interaction are supported, read from persisted snapshot stats. Value and asset details remain explicitly false until their own release. */
+        InteractionGraphCapabilities: {
+            /** @enum {boolean} */
+            perCounterpartyTransactionCount: true;
+            /** @enum {boolean} */
+            direction: true;
+            /** @enum {boolean} */
+            firstInteractionAt: true;
+            /** @enum {boolean} */
+            lastInteractionAt: true;
+            /** @enum {boolean} */
+            value: false;
+            /** @enum {boolean} */
+            assetDetails: false;
+        };
+        InteractionGraph: {
+            walletAddress: string;
+            nodes: components["schemas"]["InteractionGraphNode"][];
+            summary: components["schemas"]["InteractionGraphSummary"];
+            coverage: components["schemas"]["InteractionGraphCoverage"];
+            pagination: components["schemas"]["InteractionGraphPagination"];
+            capabilities: components["schemas"]["InteractionGraphCapabilities"];
+            explanations: string[];
+        };
+        InteractionGraphData: {
+            wallet: string;
+            interactionGraph: components["schemas"]["InteractionGraph"];
         };
         BatchRequest: {
             /**
@@ -639,6 +840,33 @@ export interface components {
              */
             startedAt: string | null;
         };
+        RefreshStarted: {
+            wallet: string;
+            /** @enum {string} */
+            status: "started";
+            /**
+             * @description Which daily budget the start drew from: `reindex` for a wallet with a committed snapshot (refresh cap), `first_index` for a never-indexed wallet (intake cap).
+             * @enum {string}
+             */
+            mode: "reindex" | "first_index";
+        };
+        RefreshFresh: {
+            wallet: string;
+            /** @enum {string} */
+            status: "fresh";
+            /**
+             * Format: date-time
+             * @description When this wallet's snapshot last committed.
+             */
+            lastIndexedAt: string;
+            /**
+             * Format: date-time
+             * @description When the 60-minute per-wallet cooldown ends and a re-index may start.
+             */
+            nextRefreshAt: string;
+            /** @description Seconds until `nextRefreshAt`. */
+            retryAfterSeconds: number;
+        };
     };
     responses: {
         /** @description The wallet path parameter is not a valid EVM address (code `INVALID_WALLET`). */
@@ -737,6 +965,23 @@ export interface components {
         UsernamePath: string;
         /** @description What the caller is about to do with this counterparty. Defaults to `payment`. */
         UseCaseQuery: components["schemas"]["UseCase"];
+        /** @description Counterparty nodes per page. Defaults to 25 and is capped at 50. */
+        InteractionLimitQuery: number;
+        /** @description Opaque cursor returned in interactionGraph.pagination.nextCursor. */
+        InteractionCursorQuery: string;
+        /**
+         * @description Opt-in ranked read. The only accepted value is `activity`: counterparties
+         *     are ordered by observed activity: transaction count (desc), then most
+         *     recent interaction (desc), then address (asc). Nodes with `metrics: null`
+         *     follow all measured nodes, address-ascending, and carry `rank: null`.
+         *     Ranked mode returns a single page: `pagination.nextCursor` is `null` and
+         *     `cursor` cannot be combined with `sort` (400, code `INVALID_SORT`). Any
+         *     other value is rejected (400, code `INVALID_SORT`). Observed activity is
+         *     not endorsement or trust and never affects score; when `sort` is absent
+         *     the default enumeration (address-ascending, cursor-paginated) is
+         *     unchanged.
+         */
+        InteractionSortQuery: "activity";
     };
     requestBodies: never;
     headers: {
@@ -997,6 +1242,77 @@ export interface operations {
                 };
             };
             400: components["responses"]["InvalidWallet"];
+            401: components["responses"]["InvalidKey"];
+            429: components["responses"]["RateLimited"];
+            "5XX": components["responses"]["ServerError"];
+        };
+    };
+    getInteractionGraph: {
+        parameters: {
+            query?: {
+                /** @description Counterparty nodes per page. Defaults to 25 and is capped at 50. */
+                limit?: components["parameters"]["InteractionLimitQuery"];
+                /** @description Opaque cursor returned in interactionGraph.pagination.nextCursor. */
+                cursor?: components["parameters"]["InteractionCursorQuery"];
+                /**
+                 * @description Opt-in ranked read. The only accepted value is `activity`: counterparties
+                 *     are ordered by observed activity: transaction count (desc), then most
+                 *     recent interaction (desc), then address (asc). Nodes with `metrics: null`
+                 *     follow all measured nodes, address-ascending, and carry `rank: null`.
+                 *     Ranked mode returns a single page: `pagination.nextCursor` is `null` and
+                 *     `cursor` cannot be combined with `sort` (400, code `INVALID_SORT`). Any
+                 *     other value is rejected (400, code `INVALID_SORT`). Observed activity is
+                 *     not endorsement or trust and never affects score; when `sort` is absent
+                 *     the default enumeration (address-ascending, cursor-paginated) is
+                 *     unchanged.
+                 */
+                sort?: components["parameters"]["InteractionSortQuery"];
+            };
+            header?: never;
+            path: {
+                /** @description EVM wallet address. `0x` + 40 hex characters (case-insensitive). */
+                wallet: components["parameters"]["WalletPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Observed Interaction Graph from persisted snapshot evidence. */
+            200: {
+                headers: {
+                    "X-RateLimit-Limit": components["headers"]["XRateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["XRateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope"] & {
+                        data: components["schemas"]["InteractionGraphData"];
+                    };
+                };
+            };
+            /**
+             * @description The wallet path parameter is not a valid EVM address (code
+             *     `INVALID_WALLET`); or `sort` carries a value other than `activity`,
+             *     or `cursor` was combined with `sort=activity` (code `INVALID_SORT`).
+             */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "ok": false,
+                     *       "version": "v1",
+                     *       "error": {
+                     *         "code": "INVALID_SORT",
+                     *         "message": "Ranked mode returns a single page; cursor cannot be combined with sort=activity."
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
             401: components["responses"]["InvalidKey"];
             429: components["responses"]["RateLimited"];
             "5XX": components["responses"]["ServerError"];
@@ -1616,7 +1932,7 @@ export interface operations {
             /**
              * @description One of three limits answered (all use code `RATE_LIMITED`;
              *     `Retry-After` says when to retry). Per-minute budget exhausted:
-             *     starting an intake consumes 20 units anonymously or 5 with a key.
+             *     starting an intake consumes 8 units anonymously or 5 with a key.
              *     Per-wallet cooldown: this wallet already had an indexing attempt in
              *     the last 10 minutes that did not commit; this 429 arrives after its
              *     units were spent. Daily start cap reached: this caller already
@@ -1637,6 +1953,119 @@ export interface operations {
                      *       "error": {
                      *         "code": "RATE_LIMITED",
                      *         "message": "This wallet already had an indexing attempt in the last 10 minutes and it did not commit. Retry in 493s."
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            "5XX": components["responses"]["ServerError"];
+        };
+    };
+    refreshInteractionGraph: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description EVM wallet address. `0x` + 40 hex characters (case-insensitive). */
+                wallet: components["parameters"]["WalletPath"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Snapshot is fresher than the 60-minute cooldown; nothing started, nothing charged. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "ok": true,
+                     *       "version": "v1",
+                     *       "data": {
+                     *         "wallet": "0x1234567890abcdef1234567890abcdef12345678",
+                     *         "status": "fresh",
+                     *         "lastIndexedAt": "2026-08-25T14:32:18Z",
+                     *         "nextRefreshAt": "2026-08-25T15:32:18Z",
+                     *         "retryAfterSeconds": 2130
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["SuccessEnvelope"] & {
+                        data?: components["schemas"]["RefreshFresh"];
+                    };
+                };
+            };
+            /** @description A run just started (`started`, with `mode`) or was already in flight (`indexing`, free). */
+            202: {
+                headers: {
+                    "X-RateLimit-Limit": components["headers"]["XRateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["XRateLimitRemaining"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuccessEnvelope"] & {
+                        data?: components["schemas"]["RefreshStarted"] | components["schemas"]["IntakeIndexing"];
+                    };
+                };
+            };
+            400: components["responses"]["InvalidWallet"];
+            /**
+             * @description No usable key. `INVALID_KEY` when an `Authorization` header was
+             *     sent but the key is malformed, unknown, revoked or paused;
+             *     `NOT_ALLOWED` when the request is anonymous (this endpoint
+             *     requires a key).
+             */
+            401: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "ok": false,
+                     *       "version": "v1",
+                     *       "error": {
+                     *         "code": "NOT_ALLOWED",
+                     *         "message": "Refreshing a wallet's interaction graph requires an API key. Anonymous callers can index a never-seen wallet once via POST /api/v1/intake/{wallet}."
+                     *       }
+                     *     }
+                     */
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /** @description The key is real but its account is frozen (code `NOT_ALLOWED`). */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorEnvelope"];
+                };
+            };
+            /**
+             * @description Three flavors, all `RATE_LIMITED`: the per-minute unit budget is
+             *     exhausted; the daily refresh (or intake) cap is reached
+             *     (`Retry-After` points at the next UTC midnight); or this wallet
+             *     had a non-committed indexing attempt in the last 10 minutes.
+             */
+            429: {
+                headers: {
+                    "X-RateLimit-Limit": components["headers"]["XRateLimitLimit"];
+                    "X-RateLimit-Remaining": components["headers"]["XRateLimitRemaining"];
+                    "Retry-After": components["headers"]["RetryAfter"];
+                    [name: string]: unknown;
+                };
+                content: {
+                    /**
+                     * @example {
+                     *       "ok": false,
+                     *       "version": "v1",
+                     *       "error": {
+                     *         "code": "RATE_LIMITED",
+                     *         "message": "Daily refresh quota reached (50 re-index runs per UTC day for this API key's plan). Retry after the next UTC midnight."
                      *       }
                      *     }
                      */

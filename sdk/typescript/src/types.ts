@@ -23,6 +23,24 @@ export type KyroTrust = components["schemas"]["TrustData"];
 /** Trust graph snapshot carried inside the trust read payload. */
 export type KyroTrustGraph = components["schemas"]["TrustGraph"];
 
+/** Observed Interaction Graph read payload. */
+export type KyroInteractionGraphData = components["schemas"]["InteractionGraphData"];
+
+/** Persisted, score-neutral observed counterparties and coverage metadata. */
+export type KyroInteractionGraph = components["schemas"]["InteractionGraph"];
+
+/**
+ * Interaction graph refresh outcome, discriminated on status:
+ * fresh (snapshot committed within the last 60 minutes; nothing started,
+ * nothing charged), started (a new run began for 5 rate units; mode names
+ * the daily cap it drew from) or indexing (an earlier run is still in
+ * flight, free).
+ */
+export type KyroInteractionGraphRefreshResult =
+  | components["schemas"]["RefreshFresh"]
+  | components["schemas"]["RefreshStarted"]
+  | components["schemas"]["IntakeIndexing"];
+
 /** Single decision read payload. */
 export type KyroDecision = components["schemas"]["DecisionData"];
 

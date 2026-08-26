@@ -5,6 +5,7 @@ export { KyroError, KyroApiError, KyroRequestError } from "./errors";
 export type { KyroRequestErrorCode } from "./errors";
 
 export type { DecisionBatchOptions, DecisionCheckOptions } from "./resources/decisions";
+export type { InteractionGraphGetOptions } from "./resources/interaction-graph";
 export type { ReceiptCreateParams } from "./resources/receipts";
 
 export type {
@@ -15,6 +16,9 @@ export type {
   KyroDecisionVerdict,
   KyroErrorCode,
   KyroIntakeResult,
+  KyroInteractionGraph,
+  KyroInteractionGraphData,
+  KyroInteractionGraphRefreshResult,
   KyroProfile,
   KyroRateLimitEvent,
   KyroRateLimitInfo,

@@ -101,13 +101,13 @@ Rate budgets, API keys, reason codes and every endpoint are documented at [docs.
 ## TypeScript SDK
 
 ```ts
-import { Kyro } from "@kyro/sdk";
+import { Kyro } from "@kyrodev/sdk";
 
 const kyro = new Kyro({ apiKey: process.env.KYRO_API_KEY });
 const decision = await kyro.decisions.check("0x1234...5678", { useCase: "escrow" });
 ```
 
-The SDK wraps all eight v1 operations with typed methods, a shared error model and rate limit metadata. It is not on npm yet; see [`sdk/typescript/README.md`](./sdk/typescript/README.md) to build it from source.
+The SDK wraps all ten v1 operations with typed methods, a shared error model and rate limit metadata. It is on npm as [`@kyrodev/sdk`](https://www.npmjs.com/package/@kyrodev/sdk): `npm install @kyrodev/sdk`. To build from source instead, see [`sdk/typescript/README.md`](./sdk/typescript/README.md).
 
 ## Development checks
 

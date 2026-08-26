@@ -3,6 +3,7 @@ import type { KyroRateLimitEvent, KyroRateLimitInfo, KyroResponse } from "./type
 import { ScoreResource } from "./resources/score";
 import { ProfileResource } from "./resources/profile";
 import { TrustResource } from "./resources/trust";
+import { InteractionGraphResource } from "./resources/interaction-graph";
 import { DecisionsResource } from "./resources/decisions";
 import { ReceiptsResource } from "./resources/receipts";
 import { IntakeResource } from "./resources/intake";
@@ -149,6 +150,8 @@ export class Kyro {
   readonly profile: ProfileResource;
   /** Trust graph reads. */
   readonly trust: TrustResource;
+  /** Score-neutral observed Interaction Graph reads. */
+  readonly interactionGraph: InteractionGraphResource;
   /** Single and batch decision checks. */
   readonly decisions: DecisionsResource;
   /** Decision receipt creation and reads. */
@@ -179,6 +182,7 @@ export class Kyro {
     this.score = new ScoreResource(this);
     this.profile = new ProfileResource(this);
     this.trust = new TrustResource(this);
+    this.interactionGraph = new InteractionGraphResource(this);
     this.decisions = new DecisionsResource(this);
     this.receipts = new ReceiptsResource(this);
     this.intake = new IntakeResource(this);

@@ -1,9 +1,23 @@
 {
-  "name": "@kyro/sdk",
+  "name": "@kyrodev/sdk",
   "version": "0.1.0",
-  "private": true,
+  "private": false,
   "description": "TypeScript SDK for the Kyro counterparty decision API.",
   "license": "MIT",
+  "author": "Kyro",
+  "homepage": "https://docs.thekyro.co",
+  "keywords": [
+    "kyro",
+    "wallet",
+    "reputation",
+    "trust-graph",
+    "counterparty",
+    "risk",
+    "ethereum",
+    "web3",
+    "typescript",
+    "sdk"
+  ],
   "type": "module",
   "engines": {
     "node": ">=18.17"
@@ -27,14 +41,18 @@
     "dist",
     "README.md"
   ],
+  "publishConfig": {
+    "access": "public"
+  },
   "sideEffects": false,
   "scripts": {
     "generate:types": "openapi-typescript ../../public/kyro-openapi.yaml -o src/generated/openapi.ts",
-    "check:generated": "openapi-typescript ../../public/kyro-openapi.yaml -o /tmp/kyro-openapi-regen.ts && diff -u src/generated/openapi.ts /tmp/kyro-openapi-regen.ts",
+    "check:generated": "node scripts/check-generated.mjs",
     "typecheck": "tsc --noEmit",
     "test": "node --import tsx --test tests/*.test.ts",
     "test:dist": "node tests/dist-smoke/esm-import.mjs && node tests/dist-smoke/cjs-require.cjs",
-    "build": "tsup"
+    "build": "tsup",
+    "prepublishOnly": "npm run check:generated && npm run typecheck && npm test && npm run build && npm run test:dist"
   },
   "devDependencies": {
     "@types/node": "^26.2.0",
@@ -42,10 +60,5 @@
     "tsup": "^8.5.1",
     "tsx": "^4.23.12",
     "typescript": "^5.6.3"
-  },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/vaibhav0xq/kyro-public.git",
-    "directory": "sdk/typescript"
   }
 }

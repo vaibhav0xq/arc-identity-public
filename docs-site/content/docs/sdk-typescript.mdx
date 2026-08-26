@@ -1,22 +1,22 @@
 ---
 title: TypeScript SDK
-description: First-party TypeScript client for the Kyro API. Typed methods for all 8 operations, a shared error model and rate limit metadata.
+description: First-party TypeScript client for the Kyro API. Typed methods for all 9 operations, a shared error model and rate limit metadata.
 ---
 
 The TypeScript SDK wraps the v1 API so you can integrate counterparty decisions without hand-writing fetch calls. It has zero runtime dependencies, runs in Node 18.17+ and modern browsers and ships both ESM and CJS builds. Types are generated from the published OpenAPI spec, so the SDK surface matches the API contract exactly.
 
-**Status: not published to npm yet.** The package lives in the Kyro repository while the publish pipeline is settled. Once it ships, installing will look like this:
+The package is published to npm as [`@kyrodev/sdk`](https://www.npmjs.com/package/@kyrodev/sdk) (v0.1.0, MIT). Install:
 
 ```bash
-npm install @kyro/sdk
+npm install @kyrodev/sdk
 ```
 
-Everything below already works today against the source build.
+Everything below works against the npm package or a source build.
 
 ## Create a client
 
 ```ts
-import { Kyro } from "@kyro/sdk";
+import { Kyro } from "@kyrodev/sdk";
 
 const kyro = new Kyro({
   apiKey: process.env.KYRO_API_KEY, // optional
@@ -49,6 +49,7 @@ A valid wallet Kyro has not scored answers with a conservative baseline instead 
 | `kyro.score.get(wallet)` | `GET /api/v1/score/{wallet}` |
 | `kyro.profile.get(username)` | `GET /api/v1/profile/{username}` |
 | `kyro.trust.get(wallet)` | `GET /api/v1/trust/{wallet}` |
+| `kyro.interactionGraph.get(wallet, { limit, cursor })` | `GET /api/v1/interaction-graph/{wallet}` |
 | `kyro.decisions.check(wallet, { useCase })` | `GET /api/v1/decision/{wallet}` |
 | `kyro.decisions.batch(inputs, { useCase })` | `POST /api/v1/decision/batch` |
 | `kyro.receipts.create({ wallet or username, useCase })` | `POST /api/v1/decision-receipts` |
@@ -89,12 +90,12 @@ if (intake.status !== "already_indexed") {
 const decision = await kyro.decisions.check(wallet, { useCase: "payment" });
 ```
 
-`intake.start` is idempotent by state: `already_indexed` answers with no work done, `indexing` joins an in-flight scan for free and `started` begins a new scan for 20 rate units anonymously or 5 with an API key. See [intake](/docs/intake).
+`intake.start` is idempotent by state: `already_indexed` answers with no work done, `indexing` joins an in-flight scan for free and `started` begins a new scan for 8 rate units anonymously or 5 with an API key. See [intake](/docs/intake).
 
 ## Handle errors
 
 ```ts
-import { KyroApiError, KyroError, KyroRequestError } from "@kyro/sdk";
+import { KyroApiError, KyroError, KyroRequestError } from "@kyrodev/sdk";
 
 try {
   await kyro.decisions.check(wallet);

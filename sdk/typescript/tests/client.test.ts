@@ -46,11 +46,21 @@ test("encodes path segments", async () => {
   assert.equal(calls[0]!.url, "https://www.thekyro.co/api/v1/profile/weird%20name.kyro");
 });
 
+test("interaction graph resource sends pagination query parameters", async () => {
+  const { fetch, calls } = mockFetch(okJson({ wallet: WALLET, interactionGraph: {} }));
+  await new Kyro({ fetch }).interactionGraph.get(WALLET, { limit: 40, cursor: "next page/+==" });
+  assert.equal(
+    calls[0]!.url,
+    `https://www.thekyro.co/api/v1/interaction-graph/${WALLET}?limit=40&cursor=next+page%2F%2B%3D%3D`,
+  );
+});
+
 test("rejects empty path segment values", async () => {
   const { fetch } = mockFetch();
   const kyro = new Kyro({ fetch });
   await assert.rejects(kyro.score.get(""), TypeError);
   await assert.rejects(kyro.profile.get("   "), TypeError);
+  await assert.rejects(kyro.interactionGraph.get(""), TypeError);
 });
 
 test("unwraps the success envelope and returns data", async () => {

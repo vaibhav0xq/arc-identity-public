@@ -1,0 +1,560 @@
+/*
+ * Interaction Graph stage — INSTRUMENT edition: the theme is
+ * transplanted from the trust constellation the user approved. A
+ * chamfered warm-charcoal gauge plate with engraved rings, meridian
+ * spokes, and a ticked bezel carries the additive canvas light engine
+ * ("lighter" compositing — light only brightens, never fogs): gold
+ * fiber threads to the root, bone-silver VERIFIED PEER LINKS between
+ * counterparties (the cross-links that make this read as a graph, not
+ * a star), mirrored light pulses, and a slow radar sweep.
+ * Counterparty nodes are machined medallions: a dark dome that flips
+ * to bone under attention, an ink monogram face, a uniform gauge
+ * track, and an engraved name plate (hue split on rim/border only:
+ * gold = registered, stone = observed).
+ * The root is a ticked precision dial with a powered bezel rim.
+ * The stage is PHYSICAL: every marker rides a spring simulation (grab,
+ * drag, fling — it sails home with overshoot) at 60fps.
+ * All motion is decorative, symmetric, and non-directional: every
+ * thread carries one light pulse EACH WAY at the same size and speed,
+ * peer links carry none, so nothing reads as flow, count, or strength.
+ */
+
+.surface {
+  --gold: #a78345;
+  --gold-bg: #eee4cd;
+  --paper: #e9e5db;
+  --paper-deep: #ded9cb;
+  --bone: #f2eee3;
+  --ink: #252827;
+  --mutedc: #747a75;
+  --quiet: #9b9d94;
+  --line-dark: #8d7647;
+  --verified: #4d795f;
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: var(--bone);
+}
+
+.snapshotBadge {
+  border: 1px solid rgb(167 131 69 / 40%);
+  color: #8a6c39;
+  background: var(--bone);
+}
+
+/*
+ * The map sits in a deep near-black light chamber: dark enough that
+ * additive light pops, with an edge vignette for depth. The fine dot
+ * lattice reads as machined registration marks rather than graph paper.
+ */
+.fieldFrame {
+  --pointer-x: 50%;
+  --pointer-y: 46%;
+  --gold: #c9a25e;
+  --line-dark: #8f9489;
+  --verified: #7fa98d;
+  position: relative;
+  overflow: hidden;
+  container-type: inline-size;
+  clip-path: polygon(0 18px, 18px 0, calc(100% - 22px) 0, 100% 22px, 100% calc(100% - 18px), calc(100% - 18px) 100%, 22px 100%, 0 calc(100% - 22px));
+  background:
+    radial-gradient(circle at 50% 40%, rgb(242 238 227 / 5%) 0%, transparent 60%),
+    radial-gradient(circle at 50% 46%, transparent 66%, rgb(0 0 0 / 22%) 100%),
+    linear-gradient(150deg, #2e332b 0%, #262a23 55%, #1f231d 100%);
+  box-shadow:
+    inset 0 0 0 1px rgb(242 238 227 / 12%),
+    inset 0 2px 18px rgb(0 0 0 / 26%);
+}
+
+/* Inner hairline — the instrument face's second engraving line. */
+.fieldFrame::after {
+  position: absolute;
+  inset: 9px;
+  pointer-events: none;
+  content: "";
+  border: 1px solid rgb(242 238 227 / 7%);
+}
+
+.fieldHud {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 0.85rem;
+  pointer-events: none;
+}
+
+.fieldHud span:first-child {
+  color: #9aa093;
+}
+
+.fieldHud span:last-child {
+  color: #b8bdb2;
+}
+
+.fieldStatusDot {
+  position: relative;
+  display: inline-block;
+  width: 0.38rem;
+  height: 0.38rem;
+  border-radius: 999px;
+  background: var(--gold);
+  box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 30%, transparent);
+  animation: statusPulse 3.4s ease-out infinite;
+}
+
+.svg {
+  position: relative;
+  z-index: 1;
+  overflow: visible;
+}
+
+/* One stage = canvas light layer below + interactive SVG instruments above. */
+.stageWrap {
+  position: relative;
+}
+
+.stageCanvas {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+
+/*
+ * Structural hairline edges (SVG): quadratic filaments riding the same
+ * elastic curve as the canvas threads. Whole-curve opacity breath only —
+ * equal, nondirectional by construction.
+ */
+.edgeBase {
+  fill: none;
+  vector-effect: non-scaling-stroke;
+  transition:
+    stroke 320ms ease,
+    opacity 320ms ease;
+  animation: edgeBreath 4.6s ease-in-out infinite;
+}
+
+/* Markers are physical: grab, drag, fling — springs carry them home. */
+.grabbable {
+  cursor: grab;
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.grabbable:active {
+  cursor: grabbing;
+}
+
+.nodeButton {
+  outline: none;
+}
+
+.nodeBody {
+  transform-box: fill-box;
+  transform-origin: center;
+  transition:
+    transform 420ms cubic-bezier(0.2, 0.85, 0.25, 1.25),
+    opacity 320ms ease,
+    filter 320ms ease;
+  animation: nodeBreathe 4.6s ease-in-out infinite;
+}
+
+/* Hairline reticle ring: brightens with attention like a lit dial. */
+.reticleRing {
+  opacity: 0.82;
+  transition: opacity 280ms ease;
+}
+
+.nodeButton:hover .reticleRing,
+.nodeButton:focus-visible .reticleRing,
+.nodeActive .reticleRing {
+  opacity: 1;
+}
+
+/* Attention flips the machined dome to bone (constellation register). */
+.nodeDomeActive {
+  opacity: 0;
+  transition: opacity 260ms ease;
+}
+
+.nodeButton:hover .nodeDomeActive,
+.nodeButton:focus-visible .nodeDomeActive,
+.nodeActive .nodeDomeActive {
+  opacity: 1;
+}
+
+/* Rim hue: stone for observed, gold undertone for registered, gold under attention. */
+.nodeRing {
+  stroke: #8f9489;
+  transition: stroke 260ms ease;
+}
+
+.nodeRingRegistered {
+  stroke: rgb(201 162 94 / 78%);
+}
+
+.nodeButton:hover .nodeRing,
+.nodeButton:focus-visible .nodeRing,
+.nodeActive .nodeRing {
+  stroke: #c9a25e;
+}
+
+/* Ink monogram on bone, quiet sage on the rest dome. */
+.nodeGlyph {
+  fill: #cfd3c9;
+  transition: fill 240ms ease;
+}
+
+.nodeButton:hover .nodeGlyph,
+.nodeButton:focus-visible .nodeGlyph,
+.nodeActive .nodeGlyph {
+  fill: #252827;
+}
+
+/* Hairline specular catch on the upper-left rim. */
+.nodeSpec {
+  opacity: 0.22;
+  transition: opacity 260ms ease;
+}
+
+.nodeButton:hover .nodeSpec,
+.nodeButton:focus-visible .nodeSpec,
+.nodeActive .nodeSpec {
+  opacity: 0.5;
+}
+
+/* Names are quiet at rest; attention lifts them to bone. */
+.nodeLabel {
+  opacity: 0.86;
+  transition:
+    fill 240ms ease,
+    opacity 280ms ease,
+    transform 320ms ease;
+}
+
+/*
+ * Name plates: engraved backing chips under every medallion — the same
+ * plate material as the trust instrument's labels. Registration shifts
+ * the border hue only; attention lifts it to gold.
+ */
+.nodeChip {
+  stroke: rgb(242 238 227 / 10%);
+  transition:
+    stroke 280ms ease,
+    opacity 280ms ease;
+}
+
+.nodeChipRegistered {
+  stroke: rgb(201 162 94 / 30%);
+}
+
+.nodeButton:hover .nodeChip,
+.nodeButton:focus-visible .nodeChip,
+.nodeActive .nodeChip {
+  stroke: rgb(201 162 94 / 45%);
+}
+
+.nodeDimmed .nodeChip {
+  opacity: 0.2;
+}
+
+.nodeButton:hover .nodeBody,
+.nodeButton:focus-visible .nodeBody,
+.nodeActive .nodeBody {
+  transform: scale(1.14);
+}
+
+.nodeButton:hover .nodeLabel,
+.nodeButton:focus-visible .nodeLabel,
+.nodeActive .nodeLabel {
+  fill: #f2eee3;
+  opacity: 1;
+  transform: translateY(2px);
+}
+
+.nodeButton:focus-visible .nodeFocus {
+  opacity: 1;
+  stroke-dashoffset: -14;
+}
+
+.nodeDimmed .nodeBody {
+  opacity: 0.26;
+}
+
+.nodeDimmed .nodeLabel {
+  opacity: 0.18;
+}
+
+.nodeSelectedPulse {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: selectedPulse 1.9s ease-out infinite;
+}
+
+.rootAtmosphere {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: atmosphereBreath 8s ease-in-out infinite;
+}
+
+/* Ticked bezel turns imperceptibly slowly — a scanning dial, not jewelry. */
+.rootDial {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: orbitTurn 90s linear infinite;
+}
+
+.rootCore {
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: rootBreathe 5.2s ease-in-out infinite;
+}
+
+/*
+ * Dock panels default to STATIC flow below the stage — the safe layout at
+ * any width (nothing can occlude or tap-block a coin). Only wide cards
+ * (>=56rem container width) promote them to the absolute bottom-right
+ * dock, whose zone the desktop stage points already keep clear. Browsers
+ * without container-query support simply keep the in-flow version.
+ */
+/*
+ * The readout and the hint share one FIXED-height slot at every width,
+ * so the hint→readout swap can never move the plate or the card. The
+ * readout's rows are deterministic: three truncating text lines (name,
+ * register, C1b metrics) plus one non-wrapping action row that scrolls
+ * horizontally on overflow.
+ */
+.detailPanel {
+  position: static;
+  width: auto;
+  height: 6.15rem;
+  margin: 0 0.6rem 0.6rem;
+  padding: 0.55rem 2.4rem 0.55rem 1rem;
+  overflow: hidden;
+  border-color: rgb(242 238 227 / 18%) !important;
+  color: #d9d6ca;
+  background: linear-gradient(165deg, #1c1d1a, #151613);
+  box-shadow: 0 16px 34px rgb(0 0 0 / 40%);
+  animation: detailReveal 360ms cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* Single accessible action row: never wraps, never clips vertically. */
+.readoutActions {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scrollbar-width: none;
+}
+
+.readoutActions::-webkit-scrollbar {
+  display: none;
+}
+
+.readoutActions > :global(*) {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+/* The console's paper buttons recut as compact instrument keys. */
+.detailPanel :global(.arc-button-secondary) {
+  padding: 0.3rem 0.55rem;
+  border-color: #5b6058;
+  color: #f2eee3;
+  font-size: 0.56rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+  background: transparent;
+}
+
+.detailPanel :global(.arc-button-secondary:hover) {
+  border-color: #c9a25e;
+  background: rgb(201 162 94 / 10%);
+}
+
+.detailPanel :global(.arc-button-secondary svg) {
+  width: 0.7rem;
+  height: 0.7rem;
+}
+
+.detailPanel::before {
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  content: "";
+  background: var(--gold);
+}
+
+.controlPanel {
+  border-color: rgb(242 238 227 / 16%) !important;
+  background: rgb(15 16 14 / 68%);
+}
+
+.stageHint {
+  position: static;
+  display: flex;
+  max-width: none;
+  height: 6.15rem;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  gap: 0.45rem 0.75rem;
+  margin: 0 0.6rem 0.6rem;
+  padding: 0.55rem 0.85rem;
+  overflow: hidden;
+  border: 1px solid rgb(242 238 227 / 16%);
+  color: #9aa093;
+  font-size: 0.72rem;
+  line-height: 1.35;
+}
+
+.stageHint span:first-child {
+  color: #f2eee3;
+}
+
+@container (min-width: 56rem) {
+  .detailPanel {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 4;
+    width: min(29rem, calc(100% - 2rem));
+    margin: 0;
+  }
+
+  .stageHint {
+    position: absolute;
+    right: 1rem;
+    bottom: 1rem;
+    z-index: 4;
+    max-width: 25rem;
+    margin: 0;
+  }
+}
+
+.graphKey {
+  color: #747a75;
+}
+
+@keyframes orbitTurn {
+  to { transform: rotate(360deg); }
+}
+
+/*
+ * Whole-edge bloom: opacity rises and falls uniformly along the entire
+ * thread. Deliberately contains no dash movement or per-end change,
+ * because interaction edges are equal and undirected.
+ */
+@keyframes edgeBreath {
+  0%, 100% { opacity: 0.22; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes nodeBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.04); }
+}
+
+@keyframes selectedPulse {
+  0% { opacity: 0.62; transform: scale(0.92); }
+  80%, 100% { opacity: 0; transform: scale(1.38); }
+}
+
+@keyframes rootBreathe {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.02); }
+}
+
+@keyframes atmosphereBreath {
+  0%, 100% { opacity: 0.55; transform: scale(0.96); }
+  50% { opacity: 0.8; transform: scale(1.05); }
+}
+
+@keyframes statusPulse {
+  0% { box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 30%, transparent); }
+  70%, 100% { box-shadow: 0 0 0 8px transparent; }
+}
+
+@keyframes detailReveal {
+  from { opacity: 0; transform: translateY(-8px) scale(0.985); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@media (max-width: 639px) {
+  .fieldHud {
+    padding: 0.6rem 0.65rem;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .surface,
+  .surface::before,
+  .surface::after,
+  .surface *,
+  .surface *::before,
+  .surface *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .fieldStatusDot,
+  .edgeBase,
+  .nodeBody,
+  .nodeSelectedPulse,
+  .rootDial,
+  .rootCore,
+  .rootAtmosphere,
+  .detailPanel {
+    animation: none !important;
+  }
+
+  .nodeBody,
+  .reticleRing,
+  .nodeLabel,
+  .nodeChip,
+  .nodeDomeActive,
+  .nodeRing,
+  .nodeGlyph,
+  .nodeSpec,
+  .edgeBase {
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * In-plate legend: the instrument's own mono microcopy row, sitting
+ * above the footer bar exactly like the trust constellation's legend.
+ * Pure documentation — every clause states equality, never a scale.
+ */
+.plateLegend {
+  display: none;
+  gap: 18px;
+  padding: 8px 22px 0;
+  font-size: 0.52rem;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: #8b9083;
+}
+
+/* Only on wide plates — at column width the chips carry the key. */
+@container (min-width: 660px) {
+  .plateLegend {
+    display: flex;
+  }
+}
+
+.plateLegend span::before {
+  margin-right: 6px;
+  color: rgb(201 162 94 / 55%);
+  content: "·";
+}

@@ -9,9 +9,10 @@ import { ArcShell } from "@/components/ArcShell";
 import { ChainCoverageExplorer } from "@/components/ChainCoverageExplorer";
 import { ConnectGatePanel } from "@/components/ConnectGatePanel";
 import { DecisionPanel } from "@/components/DecisionPanel";
+import { InteractionGraphLiveCard } from "@/components/InteractionGraphLiveCard";
 import { OnchainActivityCard } from "@/components/OnchainActivityCard";
 import { ScoreRing } from "@/components/ScoreRing";
-import { TrustGraphCard } from "@/components/TrustGraphCard";
+import { TrustEvidenceStrip, trustObservedAtLabel } from "@/components/TrustEvidenceStrip";
 import { TrustExplanationCard } from "@/components/TrustExplanationCard";
 import { TxLink } from "@/components/TxLink";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
@@ -24,6 +25,11 @@ import { shortenAddress } from "@/lib/wallet";
 import { getBadge } from "@/lib/score";
 import { deriveIntelligenceState, intelligenceStateCopy } from "@/lib/intelligence-state";
 import { hasIndexedActivity, isBaselineScore, mergeScoreState } from "@/lib/score-precedence";
+import {
+  cachedTrustGraphDisplay,
+  resolveTrustGraphRefresh,
+  unavailableTrustGraphDisplay
+} from "@/lib/trust-graph-display";
 import { useArcIdentity } from "@/hooks/useArcIdentity";
 
 type ScoreLookupResponse = {
@@ -92,6 +98,7 @@ type CachedDashboard = {
   identity: IdentityRecord;
   attestations: Attestation[];
   trustGraph: TrustGraph | null;
+  trustGraphObservedAt?: string | null;
   scoreMeta: ScoreLookupResponse | null;
   cachedAt: string;
 };
@@ -793,7 +800,8 @@ export default function DashboardPage() {
   const indexingPollRef = useRef<{ wallet: string; attempts: number; timer: number | null }>({ wallet: "", attempts: 0, timer: null });
   const [identity, setIdentity] = useState<IdentityRecord | null>(null);
   const [attestations, setAttestations] = useState<Attestation[]>([]);
-  const [trustGraph, setTrustGraph] = useState<TrustGraph | null>(null);
+  const [trustGraphDisplay, setTrustGraphDisplay] = useState(unavailableTrustGraphDisplay);
+  const trustGraph = trustGraphDisplay.graph;
   const [message, setMessage] = useState("Loading Kyro...");
   const [refreshMessage, setRefreshMessage] = useState("");
   const [refreshing, setRefreshing] = useState(false);
@@ -819,7 +827,7 @@ export default function DashboardPage() {
   function readDashboardSessionState(): DashboardSessionState {
     if (typeof window === "undefined") return { wallet: null, signatureVerified: false };
     const wallet = localStorage.getItem("arcIdentityWallet")?.trim() || arcIdentity.normalizedWallet || null;
-    /* Cached signature pairs are gone; a present wallet is the
+    /* Cached signature pairs are gone since F-01; a present wallet is the
        session signal (verified state arrives with the server profile). */
     return {
       wallet,
@@ -995,32 +1003,44 @@ export default function DashboardPage() {
     }
     const baseIdentity = !merged.accepted && identity?.profile.walletAddress.toLowerCase() === wallet.toLowerCase() ? identity : nextIdentity;
     const enriched = applyScoreMeta(baseIdentity, effectiveScore);
+    const nextTrustGraphDisplay = resolveTrustGraphRefresh(nextTrustGraph, trustGraphDisplay, wallet);
     setIdentity(enriched);
     setAttestations(nextAttestations);
-    setTrustGraph(nextTrustGraph);
+    setTrustGraphDisplay(nextTrustGraphDisplay);
     setScoreMeta(effectiveScore);
     rememberDisplayedSnapshot(wallet, enriched, effectiveScore);
-    saveCachedDashboard(wallet, enriched, nextAttestations, nextTrustGraph, effectiveScore);
+    saveCachedDashboard(wallet, enriched, nextAttestations, nextTrustGraphDisplay.graph, effectiveScore, nextTrustGraphDisplay.observedAt);
     return { identity: enriched, score: effectiveScore, accepted: merged.accepted, stale: false };
   }
 
-  function saveCachedDashboard(wallet: string, nextIdentity: IdentityRecord, nextAttestations: Attestation[], nextTrustGraph: TrustGraph | null, nextScoreMeta: ScoreLookupResponse | null) {
+  function saveCachedDashboard(
+    wallet: string,
+    nextIdentity: IdentityRecord,
+    nextAttestations: Attestation[],
+    nextTrustGraph: TrustGraph | null,
+    nextScoreMeta: ScoreLookupResponse | null,
+    nextTrustGraphObservedAt: string | null
+  ) {
     try {
       const previousReal = readLastRealDashboard(wallet);
-      if (previousReal && isBaselineScore(nextScoreMeta ?? nextIdentity)) {
+      const preservePreviousRealScore = Boolean(previousReal && isBaselineScore(nextScoreMeta ?? nextIdentity));
+      if (preservePreviousRealScore) {
         console.log("[arc-identity] score_merge_rejected_baseline_over_real", { wallet, reason: "cache_write_baseline_over_real" });
-        return;
       }
-      const resolvedUsername = cleanUsername(nextScoreMeta?.username) ?? cleanUsername(nextIdentity.profile.username) ?? cleanUsername(localStorage.getItem("arcIdentityUsername"));
-      const normalizedIdentity = withResolvedUsername(nextIdentity, resolvedUsername);
+      const cacheIdentity = preservePreviousRealScore ? previousReal!.identity : nextIdentity;
+      const cacheAttestations = preservePreviousRealScore ? previousReal!.attestations : nextAttestations;
+      const cacheScoreMeta = preservePreviousRealScore ? previousReal!.scoreMeta : nextScoreMeta;
+      const resolvedUsername = cleanUsername(cacheScoreMeta?.username) ?? cleanUsername(cacheIdentity.profile.username) ?? cleanUsername(localStorage.getItem("arcIdentityUsername"));
+      const normalizedIdentity = withResolvedUsername(cacheIdentity, resolvedUsername);
       if (resolvedUsername) storeUsernameForWallet(wallet, resolvedUsername);
       if (resolvedUsername) setKnownUsername(resolvedUsername);
       const payload: CachedDashboard = {
         wallet,
         identity: normalizedIdentity,
-        attestations: nextAttestations,
+        attestations: cacheAttestations,
         trustGraph: nextTrustGraph,
-        scoreMeta: nextScoreMeta ? { ...nextScoreMeta, username: resolvedUsername ?? nextScoreMeta.username } : nextScoreMeta,
+        trustGraphObservedAt: nextTrustGraphObservedAt,
+        scoreMeta: cacheScoreMeta ? { ...cacheScoreMeta, username: resolvedUsername ?? cacheScoreMeta.username } : cacheScoreMeta,
         cachedAt: new Date().toISOString()
       };
       localStorage.setItem(cacheKey(wallet), JSON.stringify(payload));
@@ -1057,7 +1077,7 @@ export default function DashboardPage() {
       if (resolvedUsername) setKnownUsername(resolvedUsername);
       setIdentity(normalizedIdentity);
       setAttestations(selected.attestations ?? []);
-      setTrustGraph(selected.trustGraph ?? null);
+      setTrustGraphDisplay(cachedTrustGraphDisplay(selected.trustGraph, selected.trustGraphObservedAt ?? null, wallet));
       setScoreMeta(selected.scoreMeta ?? null);
       rememberDisplayedSnapshot(wallet, normalizedIdentity, selected.scoreMeta ?? null, selected.cachedAt);
       setMessage("");
@@ -1096,7 +1116,7 @@ export default function DashboardPage() {
       setKnownUsername(null);
       setIdentity(null);
       setAttestations([]);
-      setTrustGraph(null);
+      setTrustGraphDisplay(unavailableTrustGraphDisplay());
       setScoreMeta(null);
       setRefreshMessage("");
       setMessage("Connect an EVM wallet to open your identity dashboard.");
@@ -1105,6 +1125,9 @@ export default function DashboardPage() {
     }
     const requestId = loadRequestIdRef.current + 1;
     loadRequestIdRef.current = requestId;
+    setTrustGraphDisplay((current) => current.graph && current.graph.walletAddress.toLowerCase() !== wallet.toLowerCase()
+      ? unavailableTrustGraphDisplay()
+      : current);
     // Clear the previous wallet's username synchronously on a wallet switch so
     // the header never briefly wears the old identity's name.
     if (loadActiveWalletRef.current && loadActiveWalletRef.current !== wallet.toLowerCase()) setKnownUsername(null);
@@ -1157,7 +1180,7 @@ export default function DashboardPage() {
                 if (shouldApplyDashboardSnapshot(wallet, cachedIdentity, cachedScore, "ensure_failed_last_real_cache", realCached.cachedAt)) {
                   setIdentity(cachedIdentity);
                   setAttestations(realCached.attestations ?? []);
-                  setTrustGraph(realCached.trustGraph ?? null);
+                  setTrustGraphDisplay(cachedTrustGraphDisplay(realCached.trustGraph, realCached.trustGraphObservedAt ?? null, wallet));
                   setScoreMeta(cachedScore);
                   rememberDisplayedSnapshot(wallet, cachedIdentity, cachedScore, realCached.cachedAt);
                 }
@@ -1175,7 +1198,7 @@ export default function DashboardPage() {
             // using the cached username instead.
             setIdentity(null);
             setAttestations([]);
-            setTrustGraph(null);
+            setTrustGraphDisplay(unavailableTrustGraphDisplay());
             setScoreMeta(null);
             setMessage("Loading wallet intelligence...");
             if (!passiveRefresh) setRefreshMessage("Loading wallet intelligence...");
@@ -1186,7 +1209,7 @@ export default function DashboardPage() {
             setIdentity(null);
             setKnownUsername(null);
             setAttestations([]);
-            setTrustGraph(null);
+            setTrustGraphDisplay(unavailableTrustGraphDisplay());
             setScoreMeta(null);
             setLoadState("loading_cached_profile");
             setMessage(dashboardPendingMessage(true));
@@ -1212,7 +1235,7 @@ export default function DashboardPage() {
           if (!hadCachedDashboard && !realCached) {
             setIdentity(null);
             setAttestations([]);
-            setTrustGraph(null);
+            setTrustGraphDisplay(unavailableTrustGraphDisplay());
             setScoreMeta(null);
             setMessage("Loading wallet intelligence...");
             if (!passiveRefresh) setRefreshMessage("Loading wallet intelligence...");
@@ -1223,7 +1246,7 @@ export default function DashboardPage() {
             if (shouldApplyDashboardSnapshot(wallet, cachedIdentity, cachedScore, "claimed_last_real_cache", realCached.cachedAt)) {
               setIdentity(cachedIdentity);
               setAttestations(realCached.attestations ?? []);
-              setTrustGraph(realCached.trustGraph ?? null);
+              setTrustGraphDisplay(cachedTrustGraphDisplay(realCached.trustGraph, realCached.trustGraphObservedAt ?? null, wallet));
               setScoreMeta(cachedScore);
               rememberDisplayedSnapshot(wallet, cachedIdentity, cachedScore, realCached.cachedAt);
             }
@@ -1253,7 +1276,7 @@ export default function DashboardPage() {
             if (waitingForFirstIndex && indexingPollRef.current.attempts < INDEXING_POLL_MAX_ATTEMPTS) {
               setIdentity(null);
               setAttestations([]);
-              setTrustGraph(null);
+              setTrustGraphDisplay(unavailableTrustGraphDisplay());
               setScoreMeta(null);
               setMessage("Setting up your identity. Running your first wallet index...");
               if (!passiveRefresh) setRefreshMessage("Setting up your identity. Running your first wallet index...");
@@ -1295,7 +1318,7 @@ export default function DashboardPage() {
               if (shouldApplyDashboardSnapshot(wallet, cachedIdentity, cachedScore, "profile_failed_last_real_cache", realCached.cachedAt)) {
                 setIdentity(cachedIdentity);
                 setAttestations(realCached.attestations ?? []);
-                setTrustGraph(realCached.trustGraph ?? null);
+                setTrustGraphDisplay(cachedTrustGraphDisplay(realCached.trustGraph, realCached.trustGraphObservedAt ?? null, wallet));
                 setScoreMeta(cachedScore);
                 rememberDisplayedSnapshot(wallet, cachedIdentity, cachedScore, realCached.cachedAt);
               }
@@ -1303,7 +1326,7 @@ export default function DashboardPage() {
             } else {
               setIdentity(null);
               setAttestations([]);
-              setTrustGraph(null);
+              setTrustGraphDisplay(unavailableTrustGraphDisplay());
               setScoreMeta(null);
             }
             setMessage(realCached ? "" : "Loading wallet intelligence...");
@@ -1319,7 +1342,7 @@ export default function DashboardPage() {
           setIdentity(null);
           setKnownUsername(null);
           setAttestations([]);
-          setTrustGraph(null);
+          setTrustGraphDisplay(unavailableTrustGraphDisplay());
           setScoreMeta(null);
           setLoadState("new_wallet_no_data");
           setMessage("Complete your identity to unlock wallet intelligence.");
@@ -1395,6 +1418,20 @@ export default function DashboardPage() {
       if (refreshed.walletAddress && refreshed.walletAddress.toLowerCase() !== wallet.toLowerCase()) {
         throw new Error("Refresh result wallet mismatch");
       }
+      const refreshedTrustGraph = await fetchJsonWithTimeout<TrustGraph>(`/api/trust/${wallet}?t=${Date.now()}`, {
+        headers: { "Cache-Control": "no-store" }
+      }, 12000).catch((trustError) => {
+        console.warn("[arc-identity] dashboard_trust_graph_refresh_failed", {
+          wallet,
+          error: trustError instanceof Error ? trustError.message : "Unknown error"
+        });
+        return null;
+      });
+      if (!isCurrentRefresh(requestId, wallet)) {
+        console.log("[arc-identity] dashboard_manual_refresh_stale_response_ignored", { wallet, requestId, latestRequestId: refreshRequestIdRef.current, stage: "trust_graph" });
+        return;
+      }
+      const refreshedTrustGraphDisplay = resolveTrustGraphRefresh(refreshedTrustGraph, trustGraphDisplay, wallet);
       const canonicalUsername = cleanUsername(refreshed.username) ?? cleanUsername(identity?.profile.username) ?? cleanUsername(getTrustedCachedUsername(wallet));
       const nextScoreMeta = canonicalUsername ? { ...refreshed, username: canonicalUsername } : refreshed;
       if (canonicalUsername) storeUsernameForWallet(wallet, canonicalUsername);
@@ -1422,8 +1459,16 @@ export default function DashboardPage() {
       const appliedIdentity = applyScoreMeta(withResolvedUsername(base, canonicalUsername), appliedScore);
       setIdentity(appliedIdentity);
       setScoreMeta(appliedScore);
+      setTrustGraphDisplay(refreshedTrustGraphDisplay);
       rememberDisplayedSnapshot(wallet, appliedIdentity, appliedScore);
-      saveCachedDashboard(wallet, appliedIdentity, attestations, trustGraph, appliedScore);
+      saveCachedDashboard(
+        wallet,
+        appliedIdentity,
+        attestations,
+        refreshedTrustGraphDisplay.graph,
+        appliedScore,
+        refreshedTrustGraphDisplay.observedAt
+      );
       setLoadState("ready");
       const intelligenceState = deriveIntelligenceState({
         walletConnected: true,
@@ -1432,7 +1477,10 @@ export default function DashboardPage() {
         score: appliedScore,
         chains: appliedScore?.indexedChains
       });
-      setRefreshMessage(refreshCompletionMessage(intelligenceState));
+      const completionMessage = refreshCompletionMessage(intelligenceState);
+      setRefreshMessage(refreshedTrustGraphDisplay.source === "cached"
+        ? `${completionMessage} Trust graph refresh failed; cached relationships are labeled below.`
+        : completionMessage);
       console.log("[arc-identity] dashboard_manual_refresh_completed", { wallet, requestId, state: intelligenceState });
     } catch (refreshError) {
       if (isCurrentRefresh(requestId, wallet)) {
@@ -1599,7 +1647,44 @@ export default function DashboardPage() {
             </div>
             <div className="grid gap-8 xl:grid-cols-[1.4fr_0.8fr] xl:items-start">
               <div className="grid gap-8">
-                <TrustGraphCard graph={trustGraph} />
+                <InteractionGraphLiveCard
+                  wallet={identity.profile.walletAddress}
+                  peerEdges={trustGraph?.peerEdges ?? null}
+                  refreshKey={(identity.multiChain?.chains ?? []).map((chain) => chain.indexedAt).join("|") || scoreMeta?.lastIndexedAt}
+                  title="Observed Interaction Graph"
+                  description="Saved onchain counterparties across indexed networks. These observations are score-neutral; verified Trust relationships appear only as a separate overlay."
+                />
+                {trustGraph && trustGraph.edges.length > 0 ? (
+                  <TrustEvidenceStrip
+                    graph={trustGraph}
+                    source={trustGraphDisplay.source}
+                    observedAt={trustGraphDisplay.observedAt}
+                  />
+                ) : (
+                  <section className="border-t border-linec pt-3">
+                    <p className="kicker">Verified attestations</p>
+                    {trustGraph ? (
+                      <div className="mt-3 border border-dashed border-linec px-5 py-5 text-center">
+                        <p className="kicker">No verified peers yet</p>
+                        {trustGraphDisplay.source === "cached" ? (
+                          <p role="status" className="mx-auto mt-3 max-w-md text-left text-xs leading-relaxed text-[#7a571f]">
+                            Cached view. Live trust verification is unavailable, so this may not reflect
+                            current relationships. Last verified {trustObservedAtLabel(trustGraphDisplay.observedAt)}.
+                          </p>
+                        ) : null}
+                        <p className="mx-auto mt-2.5 max-w-md text-sm leading-relaxed text-mutedc">
+                          Trust edges are created when an attestation backed by a real onchain transaction is verified.
+                          Attest a transaction with a counterparty you have actually transacted with to start building your network.
+                        </p>
+                        <Link href="/attestations" className="arc-button-secondary mt-4 inline-block px-4 py-2 text-xs font-bold">
+                          Submit an attestation
+                        </Link>
+                      </div>
+                    ) : (
+                      <p className="mt-3 text-sm text-mutedc">Verified Trust overlay data is not available yet.</p>
+                    )}
+                  </section>
+                )}
                 <section className="r4-panel pt-6">
                   <p className="arc-section-label">Activity + Attestations</p>
                   <div className="mt-5">

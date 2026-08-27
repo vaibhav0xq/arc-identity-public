@@ -11,6 +11,7 @@ Full refresh of the public mirror around the hosted Kyro platform.
 - The receipt share page now reads from the public v1 receipts API.
 - Local runs proxy API calls to the hosted service, so the app surface works without any server code in this repository.
 - Added the MIT license with the brand asset carve out described in the README.
+- Synced the app surface with the hosted service: a wallet network notice with one tap switch back to Ethereum, the dashboard interaction graph card and trust evidence strip, the public pricing page and the current check, landing and dashboard surfaces.
 
 ## v0.2.1 - 2026-08-09
 

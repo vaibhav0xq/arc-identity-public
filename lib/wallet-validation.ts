@@ -1,6 +1,7 @@
-/* Canonical wallet address validation, shared by every code path that
-   turns raw input into a lookup or filter value: anything that reaches
-   a query surface must first pass this shape check. */
+/* Canonical wallet address validation, shared by API routes and query
+   builders. Audit finding F-03: several trust graph queries interpolate
+   wallet strings into PostgREST .or() filters, so every value that reaches
+   a filter must first pass this shape check. */
 
 export const WALLET_ADDRESS_PATTERN = /^0x[a-f0-9]{40}$/;
 

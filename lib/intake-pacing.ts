@@ -1,11 +1,14 @@
 /* Client-side pacing model for anonymous wallet intake.
  *
- * Mirrors the server economics so the console never fires a request
+ * Mirrors the server economics (F-04) so the console never fires a request
  * it can predict will be rejected:
  * - The public limiter is a FIXED 60s window (bucket keyed by floor(now/60s)),
  *   20 weighted units per window per IP for anonymous callers.
- * - Starting an intake costs the FULL anonymous window (20 units), so
- *   anonymous indexing runs at most one new wallet per minute.
+ * - Starting an intake costs 8 of those 20 units, so anonymous indexing runs
+ *   at most two new wallets per minute — with headroom left in every window
+ *   for the 1-unit verdict reads that complete each row. (The old price, 20,
+ *   drained the whole window per start: bulk runs were serialized to one
+ *   wallet per minute and verdict reads starved behind queued starts.)
  * - A rejected request still burns its units server-side, which is exactly
  *   why doomed requests must never be fired: one bad attempt poisons the
  *   rest of its window.
@@ -20,13 +23,13 @@
  * (scripts/test-intake-pacing.mjs).
  *
  * Server constants mirrored here, verbatim sources:
- * - app/api/v1/intake/[wallet]/route.ts (INTAKE_RATE_UNITS_ANONYMOUS = 20)
+ * - app/api/v1/intake/[wallet]/route.ts (INTAKE_RATE_UNITS_ANONYMOUS = 8)
  * - lib/api-plans.ts (anonymous 20 units/min/IP)
  * If either side changes, change this file in the same commit. */
 
 export const RATE_WINDOW_MS = 60_000;
 export const ANONYMOUS_WINDOW_UNITS = 20;
-export const ANONYMOUS_INTAKE_UNITS = 20;
+export const ANONYMOUS_INTAKE_UNITS = 8;
 export const DECISION_READ_UNITS = 1;
 /* Attempts aim slightly past the window boundary so a small clock skew
    between browser and server cannot land us in the old window. */
@@ -201,7 +204,7 @@ export function parseRetryAfterSeconds(headers: { get(name: string): string | nu
 /* ------------------------------------------------------------------ */
 
 export type IntakeAttemptOutcome =
-  /* 202 started: charged the full window. */
+  /* 202 started: charged the intake price. */
   | { type: "started" }
   /* 200 already_indexed or 202 join of an active job: free, no window used. */
   | { type: "free" }

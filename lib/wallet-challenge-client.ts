@@ -1,11 +1,17 @@
-/* Browser-side half of the wallet challenge flow.
+/* Browser-side half of the wallet challenge flow (audit finding F-01).
 
    Every wallet-authenticated mutation fetches a fresh server-issued message,
    asks the wallet to sign it, and sends the pair along with the request.
    Nothing is cached: challenges are single use and expire in minutes, so
    there is nothing worth storing in localStorage anymore. */
 
-export type WalletChallengePurpose = "key-management" | "username-claim" | "profile-setup";
+export type WalletChallengePurpose =
+  | "key-management"
+  | "team-management"
+  | "username-claim"
+  | "profile-setup"
+  | "portal-login"
+  | "portal-admin-action";
 
 export type WalletChallengeSignature = {
   signature: string;
@@ -113,6 +119,14 @@ export async function signChallengeWithConnectedWallet(
   walletAddress: string,
   purpose: WalletChallengePurpose
 ): Promise<WalletChallengeSignature> {
+  const challenge = await requestWalletChallenge(walletAddress, purpose);
+  return signIssuedChallengeWithConnectedWallet(walletAddress, challenge.message);
+}
+
+export async function signIssuedChallengeWithConnectedWallet(
+  walletAddress: string,
+  message: string
+): Promise<WalletChallengeSignature> {
   const provider = await findProviderForWallet(walletAddress);
   if (!provider) {
     throw new Error("No compatible EVM wallet found. Reconnect your wallet and retry.");
@@ -125,5 +139,12 @@ export async function signChallengeWithConnectedWallet(
       /* The signing step below surfaces the real failure. */
     }
   }
-  return signWalletChallenge(provider, walletAddress, purpose);
+  const signature = await provider.request({
+    method: "personal_sign",
+    params: [message, walletAddress]
+  });
+  if (typeof signature !== "string" || !signature.startsWith("0x")) {
+    throw new Error("Wallet did not return a signature.");
+  }
+  return { signature, signatureMessage: message };
 }

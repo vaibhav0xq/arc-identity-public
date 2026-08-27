@@ -46,12 +46,12 @@ export function profileRouteFor(username?: string | null) {
   return `/profile/${canonical}`;
 }
 
-/* Boundary validation for any API input that claims to be a username.
-   This is intentionally LOOSER than the claim-time canonical rule
-   (toArcUsername: 3-30 characters): the boundary check enforces charset
-   and outer length bounds (2-64) so raw inputs carrying query
-   metacharacters, emoji or kilobyte strings are rejected before they
-   reach lookups or filter strings. Claim-time strictness is unchanged. */
+/* Boundary validation for any API input that claims to be a username
+   (audit finding F-05). This is intentionally LOOSER than the claim-time
+   canonical rule (toArcUsername: 3-30 characters): the boundary check
+   enforces charset and outer length bounds (2-64) so raw inputs carrying
+   PostgREST metacharacters, emoji or kilobyte strings are rejected before
+   they reach lookups or filter strings. Claim-time strictness is unchanged. */
 export const USERNAME_INPUT_MIN_LENGTH = 2;
 export const USERNAME_INPUT_MAX_LENGTH = 64;
 export const USERNAME_INPUT_RULE =

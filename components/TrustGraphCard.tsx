@@ -3,6 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import type { TrustEdge, TrustGraph } from "@/lib/types";
+import type { TrustGraphDisplaySource } from "@/lib/trust-graph-display";
 import { shortenAddress } from "@/lib/wallet";
 import { TrustConstellation } from "@/components/TrustConstellation";
 import { RelationshipDrawer } from "@/components/RelationshipDrawer";
@@ -23,6 +24,33 @@ function healthTone(health: string) {
 
 function peerLabel(edge: TrustEdge) {
   return edge.peerUsername ?? shortenAddress(edge.peerWallet ?? edge.targetWallet);
+}
+
+function observedAtLabel(value: string | null | undefined) {
+  if (!value) return "an earlier session";
+  const timestamp = new Date(value);
+  if (Number.isNaN(timestamp.getTime())) return "an earlier session";
+  return timestamp.toLocaleString(undefined, {
+    dateStyle: "medium",
+    timeStyle: "short"
+  });
+}
+
+function TrustGraphProvenance({
+  source,
+  observedAt
+}: {
+  source: TrustGraphDisplaySource;
+  observedAt?: string | null;
+}) {
+  if (source !== "cached") return null;
+  return (
+    <div role="status" className="mt-5 border border-limited/35 bg-limited-bg px-4 py-3 text-sm leading-relaxed text-limited">
+      <strong>Cached Verified Trust overlay.</strong>{" "}
+      Live verification is unavailable, so these relationships are not being presented as current evidence.
+      {" "}Last verified {observedAtLabel(observedAt)}.
+    </div>
+  );
 }
 
 function ProfileTooltip({ edge }: { edge: TrustEdge }) {
@@ -54,14 +82,18 @@ function PeerIdentity({ edge, className = "" }: { edge: TrustEdge; className?: s
 
 export function TrustGraphCard({
   graph,
-  title = "Trust Network",
+  title = "Verified Trust",
   description,
-  variant = "dashboard"
+  variant = "dashboard",
+  source = "live",
+  observedAt = null
 }: {
   graph?: TrustGraph | null;
   title?: string;
   description?: string;
   variant?: "dashboard" | "public";
+  source?: TrustGraphDisplaySource;
+  observedAt?: string | null;
 }) {
   const [activeEdge, setActiveEdge] = useState<TrustEdge | null>(null);
 
@@ -69,7 +101,7 @@ export function TrustGraphCard({
     return (
     <section className="r4-panel pt-6">
         <p className="arc-section-label">{title}</p>
-        <p className="mt-3 text-sm text-mutedc">Trust graph data is not available yet.</p>
+        <p className="mt-3 text-sm text-mutedc">Verified Trust overlay data is not available yet.</p>
       </section>
     );
   }
@@ -78,7 +110,8 @@ export function TrustGraphCard({
     return (
       <section className="r4-panel pt-6">
         <p className="arc-section-label">{title}</p>
-        <h2 className="mt-2.5 text-2xl font-extrabold text-ink">Transaction-verified trust graph</h2>
+        <h2 className="mt-2.5 text-2xl font-extrabold text-ink">Verified Trust overlay</h2>
+        <TrustGraphProvenance source={source} observedAt={observedAt} />
         <div className="mt-6 border border-dashed border-linec px-6 py-10 text-center sm:py-12">
           <p className="kicker">No verified peers yet</p>
           <p className="mx-auto mt-3 max-w-md text-sm leading-relaxed text-mutedc">
@@ -103,13 +136,14 @@ export function TrustGraphCard({
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <p className="arc-section-label">{title}</p>
-          <h2 className="mt-2.5 text-2xl font-extrabold text-ink">Transaction-verified trust graph</h2>
+          <h2 className="mt-2.5 text-2xl font-extrabold text-ink">Verified Trust overlay</h2>
           {description ? <p className="mt-2.5 max-w-xl text-sm leading-relaxed text-mutedc">{description}</p> : null}
         </div>
         <span className={`chip ${healthTone(graph.metrics.networkHealth)}`}><span className="dot" />
           {graph.metrics.suspicious ? "Review" : graph.metrics.networkHealth}
         </span>
       </div>
+      <TrustGraphProvenance source={source} observedAt={observedAt} />
 
       <div className="mt-8 grid gap-x-6 sm:grid-cols-5">
         {[

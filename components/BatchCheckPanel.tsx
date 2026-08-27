@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import { DECISION_MODEL_VERSION, USE_CASES, type UseCase } from "@/lib/decision-engine";
-import { USE_CASE_LABELS, shortWallet } from "@/components/VerdictReport";
+import { USE_CASE_LABELS, shortFindingLabel, shortWallet } from "@/components/VerdictReport";
 import { useWalletIntake, type IntakeStatus } from "@/components/useWalletIntake";
 import { useCountdownSeconds } from "@/components/useCountdown";
 import {
@@ -28,8 +28,9 @@ const BATCH_TIMEOUT_MS = 45_000;
 /* The web console is always anonymous; the API allows 50 rows with a key. */
 const MAX_ROWS = 10;
 /* "Index all" pacing lives in lib/intake-pacing.ts. The anonymous limiter
-   is a FIXED 60s window of 20 units and ONE intake start costs all 20, so
-   the queue starts at most one wallet per window, in table order, and never
+   is a FIXED 60s window of 20 units and one intake start costs 8, so the
+   queue starts up to two wallets per window, in table order, with headroom
+   left for the 1-unit verdict reads that complete each row — and it never
    fires a request the shared ledger predicts will be rejected (rejected
    requests still burn their units server-side). The batch pre-check is
    gated the same way: one unit per deduped row, so instead of firing into
@@ -437,7 +438,7 @@ export function BatchCheckPanel({
           </span>
           {overCap ? (
             <span className="font-mono text-[0.68rem] uppercase tracking-[0.1em] text-limited">
-              Limited to {MAX_ROWS} here — the API takes 50 with a key
+              Limited to {MAX_ROWS} here (the API takes 50 with a key)
             </span>
           ) : null}
         </div>
@@ -554,7 +555,7 @@ export function BatchCheckPanel({
                 <span className="sr-only" role="status">
                   {bulkTotal > 0
                     ? bulkActive
-                      ? `Bulk indexing: ${bulkDoneCount} of ${bulkTotal} wallets processed, one start per minute`
+                      ? `Bulk indexing: ${bulkDoneCount} of ${bulkTotal} wallets processed, up to two starts per minute`
                       : "Bulk indexing finished"
                     : ""}
                 </span>
@@ -564,7 +565,7 @@ export function BatchCheckPanel({
                     onClick={startBulkIndex}
                     disabled={bulkActive}
                     className="bt-index is-lg shrink-0"
-                    title="Indexes every no-score row. Anonymous indexing runs one wallet per minute, so each row waits its turn in the queue."
+                    title="Indexes every no-score row. Anonymous indexing runs up to two wallets per minute, so each row waits its turn in the queue."
                   >
                     {bulkActive
                       ? `Indexing ${Math.min(bulkDoneCount + 1, bulkTotal)}/${bulkTotal}...`
@@ -626,8 +627,12 @@ export function BatchCheckPanel({
                           <td>
                             {row.status === "ok" ? (
                               <span className="flex flex-wrap gap-1.5">
+                                {/* Human labels in the register; the raw code and
+                                    message live in the title attr and the CSV. */}
                                 {[...row.reasons, ...row.warnings].slice(0, 3).map((reason, chipIndex) => (
-                                  <span key={`${reason.code}-${chipIndex}`} className="code-chip">{reason.code}</span>
+                                  <span key={`${reason.code}-${chipIndex}`} className="soft-chip" title={`${reason.code}: ${reason.message}`}>
+                                    {shortFindingLabel(reason.code)}
+                                  </span>
                                 ))}
                                 {row.reasons.length + row.warnings.length > 3 ? (
                                   <span className="font-mono text-[0.68rem] text-quiet">+{row.reasons.length + row.warnings.length - 3}</span>
@@ -639,7 +644,7 @@ export function BatchCheckPanel({
                                  the full sentence, the title attr keeps it per row. */
                               <span className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                 <span className="bt-note" title={row.note ?? undefined}>
-                                  No committed snapshot
+                                  Not indexed yet
                                 </span>
                                 <RowIntake
                                   wallet={row.wallet}
@@ -668,7 +673,7 @@ export function BatchCheckPanel({
                 </table>
               </div>
               <p className="bt-foot">
-                Rows marked <span className="font-mono text-[0.8em] uppercase">no score</span> have no committed snapshot yet — Kyro
+                Rows marked <span className="font-mono text-[0.8em] uppercase">no score</span> have no committed snapshot yet. Kyro
                 reports nothing rather than guessing. Run a{" "}
                 <button type="button" className="underline underline-offset-2" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
                   single check
@@ -703,13 +708,13 @@ export function BatchCheckPanel({
             <span className="rpt-meta">up to {MAX_ROWS} rows</span>
           </div>
           <p className="flow-line">
-            <b>01</b> Paste the list — one wallet or username per line <span aria-hidden>→</span> <b>02</b> Set
-            the stakes — one use case for the whole batch <span aria-hidden>→</span> <b>03</b> Read the table —
+            <b>01</b> Paste the list: one wallet or username per line <span aria-hidden>→</span> <b>02</b> Set
+            the stakes: one use case for the whole batch <span aria-hidden>→</span> <b>03</b> Read the table:
             verdicts, limits and findings per row, exportable as CSV
           </p>
           <p className="api-line">
             Each row is the exact verdict developers get from{" "}
-            <code className="font-mono text-xs">POST /api/v1/decision/batch</code> — committed evidence only,
+            <code className="font-mono text-xs">POST /api/v1/decision/batch</code>: committed evidence only,
             never a guess. Need 50 rows a call? <Link href="/developers" className="underline underline-offset-2">Get an API key</Link>.
           </p>
         </section>
@@ -945,7 +950,7 @@ function RowIntake({
       );
     }
     return (
-      <span className={`animate-pulse ${quiet}`} title="Anonymous indexing runs one wallet per minute.">
+      <span className={`animate-pulse ${quiet}`} title="Anonymous indexing runs up to two wallets per minute.">
         paced · next attempt in {waitLabel(countdown)}
       </span>
     );
@@ -968,7 +973,7 @@ function RowIntake({
     return (
       <span
         className={`animate-pulse ${quiet}`}
-        title="Anonymous indexing runs one wallet per minute. This row starts automatically when its turn comes."
+        title="Anonymous indexing runs up to two wallets per minute. This row starts automatically when its turn comes."
       >
         queued · starts in {waitLabel(countdown)}
       </span>

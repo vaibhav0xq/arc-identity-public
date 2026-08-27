@@ -6,8 +6,9 @@
    already on screen stays visible the whole time — indexing progress is
    additive, never a blocking gate.
 
-   Anonymous pacing: starting an intake costs the FULL anonymous
-   minute window, and rejected requests still burn their units server-side.
+   Anonymous pacing (F-04): starting an intake costs 8 of the 20-unit
+   anonymous minute window (at most two starts per minute, with headroom for
+   verdict reads), and rejected requests still burn their units server-side.
    So start() consults the shared client ledger first and never fires a
    request it can predict will 429: instead it reports a paced state with
    the exact wait, and the caller shows a countdown and re-calls start()
@@ -97,9 +98,9 @@ export function useWalletIntake(onCommitted: (wallet: string) => void) {
       const run = runRef.current;
       const isCurrent = () => runRef.current === run;
 
-      /* Doomed-request gate: if this tab already spent the window (the check
-         itself costs a unit, a bulk row start costs all twenty), do not burn
-         another twenty units to be told no. Report ordinary pacing instead. */
+      /* Doomed-request gate: if this tab's window cannot afford another
+         start (two starts fill 16 of 20 units; reads take the rest), do not
+         burn more units to be told no. Report ordinary pacing instead. */
       const waitMs = anonymousBudget.msUntilAffordable(ANONYMOUS_INTAKE_UNITS);
       if (waitMs > 0) {
         const retryAfterSeconds = Math.max(1, Math.ceil(waitMs / 1000));
@@ -107,7 +108,7 @@ export function useWalletIntake(onCommitted: (wallet: string) => void) {
           status: "cooldown",
           wallet,
           stage: null,
-          message: "Anonymous indexing runs one wallet per minute.",
+          message: "Anonymous indexing runs up to two wallets per minute.",
           limitKind: "window",
           retryAfterSeconds
         });
@@ -161,7 +162,7 @@ export function useWalletIntake(onCommitted: (wallet: string) => void) {
            sentence, which says exactly what is going on and for how long. */
         const message =
           kind === "window"
-            ? "Anonymous indexing runs one wallet per minute."
+            ? "Anonymous indexing runs up to two wallets per minute."
             : serverMessage ?? `Too many requests. Retry in ${retryAfterSeconds ?? "a few"} seconds.`;
         /* A window 429 means the rejected request still burned its units;
            record it so nothing retries into the same poisoned window. The
@@ -238,7 +239,7 @@ export function useWalletIntake(onCommitted: (wallet: string) => void) {
             status: "timeout",
             wallet,
             stage: null,
-            message: "Still indexing. Re-run the check in a minute — the scan continues server-side.",
+            message: "Still indexing. Re-run the check in a minute. The scan continues server-side.",
             limitKind: null,
             retryAfterSeconds: null
           });

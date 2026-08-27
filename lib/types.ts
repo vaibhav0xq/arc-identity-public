@@ -57,6 +57,24 @@ export type ChainSnapshot = {
   historyCapped?: boolean | null;
   errorTransient?: boolean | null;
   recencyReliable?: boolean | null;
+  /* C1a: per-counterparty stats captured during indexing. Write-path only
+     until C1b; null/undefined = snapshot predates capture or the provider
+     path exposes no per-row evidence (Arc analytics, error/empty scans). */
+  counterpartyStats?: CounterpartyStat[] | null;
+};
+
+/* C1a per-counterparty interaction stats. One entry per address in the same
+   row's counterparty_addresses; persisted as jsonb, never read before C1b. */
+export type CounterpartyStat = {
+  a: string;             // counterparty address (lowercase)
+  tx: number;            // deduped tx count with the center wallet on this chain
+  in: number;            // inbound rows (counterparty -> wallet); in + out === tx
+  out: number;           // outbound rows (wallet -> counterparty)
+  first: string | null;  // ISO timestamp bounds over rows with usable timestamps
+  last: string | null;
+  vin: string;           // native value sums in wei, decimal strings (BigInt-safe;
+  vout: string;          //   token/NFT rows contribute 0 — no token valuation)
+  capped: boolean;       // chain history window capped: every count is a floor
 };
 
 export type MultiChainWalletProfile = {
@@ -69,6 +87,97 @@ export type MultiChainWalletProfile = {
   totalContractInteractions: number;
   chains: ChainSnapshot[];
 };
+
+/* Interaction Graph is a separate, score-neutral view of persisted onchain
+   counterparty snapshots. C1b: per-counterparty transaction counts, direction
+   and first/last interaction are read from persisted counterparty stats and
+   exposed as nullable node metrics — never inferred. Native value and asset
+   details remain unsupported until their own approved release. */
+export type InteractionGraphCoverageStatus = "not_indexed" | "indexing" | "complete" | "partial" | "unavailable";
+
+export type InteractionGraphNodeChain = {
+  chain: string;
+  chainId: number;
+  explorerUrl: string | null;
+};
+
+/* Merged across every chain where stats were captured. lowerBound reads
+   totals as "at least" (a counted chain hit a history cap, or some
+   contributing chains lack captured stats). basis reports how many
+   contributing chains were counted / pending capture / aggregate-only. */
+export type InteractionGraphNodeMetrics = {
+  transactionCount: { total: number; in: number; out: number };
+  firstInteractionAt: string | null;
+  lastInteractionAt: string | null;
+  lowerBound: boolean;
+  basis: { counted: number; pending: number; unavailable: number };
+};
+
+export type InteractionGraphNode = {
+  walletAddress: string;
+  username: string | null;
+  profileUrl: string | null;
+  registered: boolean;
+  verifiedKyroPeer: boolean;
+  chains: InteractionGraphNodeChain[];
+  metrics: InteractionGraphNodeMetrics | null;
+  /* C2: present only in ranked (sort=activity) responses — 1-based
+     contiguous rank for measured nodes, null for metrics-null nodes that
+     trail them. Observed activity only: never endorsement, trust, or a
+     score input. Absent entirely in default enumeration responses. */
+  rank?: number | null;
+};
+
+export type InteractionGraphCoverageChain = {
+  chain: string;
+  chainId: number;
+  status: ChainStatus;
+  counterpartyCount: number;
+  indexedAt: string;
+  source: string;
+  historyCapped: boolean | null;
+  recencyReliable: boolean | null;
+  transientIssue: boolean;
+  standingLimitation: boolean;
+};
+
+export type InteractionGraph = {
+  walletAddress: string;
+  nodes: InteractionGraphNode[];
+  summary: {
+    totalCounterparties: number;
+    returnedCounterparties: number;
+    kyroProfilesOnPage: number;
+    verifiedKyroPeers: number;
+    chainsWithCounterparties: number;
+  };
+  coverage: {
+    status: InteractionGraphCoverageStatus;
+    source: "persisted_snapshot";
+    observedAt: string | null;
+    stale: boolean;
+    indexing: boolean;
+    historyCapped: boolean;
+    hasTransientIssues: boolean;
+    hasStandingLimitations: boolean;
+    chains: InteractionGraphCoverageChain[];
+  };
+  pagination: {
+    limit: number;
+    nextCursor: string | null;
+    hasMore: boolean;
+  };
+  capabilities: {
+    perCounterpartyTransactionCount: true;
+    direction: true;
+    firstInteractionAt: true;
+    lastInteractionAt: true;
+    value: false;
+    assetDetails: false;
+  };
+  explanations: string[];
+};
+
 export type WalletActivitySnapshot = {
   id: string;
   walletAddress: string;
@@ -191,6 +300,9 @@ export type TrustGraph = {
   anomalies: TrustAnomaly[];
   reciprocalPeers: TrustEdge[];
   strongestPeers: TrustEdge[];
+  /* Verified trust edges between this wallet's peers, both endpoints are peers.
+     Optional because older snapshots and time-boxed summaries omit it. */
+  peerEdges?: TrustEdge[];
   metrics: {
     trustedPeerCount: number;
     reciprocalCount: number;

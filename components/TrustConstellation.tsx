@@ -4,6 +4,13 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { TrustEdge, TrustGraph } from "@/lib/types";
 import { shortenAddress } from "@/lib/wallet";
+import {
+  buildPeerLinks,
+  buildPeers,
+  clampWeight,
+  easeOut,
+  type PeerSpec
+} from "@/lib/trust-constellation-layout";
 
 /* Trust instrument — a live canvas observatory.
    Peers orbit the wallet on weight rings (closer = stronger). Transaction
@@ -21,12 +28,6 @@ const QUIET = "#9aa093";
 const GOLD = "#c9a25e";
 const GREEN = "#7fa98d";
 const ROSE = "#c07f72";
-
-function hashId(id: string) {
-  let h = 0;
-  for (let i = 0; i < id.length; i++) h = (h * 31 + id.charCodeAt(i)) | 0;
-  return Math.abs(h);
-}
 
 function peerLabel(edge: TrustEdge) {
   return edge.peerUsername ?? shortenAddress(edge.peerWallet ?? edge.targetWallet);
@@ -46,55 +47,6 @@ function ageLabel(value: string | null) {
   return `${days}d ago`;
 }
 
-function clampWeight(weight: number) {
-  return Number.isFinite(weight) ? Math.max(0, Math.min(100, weight)) : 0;
-}
-
-function easeOut(p: number) {
-  const t = Math.max(0, Math.min(1, p));
-  return 1 - Math.pow(1 - t, 3);
-}
-
-type Particle = { p: number; speed: number; dir: 1 | -1; size: number };
-
-type PeerSpec = {
-  edge: TrustEdge;
-  i: number;
-  baseAngle: number;
-  drift: number;
-  phase: number;
-  nodeR: number;
-  risky: boolean;
-  bow: number;
-  particles: Particle[];
-};
-
-function buildPeers(edges: TrustEdge[]): PeerSpec[] {
-  const shown = [...edges].sort((a, b) => b.trustWeight - a.trustWeight).slice(0, 8);
-  const n = shown.length;
-  return shown.map((edge, i) => {
-    const h = hashId(edge.id);
-    const jitter = (h % 17) - 8;
-    const count = Math.min(4, 1 + Math.floor(edge.interactionCount / 2));
-    return {
-      edge,
-      i,
-      baseAngle: ((-54 + (i * 360) / n + jitter) * Math.PI) / 180,
-      drift: (0.016 + (h % 7) * 0.004) * (h % 2 ? 1 : -1),
-      phase: (h % 628) / 100,
-      nodeR: 14 + Math.min(6, edge.interactionCount * 1.1),
-      risky: /high risk|anomaly|suspicious/i.test(edge.peerRiskLevel ?? ""),
-      bow: (h % 2 ? 1 : -1) * (0.09 + (h % 5) * 0.02),
-      particles: Array.from({ length: count }, (_, k) => ({
-        p: (((h >> (k + 1)) % 97) / 97 + k / count) % 1,
-        speed: 0.09 + (clampWeight(edge.trustWeight) / 100) * 0.14 + k * 0.015,
-        dir: (edge.reciprocal && k % 2 === 1 ? -1 : 1) as 1 | -1,
-        size: 1.5 + ((h >> k) % 3) * 0.5
-      }))
-    };
-  });
-}
-
 /* Per-peer mutable animation state (lerped every frame). */
 type PeerAnim = { x: number; y: number; angle: number; scale: number; alpha: number; lastPing: number };
 type Ripple = { x: number; y: number; born: number; max: number; color: string };
@@ -108,6 +60,12 @@ export function TrustConstellation({ graph, onOpen }: { graph: TrustGraph; onOpe
     .join("|");
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const peers = useMemo(() => buildPeers(graph.edges), [edgesKey]);
+  // Same trick for the peer-to-peer threads: key on data, not array identity.
+  const peerEdgesKey = (graph.peerEdges ?? [])
+    .map((e) => `${e.id}:${e.sharedCounterpartyCount}:${e.trustWeight}`)
+    .join("|");
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const peerLinks = useMemo(() => buildPeerLinks(graph.peerEdges ?? [], peers), [peerEdgesKey, peers]);
   const [hovered, setHovered] = useState<string | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   // Remembers the last peer the user pointed at so the readout does not
@@ -380,6 +338,49 @@ export function TrustConstellation({ graph, onOpen }: { graph: TrustGraph; onOpe
             ctx.lineWidth = 2;
             ctx.stroke();
           }
+        }
+      }
+
+      /* peer-to-peer threads — verified bonds between the peers themselves,
+         drawn beneath the ribbons so the circle reads as a real network */
+      if (peerLinks.length > 0) {
+        const peerById = new Map(peers.map((peer) => [peer.edge.id, peer]));
+        const maxShared = Math.max(1, ...peerLinks.map((link) => link.shared));
+        for (const link of peerLinks) {
+          const peerA = peerById.get(link.aId);
+          const peerB = peerById.get(link.bId);
+          if (!peerA || !peerB) continue;
+          const a = animRef.current.get(link.aId);
+          const b = animRef.current.get(link.bId);
+          if (!a || !b) continue;
+          const enterA = reduce ? 1 : easeOut((t - 0.18 - peerA.i * 0.1) / 0.55);
+          const enterB = reduce ? 1 : easeOut((t - 0.18 - peerB.i * 0.1) / 0.55);
+          const enter = Math.min(enterA, enterB);
+          if (enter <= 0.01) continue;
+          const dx = b.x - a.x;
+          const dy = b.y - a.y;
+          const dist = Math.hypot(dx, dy) || 1;
+          /* Nodes basically touching: a thread would just smear the glow. */
+          if (dist < peerA.nodeR + peerB.nodeR + 18) continue;
+          const ux = dx / dist;
+          const uy = dy / dist;
+          const x1 = a.x + ux * (peerA.nodeR + 6);
+          const y1 = a.y + uy * (peerA.nodeR + 6);
+          const x2 = b.x - ux * (peerB.nodeR + 6);
+          const y2 = b.y - uy * (peerB.nodeR + 6);
+          const strength = link.shared / maxShared;
+          const touchesActive = link.aId === activeId || link.bId === activeId;
+          let alpha = (0.05 + strength * 0.09) * Math.min(a.alpha, b.alpha) * enter;
+          if (touchesActive) alpha = (0.24 + strength * 0.14) * enter;
+          else if (dimming) alpha *= 0.35;
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.strokeStyle = touchesActive
+            ? `rgba(201,162,94,${alpha.toFixed(3)})`
+            : `rgba(242,238,227,${alpha.toFixed(3)})`;
+          ctx.lineWidth = 0.6 + strength * 1.8 + (touchesActive ? 0.4 : 0);
+          ctx.stroke();
         }
       }
 
@@ -754,6 +755,9 @@ export function TrustConstellation({ graph, onOpen }: { graph: TrustGraph; onOpe
       ctx.textAlign = "left";
       ctx.font = mono(9.5);
       ctx.fillStyle = QUIET;
+      if (peerLinks.length > 0) {
+        ctx.fillText("─ thread = verified bond between two peers · thicker = more shared counterparties", 16, H - 27);
+      }
       ctx.fillText("▰ ribbon = verified bond   ◠ gauge + bar = weight   ● comets = interactions   ⌒ wake = orbit", 16, H - 14);
     }
 
@@ -780,7 +784,7 @@ export function TrustConstellation({ graph, onOpen }: { graph: TrustGraph; onOpe
       ro.disconnect();
       redrawRef.current = null;
     };
-  }, [peers]);
+  }, [peers, peerLinks]);
 
   if (peers.length === 0) return null;
 

@@ -42,20 +42,23 @@ export function StatsSection() {
     };
   }, []);
 
-  const primary: Array<[string, string]> = [
-    ["Chain snapshots indexed", formatCount(stats?.chainSnapshotsIndexed)],
-    ["Score snapshots computed", formatCount(stats?.scoreSnapshotsComputed)],
-    ["Identities indexed", formatCount(stats?.identitiesIndexed)],
-    ["Verified attestations", formatCount(stats?.verifiedAttestations)]
+  /* Zero is a deliberate display state, not an accident: young counters keep
+     their honest 0 and carry a "counting from launch" annotation so the page
+     never reads as broken or padded. Raw values flow to render untouched. */
+  const primary: Array<[string, unknown]> = [
+    ["Chain snapshots indexed", stats?.chainSnapshotsIndexed],
+    ["Score snapshots computed", stats?.scoreSnapshotsComputed],
+    ["Identities indexed", stats?.identitiesIndexed],
+    ["Verified attestations", stats?.verifiedAttestations]
   ];
 
-  const secondary: Array<[string, string, string]> = [
-    ["Trust edges", "Directed, transaction-backed relationships", formatCount(stats?.trustEdges)],
-    ["API keys created", "Lifetime total, including revoked", formatCount(stats?.apiKeysCreated)],
-    ["Indexed chains", "Distinct networks with indexed activity", formatCount(stats?.indexedChains)],
-    ["Latest indexed activity", "Most recent committed snapshot", formatTimestamp(stats?.latestIndexedAt)],
-    ["API lookups served", "v1 score, profile and trust reads, counted from launch", formatCount(stats?.apiLookupsServed)],
-    ["Decision checks generated", "Allow / caution / block verdicts, counted from launch", formatCount(stats?.decisionChecksGenerated)]
+  const secondary: Array<[string, string, unknown, "count" | "time"]> = [
+    ["Trust edges", "Directed, transaction-backed relationships", stats?.trustEdges, "count"],
+    ["API keys created", "Lifetime total, including revoked", stats?.apiKeysCreated, "count"],
+    ["Indexed chains", "Distinct networks with indexed activity", stats?.indexedChains, "count"],
+    ["Latest indexed activity", "Most recent committed snapshot", stats?.latestIndexedAt, "time"],
+    ["API lookups served", "v1 score, profile and trust reads, counted from launch", stats?.apiLookupsServed, "count"],
+    ["Decision checks generated", "Allow / caution / block verdicts, counted from launch", stats?.decisionChecksGenerated, "count"]
   ];
 
   return (
@@ -66,22 +69,29 @@ export function StatsSection() {
       </div>
       <div className="credential-plate mt-10 min-w-0" data-cascade>
         <div className="grid gap-x-8 gap-y-8 sm:grid-cols-2 lg:grid-cols-4">
-          {primary.map(([label, value]) => (
+          {primary.map(([label, raw]) => (
             <div key={label} className="min-w-0">
               <p className="font-mono text-[0.62rem] uppercase tracking-[0.15em] text-quiet">{label}</p>
-              <p className="mt-2 font-heading text-5xl font-semibold text-bone">{value}</p>
+              <p className="mt-2 font-heading text-5xl font-semibold text-bone">{formatCount(raw)}</p>
+              {raw === 0 ? (
+                <p className="mt-2 font-mono text-[0.58rem] uppercase tracking-[0.14em] text-quiet">Counting from launch</p>
+              ) : null}
             </div>
           ))}
         </div>
         <div className="plate-line mt-8" aria-hidden="true" />
         <div className="mt-4 grid gap-x-10 lg:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          {secondary.map(([label, detail, value]) => (
+          {secondary.map(([label, detail, raw, kind]) => (
             <div key={label} className="flex items-baseline justify-between gap-4 border-b border-white/10 py-3">
               <span className="min-w-0">
                 <b className="block font-medium text-bone">{label}</b>
                 <small className="text-quiet">{detail}</small>
               </span>
-              <span className="shrink-0 font-mono text-sm text-bone">{value}</span>
+              {raw === 0 ? (
+                <span className="shrink-0 font-mono text-sm text-quiet">0 · counting from launch</span>
+              ) : (
+                <span className="shrink-0 font-mono text-sm text-bone">{kind === "time" ? formatTimestamp(raw) : formatCount(raw)}</span>
+              )}
             </div>
           ))}
         </div>

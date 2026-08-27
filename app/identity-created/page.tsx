@@ -134,7 +134,7 @@ export default function IdentityCreatedPage() {
       let nextUsername = initialUsername;
       let nextScore: ScoreLookupResponse | null = null;
 
-      /* Wallet-only ensure: a pure read, no signature required. */
+      /* Wallet-only ensure: a pure read since F-01, no signature required. */
       const ensurePromise = wallet
         ? fetchJsonWithTimeout<ProfileEnsureResponse>("/api/profile/ensure", {
             method: "POST",

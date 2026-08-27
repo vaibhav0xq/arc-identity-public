@@ -579,9 +579,9 @@ export function KyroCheckClient() {
           {intake.state.status === "idle" || intake.state.wallet !== noScoreWallet ? (
             <>
               <p className="mt-4 max-w-2xl text-[0.95rem] leading-7" style={{ color: "#b8bdb2" }}>
-                Kyro has never indexed this wallet, so there is no verdict to give. Index it now — a first
+                Kyro has never indexed this wallet, so there is no verdict to give. Index it now: a first
                 scan across 6 chains takes about a minute, then the check re-runs automatically on committed
-                evidence. Anonymous indexing runs one wallet per minute, so the start may wait for the next
+                evidence. Anonymous indexing runs up to two wallets per minute, so the start may wait for the next
                 open slot. The wallet&apos;s owner is not involved.
               </p>
               <div className="mt-5">
@@ -626,7 +626,7 @@ export function KyroCheckClient() {
                 {pacedCountdown !== null && pacedCountdown > 0 ? `Indexing starts in ${pacedCountdown}s` : "Indexing starts shortly"}
               </p>
               <p className="mt-3 max-w-2xl text-[0.9rem] leading-6" style={{ color: "#b8bdb2" }}>
-                Anonymous indexing runs one wallet per minute. This wallet is next in line and starts
+                Anonymous indexing runs up to two wallets per minute. This wallet is next in line and starts
                 automatically, no retry needed.
               </p>
             </div>
@@ -645,7 +645,7 @@ export function KyroCheckClient() {
           <div className="plate-meta">
             <span>POST /api/v1/intake</span>
             <span>first index ~1 min</span>
-            <span>one anonymous start per minute</span>
+            <span>up to two anonymous starts per minute</span>
             <span>owner not involved</span>
           </div>
         </section>
@@ -684,13 +684,13 @@ export function KyroCheckClient() {
                   {intake.state.status === "idle" || intake.state.wallet !== result.wallet ? (
                     <>
                       <div className="wbn-text">
-                        <p className="wbn-kicker">Unindexed wallet — verdict is a baseline</p>
+                        <p className="wbn-kicker">Unindexed wallet: verdict is a baseline</p>
                         <p className="wbn-body">
                           Kyro has never indexed this wallet, so this verdict leans conservative rather
                           than reflecting observed history. A first scan across 6 chains takes about a
                           minute, then the verdict re-runs automatically on committed evidence. Anonymous
-                          indexing runs one wallet per minute, so the start may wait for the next open
-                          slot. The wallet&apos;s owner is not involved.
+                          indexing runs up to two wallets per minute, so the start may wait for the
+                          next open slot. The wallet&apos;s owner is not involved.
                         </p>
                       </div>
                       <button type="button" onClick={() => intake.start(result.wallet)} className="wbn-btn">
@@ -701,8 +701,8 @@ export function KyroCheckClient() {
                   {intake.state.wallet === result.wallet &&
                   (intake.state.status === "starting" || intake.state.status === "indexing") ? (
                     <p className="wbn-status animate-pulse" aria-live="polite">
-                      Indexing{intake.state.stage ? ` · ${intake.state.stage}` : "..."} — the verdict
-                      re-runs automatically when the scan commits.
+                      Indexing{intake.state.stage ? ` · ${intake.state.stage}` : "..."} (the verdict
+                      re-runs automatically when the scan commits)
                     </p>
                   ) : null}
                   {intake.state.wallet === result.wallet && intake.state.status === "committed" ? (
@@ -730,8 +730,8 @@ export function KyroCheckClient() {
                   intake.state.limitKind === "window" ? (
                     <p className="wbn-status animate-pulse" aria-live="polite">
                       {pacedCountdown !== null && pacedCountdown > 0
-                        ? `Indexing starts in ${pacedCountdown}s. Anonymous indexing runs one wallet per minute.`
-                        : "Indexing starts shortly. Anonymous indexing runs one wallet per minute."}
+                        ? `Indexing starts in ${pacedCountdown}s. Anonymous indexing runs up to two wallets per minute.`
+                        : "Indexing starts shortly. Anonymous indexing runs up to two wallets per minute."}
                     </p>
                   ) : null}
                   {intake.state.wallet === result.wallet &&
@@ -788,7 +788,7 @@ export function KyroCheckClient() {
                         </button>
                       </div>
                       <p className="rail-note">
-                        Mint an immutable snapshot of this verdict and share it as a link — proof of what
+                        Mint an immutable snapshot of this verdict and share it as a link: proof of what
                         Kyro said and when.
                       </p>
                     </>
@@ -842,11 +842,11 @@ export function KyroCheckClient() {
             </div>
           </div>
           <p className="flow-line">
-            <b>01</b> Identify — wallet or username <span aria-hidden>→</span> <b>02</b> Set the stakes — pick
-            the use case <span aria-hidden>→</span> <b>03</b> Read the verdict — with every finding behind it
+            <b>01</b> Identify: wallet or username <span aria-hidden>→</span> <b>02</b> Set the stakes: pick
+            the use case <span aria-hidden>→</span> <b>03</b> Read the verdict: with every finding behind it
           </p>
           <p className="api-line">
-            Kyro checks reputation before payments, escrow, lending or marketplace deals — the same verdict
+            Kyro checks reputation before payments, escrow, lending or marketplace deals: the same verdict
             developers get from <code className="font-mono text-xs">GET /api/v1/decision/:wallet</code>.
           </p>
         </section>

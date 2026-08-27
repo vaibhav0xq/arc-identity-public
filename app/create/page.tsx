@@ -137,7 +137,7 @@ export default function CreateProfilePage() {
 
   const checkExistingIdentity = useCallback(async (wallet: string, showFailureNote = false) => {
     if (onboardingCompleteRef.current) return;
-    /* Wallet-only lookup: ensure without credentials is a pure
+    /* Wallet-only lookup since F-01: ensure without credentials is a pure
        read, so no signature is needed to check for an existing identity. */
     const lookupKey = wallet ? wallet.toLowerCase() : "";
     if (!wallet) {
@@ -309,7 +309,7 @@ export default function CreateProfilePage() {
     console.log("[arc-identity] username_claim_started", { wallet, username: usernameValue });
 
     try {
-      /* Claims sign a fresh single-use challenge at submit time.
+      /* F-01: claims sign a fresh single-use challenge at submit time.
          Signatures are never read from or written to localStorage. */
       const credentials = await signChallengeWithConnectedWallet(wallet, "username-claim");
       setSuccess("Creating your identity...");

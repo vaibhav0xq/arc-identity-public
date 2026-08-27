@@ -7,7 +7,9 @@ import {
   EvidenceSection,
   FindingsSection,
   VERDICT_META,
+  buildVerdictSummary,
   formatUtc,
+  relativeAge,
   shortWallet,
   useCaseLabel,
   type SnapshotLike
@@ -102,7 +104,9 @@ export function DecisionWorkbench({
           <h2 id="check-verdict" className="rail-verdict" style={{ color: verdict.tint }}>
             {verdict.label}
           </h2>
-          <p className="rail-sub">{verdict.subline}</p>
+          {/* The answer in words — what decided it and what the limit means.
+              Nobody should have to assemble this from the finding rows. */}
+          <p className="rail-sub">{buildVerdictSummary(result)}</p>
           <dl className="rail-stats">
             <div className="rail-stat">
               <dt>Recommended limit</dt>
@@ -111,21 +115,20 @@ export function DecisionWorkbench({
               </dd>
             </div>
             <div className="rail-stat">
-              <dt>Risk level</dt>
-              <dd>{result.riskLevel ?? "Unknown"}</dd>
-            </div>
-            <div className="rail-stat">
               <dt>Identity score</dt>
-              <dd>{result.score ?? "N/A"}</dd>
-            </div>
-            <div className="rail-stat">
-              <dt>Advisories</dt>
-              <dd>{String(advisories).padStart(2, "0")}</dd>
+              <dd>
+                {result.score ?? "N/A"}
+                {result.score !== null ? (
+                  <span> / 100{result.riskLevel ? ` · ${result.riskLevel}` : ""}</span>
+                ) : null}
+              </dd>
             </div>
             <div className="rail-stat">
               <dt>Freshness</dt>
               <dd className="small">
-                {result.freshness.cacheStatus ?? "unknown"}
+                {result.freshness.cacheStatus === "cached" && result.freshness.lastIndexedAt
+                  ? `checked ${relativeAge(result.freshness.lastIndexedAt)}`
+                  : (result.freshness.cacheStatus ?? "unknown")}
                 {result.freshness.refreshRecommended ? " · refresh advised" : ""}
               </dd>
             </div>
@@ -187,6 +190,8 @@ export function DecisionWorkbench({
             sectionId="check-reasons-title"
             reasons={result.reasons}
             warnings={result.warnings ?? []}
+            groupAdvisories
+            compact
           />
         </div>
 
@@ -265,7 +270,7 @@ export function DecisionWorkbench({
               </div>
             </dl>
             <p className="api-line mt-4">
-              Live read from <code className="font-mono text-xs">GET /api/v1/decision/:wallet</code> — the same verdict
+              Live read from <code className="font-mono text-xs">GET /api/v1/decision/:wallet</code>, the same verdict
               the API returns.
             </p>
           </section>

@@ -2,10 +2,12 @@
 
 import Link from "next/link";
 import Image from "next/image";
+import { useEffect, useRef, useState } from "react";
 import { usePathname } from "next/navigation";
 import { ProfileNavButton } from "@/components/ProfileNavButton";
 import { ReportIssueLink } from "@/components/ReportIssueLink";
 import { WalletConnectButton } from "@/components/WalletConnectButton";
+import { WalletNetworkNotice } from "@/components/WalletNetworkNotice";
 
 const toolsNav: Array<[string, string]> = [
   ["Counterparty Check", "/check"]
@@ -25,6 +27,7 @@ const developersNav: Array<[string, string]> = [
 const marketingNav: Array<[string, string]> = [
   ["Counterparty Check", "/check"],
   ["Directory", "/directory"],
+  ["Pricing", "/pricing"],
   ["Docs", "https://docs.thekyro.co"],
   ["Developer API", "/developers"]
 ];
@@ -61,13 +64,80 @@ function stayPut(active: boolean) {
   };
 }
 
+/**
+ * Horizontally scrollable mobile tab strip with edge-fade affordances.
+ * - Fades appear only when there is actually more content in that direction,
+ *   so tabs never look silently clipped.
+ * - On mount, the active tab is scrolled into view instead of parking
+ *   off the right edge.
+ */
+function MobileTabNav({
+  children,
+  navClassName,
+  wrapClassName = "",
+  ariaLabel
+}: {
+  children: React.ReactNode;
+  navClassName: string;
+  wrapClassName?: string;
+  ariaLabel: string;
+}) {
+  const scrollerRef = useRef<HTMLElement>(null);
+  const [edges, setEdges] = useState({ left: false, right: false });
+
+  useEffect(() => {
+    const el = scrollerRef.current;
+    if (!el) return;
+    const update = () => {
+      const max = el.scrollWidth - el.clientWidth;
+      setEdges((previous) => {
+        const next = { left: el.scrollLeft > 6, right: el.scrollLeft < max - 6 };
+        return previous.left === next.left && previous.right === next.right ? previous : next;
+      });
+    };
+    // Land with the active tab visible instead of clipped off the right edge.
+    const active = el.querySelector<HTMLElement>('[aria-current="page"]');
+    if (active) {
+      const target = active.offsetLeft - (el.clientWidth - active.offsetWidth) / 2;
+      el.scrollLeft = Math.max(0, Math.min(target, el.scrollWidth - el.clientWidth));
+    }
+    update();
+    el.addEventListener("scroll", update, { passive: true });
+    window.addEventListener("resize", update);
+    return () => {
+      el.removeEventListener("scroll", update);
+      window.removeEventListener("resize", update);
+    };
+  }, []);
+
+  return (
+    <div className={`relative min-w-0 ${wrapClassName}`}>
+      <nav
+        ref={scrollerRef}
+        aria-label={ariaLabel}
+        className={`arc-mobile-nav flex min-w-0 gap-1.5 overflow-x-auto ${navClassName}`}
+      >
+        {children}
+      </nav>
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-0 left-0 w-8 bg-gradient-to-r from-paper to-transparent transition-opacity duration-200 ${edges.left ? "opacity-100" : "opacity-0"}`}
+      />
+      <div
+        aria-hidden="true"
+        className={`pointer-events-none absolute inset-y-0 right-0 w-8 bg-gradient-to-l from-paper to-transparent transition-opacity duration-200 ${edges.right ? "opacity-100" : "opacity-0"}`}
+      />
+    </div>
+  );
+}
+
 function MarketingShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const isCurrent = (href: string) => pathname === href;
 
   return (
     <main className="arc4 relative min-h-screen w-full max-w-full bg-paper text-ink">
-      <header className="relative z-40 border-b border-linec bg-paper/95 backdrop-blur-sm md:sticky md:top-0">
+      <header className="relative z-40 border-b border-linec bg-paper md:sticky md:top-0">
         <div className="flex min-h-[64px] w-full items-center justify-between gap-3 px-4 py-2.5 sm:px-6 lg:px-[clamp(24px,3vw,56px)]">
           <div className="flex min-w-0 items-center gap-3">
             <Wordmark />
@@ -108,7 +178,11 @@ function MarketingShell({ children }: { children: React.ReactNode }) {
             <WalletConnectButton compact />
           </div>
         </div>
-        <nav className="arc-mobile-nav -mx-1 flex w-[calc(100%+0.5rem)] min-w-0 gap-1.5 overflow-x-auto px-4 pb-2 text-[0.8rem] font-medium text-mutedc sm:px-6 lg:hidden">
+        <MobileTabNav
+          ariaLabel="Primary"
+          wrapClassName="lg:hidden"
+          navClassName="px-4 pb-2 text-[0.8rem] font-medium text-mutedc sm:px-6"
+        >
           {marketingNav.map(([label, href]) =>
             href.startsWith("http") ? (
               <a
@@ -135,8 +209,9 @@ function MarketingShell({ children }: { children: React.ReactNode }) {
             )
           )}
           <ReportIssueLink className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-[#d9c9a4] bg-[#f0e3c8]/60 px-3 py-2 text-center text-limited transition-colors duration-150 hover:bg-[#f0e3c8]" />
-        </nav>
+        </MobileTabNav>
       </header>
+      <WalletNetworkNotice />
       <div className="page-enter relative z-10 w-full">{children}</div>
     </main>
   );
@@ -218,7 +293,7 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
         </header>
 
         {/* Mobile header */}
-        <header className="relative z-40 border-b border-linec bg-paper/95 backdrop-blur-sm lg:hidden">
+        <header className="relative z-40 border-b border-linec bg-paper lg:hidden">
           <div className="grid w-full gap-2 px-3 py-2.5 sm:px-6">
             <div className="flex min-w-0 items-center justify-between gap-3">
               <div className="flex min-w-0 items-center gap-2">
@@ -228,7 +303,11 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
                 </span>
               </div>
             </div>
-            <nav className="arc-mobile-nav -mx-1 flex w-[calc(100%+0.5rem)] min-w-0 gap-1.5 overflow-x-auto px-1 pb-1 text-[0.8rem] font-medium text-mutedc">
+            <MobileTabNav
+              ariaLabel="Workspace"
+              wrapClassName="-mx-1 w-[calc(100%+0.5rem)]"
+              navClassName="px-1 pb-1 text-[0.8rem] font-medium text-mutedc"
+            >
               {[...consoleNav, ...toolsNav, ...developersNav].map(([label, href]) =>
                 href.startsWith("http") ? (
                   <a
@@ -255,13 +334,15 @@ export function ArcShell({ children, variant = "console" }: ArcShellProps) {
                 )
               )}
               <ReportIssueLink className="min-w-fit shrink-0 whitespace-nowrap rounded-[2px] border border-[#d9c9a4] bg-[#f0e3c8]/60 px-3 py-2 text-center text-limited transition-colors duration-150 hover:bg-[#f0e3c8]" />
-            </nav>
+            </MobileTabNav>
             <div className="grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1fr)_auto]">
               <ProfileNavButton />
               <WalletConnectButton compact />
             </div>
           </div>
         </header>
+
+        <WalletNetworkNotice />
 
         <div className="page-enter relative z-10 mx-auto flex w-full max-w-[1500px] flex-1 flex-col px-3 pb-[max(1.5rem,env(safe-area-inset-bottom))] pt-4 sm:px-6 sm:py-6 lg:px-8 lg:pt-8">
           {children}

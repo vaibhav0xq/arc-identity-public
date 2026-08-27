@@ -10,7 +10,7 @@ export const metadata: Metadata = {
     "Decision API. Pre-transaction decisions powered by wallet intelligence and reputation evidence. Allow / caution / block verdicts, USDC limits, reason codes and receipts."
 };
 
-const DOCS_BASE = "https://docs.thekyro.co/docs";
+const DOCS_BASE = "https://docs.thekyro.co";
 
 const coreEndpoints: {
   method: "GET" | "POST";
@@ -41,6 +41,12 @@ const coreEndpoints: {
     path: "/api/v1/trust/:wallet",
     purpose: "Verified trust graph for a wallet: transaction-backed relationship edges and graph metrics.",
     docs: `${DOCS_BASE}/api-reference/getTrustGraph`
+  },
+  {
+    method: "GET",
+    path: "/api/v1/interaction-graph/:wallet",
+    purpose: "Observed onchain counterparties from saved snapshots, separate from verified trust and score.",
+    docs: `${DOCS_BASE}/api-reference/getInteractionGraph`
   },
   {
     method: "GET",
@@ -174,7 +180,7 @@ export default function DevelopersPage() {
           </div>
           <div className="mt-6 flex flex-wrap gap-3">
             <a
-              href="https://docs.thekyro.co/docs"
+              href="https://docs.thekyro.co"
               target="_blank"
               rel="noopener noreferrer"
               className="border-2 border-ink bg-ink px-4 py-2.5 text-sm font-bold text-bone transition hover:bg-[#3a3e3a]"
@@ -189,6 +195,9 @@ export default function DevelopersPage() {
             </a>
             <Link href="/check" className="border border-linec bg-bone px-4 py-2.5 text-sm font-bold text-ink transition hover:border-ink">
               Counterparty Check (no code)
+            </Link>
+            <Link href="/pricing" className="border border-linec bg-bone px-4 py-2.5 text-sm font-bold text-ink transition hover:border-ink">
+              View pricing
             </Link>
           </div>
         </header>

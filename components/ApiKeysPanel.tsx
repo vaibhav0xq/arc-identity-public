@@ -280,7 +280,7 @@ export function ApiKeysPanel() {
                     <span className="font-mono text-[0.65rem] text-quiet">{activeKeys.length} active</span>
                   </div>
                   {activeKeys.length === 0 ? (
-                    <p className="mt-4 text-sm text-mutedc">No active keys yet. Create one to unlock 120 requests per minute.</p>
+                    <p className="mt-4 text-sm text-mutedc">No active keys yet. Create one to unlock 120 units per minute.</p>
                   ) : (
                     activeKeys.map((key) => (
                       <div className="ledger-row" key={key.id}>

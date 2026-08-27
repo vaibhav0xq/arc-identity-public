@@ -9,7 +9,7 @@ import { ARC_GITHUB_REPO_URL, ARC_SUPPORT_EMAIL, ARC_TWITTER_URL } from "@/lib/l
 
 const evidence = [
   ["01", "Transaction pattern", "Consistent settlement rhythm", "verified"],
-  ["02", "Trust graph", "Counterparty edges with context", "verified"],
+  ["02", "Verified trust", "Attestation-backed peer edges", "verified"],
   ["03", "Chain coverage", "Arc · Ethereum · Base", "active"]
 ];
 
@@ -26,9 +26,14 @@ export function LandingExperience() {
     const root = document.querySelector<HTMLElement>(".landing-cinematic");
     root?.classList.add("landing-js-ready");
     const items = root ? Array.from(root.querySelectorAll<HTMLElement>(".landing-reveal")) : [];
-    if (!("IntersectionObserver" in window)) items.forEach((item) => item.classList.add("is-visible"));
+    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+    // Reduced motion or no IntersectionObserver: reveal everything up front.
+    // Content never waits on a scroll-triggered animation (CSS keeps the
+    // no-JS path visible; this keeps the JS path in the same contract).
+    const revealUpFront = prefersReduced || !("IntersectionObserver" in window);
+    if (revealUpFront) items.forEach((item) => item.classList.add("is-visible"));
     const settleTimers: number[] = [];
-    const observer = "IntersectionObserver" in window ? new IntersectionObserver((entries, obs) => {
+    const observer = !revealUpFront ? new IntersectionObserver((entries, obs) => {
       entries.forEach((entry) => {
         if (entry.isIntersecting) {
           entry.target.classList.add("is-visible");
@@ -40,7 +45,6 @@ export function LandingExperience() {
       });
     }, { threshold: .14, rootMargin: "0px 0px -8% 0px" }) : null;
     items.forEach((item) => observer?.observe(item));
-    const prefersReduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
     // Stagger children inside each reveal section: index * delay via --rd.
     items.forEach((section) => {
       section.querySelectorAll<HTMLElement>("[data-cascade]").forEach((el, index) => {
@@ -257,8 +261,8 @@ export function LandingExperience() {
               <p>Evidence-weighted signal<br />not a volume ranking.</p>
             </div>
             <div className="instrument-graph">
-              <span className="instrument-kicker">Trust graph / edge map</span>
-              <svg viewBox="0 0 220 150" role="img" aria-label="Illustrative trust graph">
+              <span className="instrument-kicker">Verified trust / edge map</span>
+              <svg viewBox="0 0 220 150" role="img" aria-label="Illustrative verified trust overlay">
                 <path className="graph-edge edge-one" d="M28 84 L78 43 L137 70 L191 27" />
                 <path className="graph-edge edge-two" d="M78 43 L106 120 L137 70 L191 119" />
                 <circle cx="28" cy="84" r="5" /><circle cx="78" cy="43" r="6" /><circle cx="137" cy="70" r="7" /><circle cx="191" cy="27" r="4" /><circle cx="106" cy="120" r="4" /><circle cx="191" cy="119" r="5" />
@@ -295,7 +299,7 @@ export function LandingExperience() {
         <div className="landing-section-intro" data-cascade><span className="landing-eyebrow">02 / What the record carries</span><h2>More than a score.<br /><em>A reason to trust it.</em></h2></div>
         <div className="landing-capability-stack">
           <article className="capability-row" data-cascade><span className="cap-number">01</span><div><h3>Identity Score</h3><p>A portable signal built from behavior, not borrowed reputation. Every score has a trail back to evidence.</p></div><span className="cap-glyph">↗</span></article>
-          <article className="capability-row" data-cascade><span className="cap-number">02</span><div><h3>Trust graph</h3><p>Counterparties become context. See reciprocal relationships and the edges that make a wallet legible.</p></div><span className="cap-glyph">⌁</span></article>
+          <article className="capability-row" data-cascade><span className="cap-number">02</span><div><h3>Verified trust</h3><p>Attestations become context. See reciprocal, transaction-verified relationships and the edges that make a wallet legible.</p></div><span className="cap-glyph">⌁</span></article>
           <article className="capability-row" data-cascade><span className="cap-number">03</span><div><h3>Multichain coverage</h3><p>One identity surface across the networks where a person actually moves value.</p></div><span className="cap-glyph">◎</span></article>
           <article className="capability-row" data-cascade><span className="cap-number">04</span><div><h3>Verified attestations</h3><p>Claims with provenance, timestamp and a public way to verify them before you rely on them.</p></div><span className="cap-glyph">✓</span></article>
         </div>
@@ -316,7 +320,7 @@ export function LandingExperience() {
       <section className="landing-footer-cta landing-reveal">
         <span className="landing-eyebrow" data-cascade>Start with the address. Leave with a record.</span>
         <h2 data-parallax="-0.045">Make trust<br /><em>inspectable.</em></h2>
-        <div data-cascade><Link href="/dashboard" className="landing-button landing-button-dark">Launch Identity <span>↗</span></Link><a href="https://docs.thekyro.co/docs/reputation-scores" target="_blank" rel="noopener noreferrer" className="landing-text-link">Read the identity model <span>→</span></a></div>
+        <div data-cascade><Link href="/dashboard" className="landing-button landing-button-dark">Launch Identity <span>↗</span></Link><a href="https://docs.thekyro.co/reputation-scores" target="_blank" rel="noopener noreferrer" className="landing-text-link">Read the identity model <span>→</span></a></div>
       </section>
       <footer className="landing-footer">
         <div className="landing-footer-grid">
@@ -341,8 +345,8 @@ export function LandingExperience() {
           </nav>
           <nav className="landing-footer-col" aria-label="Legal">
             <p>Legal</p>
-            <Link href="/privacy">Privacy policy</Link>
-            <Link href="/terms">Terms of use</Link>
+            <a href="https://docs.thekyro.co/privacy" target="_blank" rel="noopener noreferrer">Privacy policy</a>
+            <a href="https://docs.thekyro.co/terms" target="_blank" rel="noopener noreferrer">Terms of use</a>
             <a href={`mailto:${ARC_SUPPORT_EMAIL}`}>Support</a>
           </nav>
         </div>

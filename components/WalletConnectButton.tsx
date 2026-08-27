@@ -9,56 +9,15 @@ import { fetchJsonWithTimeout } from "@/lib/timeouts";
 import { signWalletChallenge } from "@/lib/wallet-challenge-client";
 import { maybeArcUsername } from "@/lib/username";
 import { isIdentityCreatedRevealActive } from "@/lib/onboarding";
-
-declare global {
-  interface Window {
-    ethereum?: Eip1193Provider & { providers?: Eip1193Provider[] };
-    rabby?: Eip1193Provider;
-    okxwallet?: Eip1193Provider;
-    coinbaseWalletExtension?: { ethereum?: Eip1193Provider } | Eip1193Provider;
-    coinbaseWallet?: Eip1193Provider;
-  }
-
-  interface WindowEventMap {
-    "eip6963:announceProvider": CustomEvent<Eip6963ProviderDetail>;
-  }
-}
-
-type Eip1193Provider = {
-  request: (args: { method: string; params?: unknown[] }) => Promise<unknown>;
-  isMetaMask?: boolean;
-  isRabby?: boolean;
-  isOkxWallet?: boolean;
-  isOKExWallet?: boolean;
-  isCoinbaseWallet?: boolean;
-  isPhantom?: boolean;
-  providers?: Eip1193Provider[];
-};
-
-type Eip6963ProviderDetail = {
-  info?: {
-    uuid?: string;
-    name?: string;
-    icon?: string;
-    rdns?: string;
-  };
-  provider?: Eip1193Provider;
-};
-
-type DetectedWallet = {
-  id: string;
-  name: string;
-  provider: Eip1193Provider;
-  rdns?: string;
-  source: "eip6963" | "injected";
-  icon?: string;
-};
-
-/** EIP-6963 icons are wallet-supplied URIs; only render safe schemes. */
-function safeWalletIcon(icon?: string) {
-  if (!icon) return "";
-  return icon.startsWith("data:image/") || icon.startsWith("https://") ? icon : "";
-}
+import {
+  discoverInjectedWallets,
+  providerKey,
+  providerName,
+  safeWalletIcon,
+  walletErrorMessage,
+  type DetectedWallet,
+  type Eip1193Provider
+} from "@/lib/wallet-discovery";
 
 type ProfileEnsureResponse = {
   profile: { username: string | null } | null;
@@ -124,84 +83,6 @@ function isTimeoutError(error: unknown) {
   return /abort|aborted|timeout|signal/i.test(message);
 }
 
-function providerName(provider: Eip1193Provider, fallback = "Injected wallet") {
-  if (provider.isRabby) return "Rabby";
-  if (provider.isOkxWallet || provider.isOKExWallet) return "OKX Wallet";
-  if (provider.isCoinbaseWallet) return "Coinbase Wallet";
-  if (provider.isMetaMask) return "MetaMask";
-  return fallback === "Injected wallet" ? "Browser Wallet" : fallback;
-}
-
-function providerKey(provider: Eip1193Provider, fallback: string, rdns = "", name = "") {
-  const normalizedRdns = rdns.toLowerCase();
-  const normalizedName = name.toLowerCase();
-  if (provider.isRabby || normalizedRdns.includes("rabby") || normalizedName.includes("rabby")) return "rabby";
-  if (provider.isOkxWallet || provider.isOKExWallet || normalizedRdns.includes("okx") || normalizedName.includes("okx")) return "okx";
-  if (provider.isCoinbaseWallet || normalizedRdns.includes("coinbase") || normalizedName.includes("coinbase")) return "coinbase";
-  if (provider.isMetaMask || normalizedRdns.includes("metamask") || normalizedName.includes("metamask")) return "metamask";
-  const flags = [
-    provider.isRabby ? "rabby" : "",
-    provider.isOkxWallet || provider.isOKExWallet ? "okx" : "",
-    provider.isCoinbaseWallet ? "coinbase" : "",
-    provider.isMetaMask ? "metamask" : ""
-  ].filter(Boolean).join(":");
-  return flags || fallback;
-}
-
-function isBlockedLaunchWallet(wallet: DetectedWallet) {
-  const label = `${wallet.name} ${wallet.rdns ?? ""}`.toLowerCase();
-  return label.includes("phantom") || Boolean(wallet.provider.isPhantom);
-}
-
-function coinbaseExtensionProvider(value: Window["coinbaseWalletExtension"]) {
-  if (!value) return null;
-  return "request" in value ? value : value.ethereum ?? null;
-}
-
-function discoverInjectedWallets(eip6963Wallets: DetectedWallet[] = []) {
-  if (typeof window === "undefined") return [];
-  const detected = new Map<string, DetectedWallet>();
-  const seenProviders = new WeakSet<Eip1193Provider>();
-
-  function add(wallet: DetectedWallet | null | undefined) {
-    if (!wallet?.provider?.request) return;
-    if (isBlockedLaunchWallet(wallet)) return;
-    const key = providerKey(wallet.provider, wallet.id || wallet.name, wallet.rdns, wallet.name);
-    if (seenProviders.has(wallet.provider) && detected.has(key)) return;
-    seenProviders.add(wallet.provider);
-    if (!detected.has(key)) detected.set(key, wallet);
-  }
-
-  eip6963Wallets.forEach(add);
-
-  const providerList = window.ethereum?.providers?.length ? window.ethereum.providers : window.ethereum ? [window.ethereum] : [];
-  providerList.forEach((provider, index) => {
-    add({
-      id: providerKey(provider, `ethereum-${index}`),
-      name: providerName(provider, index === 0 ? "Browser wallet" : `Injected wallet ${index + 1}`),
-      provider,
-      source: "injected"
-    });
-  });
-
-  add(window.rabby ? { id: "rabby", name: "Rabby", provider: window.rabby, source: "injected" } : null);
-  add(window.okxwallet ? { id: "okx", name: "OKX Wallet", provider: window.okxwallet, source: "injected" } : null);
-  const coinbaseProvider = coinbaseExtensionProvider(window.coinbaseWalletExtension) ?? window.coinbaseWallet ?? null;
-  add(coinbaseProvider ? { id: "coinbase", name: "Coinbase Wallet", provider: coinbaseProvider, source: "injected" } : null);
-
-  return Array.from(detected.values());
-}
-
-function walletErrorMessage(error: unknown) {
-  const code = typeof error === "object" && error && "code" in error ? Number((error as { code?: unknown }).code) : null;
-  const message = error instanceof Error ? error.message : String(error ?? "");
-  if (code === 4001 || /rejected|denied|cancelled|canceled/i.test(message)) return "Wallet request rejected.";
-  if (/unsupported|not supported/i.test(message)) return "Unsupported wallet provider.";
-  if (/signature/i.test(message)) return "Signature rejected.";
-  if (/provider|ethereum|wallet/i.test(message)) return "Wallet provider unavailable.";
-  return "Wallet connection failed. Retry with a supported EVM wallet.";
-}
-
 export function WalletConnectButton({
   onConnect,
   compact = false
@@ -256,7 +137,7 @@ export function WalletConnectButton({
   useIsomorphicLayoutEffect(() => {
     function syncWalletState() {
       const stored = localStorage.getItem("arcIdentityWallet") ?? "";
-      /* Signatures are no longer cached. "Signature verified" is a
+      /* Signatures are no longer cached (F-01). "Signature verified" is a
          tab-scoped display hint set right after a successful challenge. */
       const verifiedWallet = sessionStorage.getItem("arcIdentityVerifiedWallet") ?? "";
       setWallet(stored);
@@ -377,7 +258,7 @@ export function WalletConnectButton({
 
       setStatus("Requesting signature verification...");
       setStage("sign");
-      /* The verification message is issued by the server (single use,
+      /* F-01: the verification message is issued by the server (single use,
          short expiry) and signed here, never built or cached client side.
          Connect-time verification is best effort: if challenge issuance is
          unavailable the wallet still connects unverified, because every

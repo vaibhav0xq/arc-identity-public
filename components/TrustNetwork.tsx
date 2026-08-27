@@ -12,9 +12,9 @@ export function TrustNetwork({ connections = [] }: { connections?: TrustProfile[
     return (
       <section className="r4-panel">
         <div className="r4-panel-body">
-        <p className="kicker">Trust network</p>
+        <p className="kicker">Verified trust connections</p>
         <h2 className="mt-2.5 font-heading text-2xl font-semibold text-ink">No verified connections yet</h2>
-        <p className="mt-3 max-w-2xl text-[0.8125rem] leading-relaxed text-mutedc">Your trust network is empty. Verified transaction edges will appear here.</p>
+        <p className="mt-3 max-w-2xl text-[0.8125rem] leading-relaxed text-mutedc">No verified trust connections yet. Verified transaction edges will appear here.</p>
         </div>
       </section>
     );
@@ -26,7 +26,7 @@ export function TrustNetwork({ connections = [] }: { connections?: TrustProfile[
     <section className="r4-panel">
       <div className="flex flex-wrap items-center justify-between gap-5">
         <div>
-          <p className="kicker">Trust network</p>
+          <p className="kicker">Verified trust connections</p>
           <h2 className="mt-2.5 font-heading text-2xl font-semibold text-ink">Transaction-verified counterparty graph</h2>
         </div>
         <div className="border-l border-linec pl-4 text-right">
